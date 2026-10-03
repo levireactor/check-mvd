@@ -1,0 +1,2082 @@
+<!DOCTYPE html>
+<html lang="vi">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Shopee Data Tools & Mã Vận Đơn Checker</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap"
+        rel="stylesheet">
+    <style>
+        :root {
+            --bg-gradient: linear-gradient(135deg, #0b0f19 0%, #111827 50%, #0d1527 100%);
+            --card-bg: rgba(22, 30, 49, 0.75);
+            --card-border: rgba(255, 255, 255, 0.08);
+            --card-glow: rgba(59, 130, 246, 0.15);
+            --primary: #3b82f6;
+            --primary-hover: #2563eb;
+            --primary-glow: rgba(59, 130, 246, 0.4);
+            --shopee: #ee4d2d;
+            --shopee-hover: #d73211;
+            --shopee-glow: rgba(238, 77, 45, 0.35);
+            --accent: #06b6d4;
+            --success: #10b981;
+            --warning: #f59e0b;
+            --danger: #ef4444;
+            --text-main: #f3f4f6;
+            --text-muted: #9ca3af;
+            --text-dim: #6b7280;
+            --code-bg: #090d16;
+            --border-subtle: #1f293d;
+            --radius-lg: 16px;
+            --radius-md: 10px;
+            --radius-sm: 6px;
+            --transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Outfit', sans-serif;
+            background: var(--bg-gradient);
+            color: var(--text-main);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            line-height: 1.5;
+            padding: 24px;
+        }
+
+        .app-container {
+            max-width: 1280px;
+            width: 100%;
+            margin: 0 auto;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        /* Header */
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 20px 28px;
+            background: var(--card-bg);
+            backdrop-filter: blur(12px);
+            border: 1px solid var(--card-border);
+            border-radius: var(--radius-lg);
+            box-shadow: 0 8px 32px var(--card-glow);
+        }
+
+        .brand-title {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+        }
+
+        .brand-icon {
+            width: 46px;
+            height: 46px;
+            background: linear-gradient(135deg, #ee4d2d, #ff7337);
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+            box-shadow: 0 4px 18px var(--shopee-glow);
+        }
+
+        h1 {
+            font-size: 1.45rem;
+            font-weight: 700;
+            letter-spacing: -0.02em;
+            background: linear-gradient(90deg, #ffffff, #fed7aa, #93c5fd);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .brand-subtitle {
+            font-size: 0.85rem;
+            color: var(--text-muted);
+        }
+
+        /* Tab Switcher */
+        .tab-bar {
+            display: flex;
+            gap: 10px;
+            background: rgba(15, 23, 42, 0.6);
+            padding: 6px;
+            border-radius: var(--radius-md);
+            border: 1px solid var(--card-border);
+            width: fit-content;
+        }
+
+        .tab-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 10px 22px;
+            border-radius: var(--radius-sm);
+            border: none;
+            background: transparent;
+            color: var(--text-muted);
+            font-family: inherit;
+            font-size: 0.92rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: var(--transition);
+        }
+
+        .tab-btn:hover {
+            color: #fff;
+            background: rgba(255, 255, 255, 0.05);
+        }
+
+        .tab-btn.active {
+            background: linear-gradient(135deg, rgba(238, 77, 45, 0.25), rgba(59, 130, 246, 0.25));
+            border: 1px solid rgba(238, 77, 45, 0.4);
+            color: #fff;
+            box-shadow: 0 4px 14px rgba(0, 0, 0, 0.25);
+        }
+
+        .tab-badge-new {
+            background: var(--shopee);
+            color: white;
+            font-size: 0.7rem;
+            padding: 2px 7px;
+            border-radius: 999px;
+            font-weight: 700;
+            text-transform: uppercase;
+        }
+
+        /* Common Card */
+        .card {
+            background: var(--card-bg);
+            backdrop-filter: blur(12px);
+            border: 1px solid var(--card-border);
+            border-radius: var(--radius-lg);
+            box-shadow: 0 8px 30px rgba(0, 0, 0, 0.3);
+        }
+
+        /* Tab 1: Extractor Styles */
+        .config-card {
+            padding: 18px 24px;
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: 20px;
+        }
+
+        .config-group {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        .config-label {
+            font-size: 0.8rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: var(--text-muted);
+            font-weight: 600;
+        }
+
+        .input-field {
+            background: var(--code-bg);
+            border: 1px solid var(--border-subtle);
+            border-radius: var(--radius-md);
+            color: #fff;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.92rem;
+            padding: 8px 14px;
+            outline: none;
+            transition: var(--transition);
+        }
+
+        .input-field:focus {
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.25);
+        }
+
+        .detected-keys-wrap {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            flex: 1;
+            min-width: 260px;
+        }
+
+        .key-chips-list {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+            min-height: 36px;
+            align-items: center;
+        }
+
+        .key-chip {
+            background: rgba(255, 255, 255, 0.06);
+            border: 1px solid rgba(255, 255, 255, 0.12);
+            border-radius: var(--radius-sm);
+            color: #cbd5e1;
+            padding: 4px 10px;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.8rem;
+            cursor: pointer;
+            transition: var(--transition);
+            user-select: none;
+        }
+
+        .key-chip:hover,
+        .key-chip.active {
+            background: rgba(59, 130, 246, 0.25);
+            border-color: var(--primary);
+            color: #93c5fd;
+            transform: translateY(-1px);
+        }
+
+        .workspace-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            min-height: 480px;
+        }
+
+        @media (max-width: 900px) {
+            .workspace-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .panel-card {
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .panel-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 14px 20px;
+            border-bottom: 1px solid var(--border-subtle);
+            background: rgba(15, 23, 42, 0.5);
+        }
+
+        .panel-title {
+            font-size: 0.95rem;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .panel-actions {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 8px 16px;
+            border-radius: var(--radius-md);
+            font-size: 0.85rem;
+            font-weight: 600;
+            cursor: pointer;
+            border: 1px solid transparent;
+            transition: var(--transition);
+            font-family: inherit;
+        }
+
+        .btn-secondary {
+            background: rgba(255, 255, 255, 0.05);
+            border-color: rgba(255, 255, 255, 0.12);
+            color: var(--text-main);
+        }
+
+        .btn-secondary:hover {
+            background: rgba(255, 255, 255, 0.1);
+            border-color: rgba(255, 255, 255, 0.2);
+        }
+
+        .btn-primary {
+            background: var(--primary);
+            color: white;
+            box-shadow: 0 2px 10px var(--primary-glow);
+        }
+
+        .btn-primary:hover {
+            background: var(--primary-hover);
+            box-shadow: 0 4px 16px var(--primary-glow);
+            transform: translateY(-1px);
+        }
+
+        .btn-shopee {
+            background: linear-gradient(135deg, #ee4d2d, #ff5722);
+            color: white;
+            box-shadow: 0 4px 14px var(--shopee-glow);
+        }
+
+        .btn-shopee:hover {
+            background: linear-gradient(135deg, #d73211, #e64a19);
+            box-shadow: 0 6px 20px var(--shopee-glow);
+            transform: translateY(-1px);
+        }
+
+        .btn-danger {
+            background: rgba(239, 68, 68, 0.15);
+            border-color: rgba(239, 68, 68, 0.3);
+            color: #f87171;
+        }
+
+        .btn-danger:hover {
+            background: rgba(239, 68, 68, 0.25);
+        }
+
+        .btn-success {
+            background: rgba(16, 185, 129, 0.15);
+            border-color: rgba(16, 185, 129, 0.3);
+            color: #34d399;
+        }
+
+        .btn-success:hover {
+            background: rgba(16, 185, 129, 0.25);
+        }
+
+        .editor-wrapper {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            position: relative;
+        }
+
+        textarea.code-area {
+            width: 100%;
+            height: 100%;
+            min-height: 380px;
+            padding: 16px 20px;
+            background: var(--code-bg);
+            border: none;
+            color: #e2e8f0;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.88rem;
+            line-height: 1.6;
+            resize: vertical;
+            outline: none;
+        }
+
+        textarea.code-area::placeholder {
+            color: #475569;
+        }
+
+        .drop-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(15, 23, 42, 0.88);
+            backdrop-filter: blur(4px);
+            border: 2px dashed var(--primary);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            flex-direction: column;
+            gap: 12px;
+            z-index: 10;
+            color: #93c5fd;
+            font-size: 1.1rem;
+            font-weight: 500;
+        }
+
+        .drop-overlay.active {
+            display: flex;
+        }
+
+        .results-view {
+            flex: 1;
+            padding: 16px 20px;
+            background: var(--code-bg);
+            overflow-y: auto;
+            max-height: 480px;
+        }
+
+        .result-row {
+            display: flex;
+            align-items: center;
+            padding: 8px 12px;
+            border-radius: var(--radius-sm);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.88rem;
+            color: #38bdf8;
+            transition: var(--transition);
+            cursor: pointer;
+        }
+
+        .result-row:hover {
+            background: rgba(255, 255, 255, 0.04);
+            color: #7dd3fc;
+        }
+
+        .result-index {
+            width: 45px;
+            color: #64748b;
+            font-size: 0.75rem;
+            user-select: none;
+        }
+
+        .result-val {
+            flex: 1;
+            word-break: break-all;
+        }
+
+        .empty-state {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100%;
+            min-height: 250px;
+            color: var(--text-dim);
+            gap: 12px;
+            text-align: center;
+        }
+
+        .empty-icon {
+            font-size: 40px;
+            opacity: 0.4;
+        }
+
+        .status-bar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px 20px;
+            background: rgba(15, 23, 42, 0.7);
+            border-top: 1px solid var(--border-subtle);
+            font-size: 0.82rem;
+            color: var(--text-muted);
+        }
+
+        .status-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: var(--success);
+            box-shadow: 0 0 8px var(--success);
+        }
+
+        /* Tab 2: Shopee Tracker Styles */
+        .shopee-layout {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        .stats-row {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 16px;
+        }
+
+        .stat-card {
+            background: var(--card-bg);
+            border: 1px solid var(--card-border);
+            border-radius: var(--radius-md);
+            padding: 16px 20px;
+            display: flex;
+            align-items: center;
+            gap: 14px;
+        }
+
+        .stat-icon {
+            width: 42px;
+            height: 42px;
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 20px;
+        }
+
+        .stat-value {
+            font-size: 1.4rem;
+            font-weight: 700;
+            color: #fff;
+        }
+
+        .stat-label {
+            font-size: 0.8rem;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+        }
+
+        /* Progress bar */
+        .progress-box {
+            background: var(--card-bg);
+            border: 1px solid var(--card-border);
+            border-radius: var(--radius-md);
+            padding: 14px 20px;
+            display: none;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .progress-header {
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.85rem;
+            color: var(--text-muted);
+        }
+
+        .progress-track {
+            width: 100%;
+            height: 8px;
+            background: rgba(255, 255, 255, 0.08);
+            border-radius: 999px;
+            overflow: hidden;
+        }
+
+        .progress-fill {
+            height: 100%;
+            width: 0%;
+            background: linear-gradient(90deg, #ee4d2d, #3b82f6);
+            border-radius: 999px;
+            transition: width 0.3s ease;
+        }
+
+        /* Table */
+        .table-container {
+            background: var(--code-bg);
+            border-radius: 0 0 var(--radius-lg) var(--radius-lg);
+            overflow-x: auto;
+            max-height: 520px;
+        }
+
+        table.data-table {
+            width: 100%;
+            border-collapse: collapse;
+            text-align: left;
+            font-size: 0.88rem;
+        }
+
+        table.data-table th {
+            background: rgba(15, 23, 42, 0.9);
+            padding: 12px 16px;
+            color: var(--text-muted);
+            font-weight: 600;
+            text-transform: uppercase;
+            font-size: 0.78rem;
+            letter-spacing: 0.05em;
+            border-bottom: 1px solid var(--border-subtle);
+            position: sticky;
+            top: 0;
+            z-index: 2;
+        }
+
+        table.data-table td {
+            padding: 12px 16px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+            color: #cbd5e1;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.84rem;
+        }
+
+        table.data-table tr:hover {
+            background: rgba(255, 255, 255, 0.03);
+        }
+
+        .tracking-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            background: rgba(6, 182, 212, 0.12);
+            border: 1px solid rgba(6, 182, 212, 0.3);
+            color: #38bdf8;
+            padding: 4px 10px;
+            border-radius: var(--radius-sm);
+            font-weight: 600;
+        }
+
+        .tracking-badge.found {
+            background: rgba(16, 185, 129, 0.15);
+            border-color: rgba(16, 185, 129, 0.4);
+            color: #34d399;
+        }
+
+        .carrier-tag {
+            background: rgba(255, 255, 255, 0.06);
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 0.78rem;
+            color: #94a3b8;
+        }
+
+        .status-pill {
+            display: inline-block;
+            padding: 3px 9px;
+            border-radius: 999px;
+            font-size: 0.75rem;
+            font-weight: 500;
+        }
+
+        .status-pill.success {
+            background: rgba(16, 185, 129, 0.15);
+            color: #34d399;
+        }
+
+        .status-pill.warning {
+            background: rgba(245, 158, 11, 0.15);
+            color: #fbbf24;
+        }
+
+        .status-pill.danger {
+            background: rgba(239, 68, 68, 0.15);
+            color: #f87171;
+        }
+
+        .btn-copy-mini {
+            background: transparent;
+            border: none;
+            color: #94a3b8;
+            cursor: pointer;
+            padding: 2px 4px;
+            border-radius: 4px;
+            transition: var(--transition);
+        }
+
+        .btn-copy-mini:hover {
+            color: #38bdf8;
+            background: rgba(255, 255, 255, 0.08);
+        }
+
+        /* Toast */
+        .toast {
+            position: fixed;
+            bottom: 24px;
+            right: 24px;
+            background: #1e293b;
+            border: 1px solid #334155;
+            color: white;
+            padding: 12px 20px;
+            border-radius: var(--radius-md);
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 0.9rem;
+            transform: translateY(100px);
+            opacity: 0;
+            transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+            z-index: 100;
+        }
+
+        .toast.show {
+            transform: translateY(0);
+            opacity: 1;
+        }
+    </style>
+</head>
+
+<body>
+
+    <div class="app-container">
+        <!-- Header -->
+        <header>
+            <div class="brand-title">
+                <div class="brand-icon">📦</div>
+                <div>
+                    <h1>Shopee Suite: Trích Xuất & Check Mã Vận Đơn</h1>
+                    <p class="brand-subtitle">Trích xuất trường dữ liệu SPC_ST & Tra cứu mã vận đơn tự động qua API
+                        Shopee</p>
+                </div>
+            </div>
+
+            <!-- Tab Switcher -->
+            <div class="tab-bar">
+                <button id="tabBtn1" class="tab-btn active" onclick="switchTab('extractor')">
+                    <span>⚡</span> Trích xuất trường
+                </button>
+                <button id="tabBtn2" class="tab-btn" onclick="switchTab('tracker')">
+                    <span>📦</span> Check Cookie <span class="tab-badge-new">Browser</span>
+                </button>
+                <button id="tabBtn3" class="tab-btn" onclick="switchTab('openplatform')">
+                    <span>🏛️</span> Shopee Open Platform <span class="tab-badge-new" style="background:#10b981;">Chính
+                        Thức</span>
+                </button>
+            </div>
+        </header>
+
+        <!-- ================= TAB 1: EXTRACTOR ================= -->
+        <div id="tabContent1" style="display: flex; flex-direction: column; gap: 20px;">
+            <!-- Config & Key Selector -->
+            <div class="card config-card">
+                <div class="config-group">
+                    <label class="config-label" for="prefixInput">Trường cần lấy (Prefix)</label>
+                    <input type="text" id="prefixInput" class="input-field" value="SPC_ST=" style="width: 150px;">
+                </div>
+
+                <div class="config-group">
+                    <label class="config-label" for="delimInput">Dấu phân cách</label>
+                    <input type="text" id="delimInput" class="input-field" value="|" style="width: 70px;">
+                </div>
+
+                <div class="config-group"
+                    style="display:flex; flex-direction:row; align-items:center; gap:8px; margin-top: auto; padding-bottom: 6px;">
+                    <label
+                        style="display:flex; align-items:center; gap:8px; cursor:pointer; font-size: 0.88rem; color:#cbd5e1; user-select:none;">
+                        <input type="checkbox" id="keepPrefixCheck" checked
+                            style="width:17px; height:17px; accent-color: var(--primary); cursor:pointer;">
+                        <span>Giữ lại cú pháp (<code style="color:#93c5fd;">SPC_ST=...</code>)</span>
+                    </label>
+                </div>
+
+                <div class="detected-keys-wrap">
+                    <label class="config-label">Các trường tìm thấy (Bấm chọn nhanh):</label>
+                    <div id="keyChips" class="key-chips-list">
+                        <span style="color: #64748b; font-size: 0.8rem; font-style: italic;">Chưa có dữ liệu...</span>
+                    </div>
+                </div>
+
+                <div style="margin-left: auto;">
+                    <button id="btnSample" class="btn btn-secondary">
+                        <span>📋</span> Dán dữ liệu mẫu
+                    </button>
+                </div>
+            </div>
+
+            <!-- Workspace Panels -->
+            <div class="workspace-grid">
+                <!-- Input Panel -->
+                <div class="card panel-card" id="dropArea">
+                    <div class="panel-header">
+                        <div class="panel-title">
+                            <span>📥</span> 1. Dữ liệu đầu vào
+                        </div>
+                        <div class="panel-actions">
+                            <input type="file" id="filePicker" accept=".txt,.log,.csv" style="display: none;">
+                            <button id="btnUpload" class="btn btn-secondary">
+                                <span>📂</span> Mở file .txt
+                            </button>
+                            <button id="btnClear" class="btn btn-secondary">
+                                <span>🧹</span> Xóa
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="editor-wrapper">
+                        <textarea id="inputText" class="code-area" placeholder="Dán nội dung có dạng:
+SPC_F=ABC01|STATUS=OK|SPC_ST=VAL_123|TEMP=42
+hoặc kéo thả file data.txt vào đây..."></textarea>
+
+                        <div id="dropOverlay" class="drop-overlay">
+                            <span style="font-size: 36px;">📂</span>
+                            <span>Thả file .txt hoặc .log vào đây để mở</span>
+                        </div>
+                    </div>
+
+                    <div class="status-bar">
+                        <span id="inputStats">0 dòng | 0 ký tự</span>
+                        <span>Hỗ trợ kéo thả file</span>
+                    </div>
+                </div>
+
+                <!-- Output Panel -->
+                <div class="card panel-card">
+                    <div class="panel-header">
+                        <div class="panel-title">
+                            <span>📤</span> 2. Kết quả trích xuất
+                        </div>
+                        <div class="panel-actions">
+                            <button id="btnCopy" class="btn btn-primary">
+                                <span>📋</span> Sao chép
+                            </button>
+                            <button id="btnDownload" class="btn btn-success">
+                                <span>💾</span> Tải về .txt
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="results-view" id="resultsView">
+                        <div class="empty-state">
+                            <div class="empty-icon">🔍</div>
+                            <p>Chưa có dữ liệu trích xuất.<br>Hãy nhập nội dung hoặc bấm <strong>"Dán dữ liệu
+                                    mẫu"</strong> ở trên.
+                            </p>
+                        </div>
+                    </div>
+
+                    <div class="status-bar">
+                        <span class="status-badge">
+                            <span class="status-dot"></span>
+                            <span id="outputStats">0 kết quả</span>
+                        </span>
+                        <span style="font-size: 0.75rem; color: #64748b;">Click vào dòng để copy riêng dòng đó</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ================= TAB 2: SHOPEE TRACKING CHECKER ================= -->
+        <div id="tabContent2" class="shopee-layout" style="display: none;">
+            <!-- Top Stats Bar -->
+            <div class="stats-row">
+                <div class="stat-card">
+                    <div class="stat-icon" style="background: rgba(59, 130, 246, 0.15); color: #60a5fa;">👥</div>
+                    <div>
+                        <div id="statTotalAccounts" class="stat-value">0</div>
+                        <div class="stat-label">Tổng tài khoản</div>
+                    </div>
+                </div>
+
+                <div class="stat-card">
+                    <div class="stat-icon" style="background: rgba(16, 185, 129, 0.15); color: #34d399;">📦</div>
+                    <div>
+                        <div id="statFoundTracking" class="stat-value">0</div>
+                        <div class="stat-label">Có Mã Vận Đơn</div>
+                    </div>
+                </div>
+
+                <div class="stat-card">
+                    <div class="stat-icon" style="background: rgba(245, 158, 11, 0.15); color: #fbbf24;">📑</div>
+                    <div>
+                        <div id="statTotalOrders" class="stat-value">0</div>
+                        <div class="stat-label">Tổng số đơn hàng</div>
+                    </div>
+                </div>
+
+                <div class="stat-card">
+                    <div class="stat-icon" style="background: rgba(239, 68, 68, 0.15); color: #f87171;">⚠️</div>
+                    <div>
+                        <div id="statAuthFailed" class="stat-value">0</div>
+                        <div class="stat-label">Cookie lỗi / Hết hạn</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Input and Action Card -->
+            <div class="card panel-card">
+                <div class="panel-header">
+                    <div class="panel-title">
+                        <span>🔑</span> Danh sách tài khoản Shopee (Nhập chuỗi chứa SPC_ST= hoặc dạng cookie)
+                    </div>
+                    <div class="panel-actions">
+                        <input type="file" id="shopeeFilePicker" accept=".txt,.log,.csv" style="display: none;">
+                        <button id="btnShopeeUpload" class="btn btn-secondary">
+                            <span>📂</span> Mở file tài khoản
+                        </button>
+                        <button id="btnShopeeSample" class="btn btn-secondary">
+                            <span>📋</span> Dán mẫu
+                        </button>
+                        <button id="btnShopeeClear" class="btn btn-secondary">
+                            <span>🧹</span> Xóa
+                        </button>
+                    </div>
+                </div>
+
+                <div
+                    style="padding: 16px 20px; background: var(--code-bg); border-bottom: 1px solid var(--border-subtle);">
+                    <textarea id="shopeeAccountsInput" class="code-area" style="min-height: 130px; height: 130px;"
+                        placeholder="Dán danh sách tài khoản (mỗi dòng 1 tài khoản). Hỗ trợ các định dạng:
+SPC_F=...|SPC_U=...|SPC_ST=123456abcdef...
+hoặc:
+SPC_ST=123456abcdef..."></textarea>
+                </div>
+
+                <div
+                    style="padding: 14px 20px; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; background: rgba(15, 23, 42, 0.4);">
+                    <div style="display: flex; align-items: center; gap: 15px;">
+                        <button id="btnStartCheck" class="btn btn-shopee"
+                            style="font-size: 0.95rem; padding: 10px 22px;">
+                            <span>🚀</span> BẮT ĐẦU CHECK MÃ VẬN ĐƠN
+                        </button>
+                        <button id="btnStopCheck" class="btn btn-danger" style="display: none;">
+                            <span>⏹️</span> Dừng lại
+                        </button>
+                        <span id="shopeeStatusText" style="font-size: 0.85rem; color: var(--text-muted);">Sẵn sàng tra
+                            cứu</span>
+                    </div>
+
+                    <div style="display: flex; align-items: center; gap: 10px;">
+                        <button id="btnCopyAllTracking" class="btn btn-primary">
+                            <span>📋</span> Copy tất cả mã vận đơn
+                        </button>
+                        <button id="btnDownloadTrackingTxt" class="btn btn-secondary">
+                            <span>💾</span> Tải file .txt
+                        </button>
+                        <button id="btnExportCSV" class="btn btn-success">
+                            <span>📊</span> Xuất file CSV
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Progress bar -->
+                <div id="progressBox" class="progress-box">
+                    <div class="progress-header">
+                        <span id="progressText">Đang xử lý 0 / 0</span>
+                        <span id="progressPercent">0%</span>
+                    </div>
+                    <div class="progress-track">
+                        <div id="progressFill" class="progress-fill"></div>
+                    </div>
+                </div>
+
+                <!-- Guidance Banner for WAF & Cookie Info -->
+                <div
+                    style="margin: 14px 20px; padding: 14px 18px; background: rgba(59, 130, 246, 0.08); border: 1px solid rgba(59, 130, 246, 0.25); border-radius: var(--radius-md); font-size: 0.85rem; line-height: 1.6;">
+                    <div
+                        style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px;">
+                        <strong style="color: #93c5fd; display: flex; align-items: center; gap: 6px;">
+                            <span>💡</span> Lưu ý quan trọng về Cookie Shopee & Lỗi WAF 90309999:
+                        </strong>
+                        <button id="btnCopyConsoleScript" class="btn btn-secondary"
+                            style="font-size: 0.78rem; padding: 4px 10px;">
+                            <span>⚡</span> Copy mã Console F12 (100% không bị chặn)
+                        </button>
+                    </div>
+                    <p style="color: #cbd5e1; margin-bottom: 4px;">
+                        Shopee áp dụng hệ thống bảo mật WAF tự động chặn truy vấn danh sách đơn hàng nếu gọi từ script
+                        ngoài (trả về
+                        mã <code>90309999</code> yêu cầu Captcha hoặc thiếu <code>SPC_F</code> đi kèm).
+                    </p>
+                    <div style="color: #94a3b8; font-size: 0.8rem;">
+                        <strong>Cách giải quyết:</strong>
+                        (1) Nhập chuỗi cookie đầy đủ có chứa <code>SPC_F=...|SPC_U=...|SPC_ST=...</code> từ tool tài
+                        khoản.
+                        (2) Hoặc bấm <strong>"Copy mã Console F12"</strong> ở trên, mở Shopee trên trình duyệt -> ấn F12
+                        Console ->
+                        Dán vào -> Enter để quét trực tiếp toàn bộ mã vận đơn và tự gửi về bảng này!
+                    </div>
+                </div>
+            </div>
+
+            <!-- Results Table Card -->
+            <div class="card panel-card">
+                <div class="panel-header">
+                    <div class="panel-title">
+                        <span>📋</span> Bảng kết quả mã vận đơn Shopee
+                    </div>
+                    <span style="font-size: 0.8rem; color: var(--text-muted);">Tự động cập nhật thời gian thực theo từng
+                        tài
+                        khoản</span>
+                </div>
+
+                <div class="table-container">
+                    <table class="data-table" id="trackingTable">
+                        <thead>
+                            <tr>
+                                <th style="width: 50px;">#</th>
+                                <th style="width: 170px;">Tài khoản (SPC_ST)</th>
+                                <th style="width: 160px;">Mã đơn hàng</th>
+                                <th style="min-width: 220px;">MÃ VẬN ĐƠN</th>
+                                <th style="width: 160px;">Đơn vị vận chuyển</th>
+                                <th style="width: 180px;">Trạng thái đơn</th>
+                                <th style="width: 180px;">Kết quả kết nối API</th>
+                            </tr>
+                        </thead>
+                        <tbody id="trackingTableBody">
+                            <tr>
+                                <td colspan="7" style="text-align: center; padding: 40px; color: #64748b;">
+                                    Chưa có dữ liệu kiểm tra. Hãy nhập danh sách tài khoản và bấm <strong>"BẮT ĐẦU CHECK
+                                        MÃ VẬN
+                                        ĐƠN"</strong>.
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- ================= TAB 3: SHOPEE OPEN PLATFORM (OFFICIAL) ================= -->
+        <div id="tabContent3" style="display: none; flex-direction: column; gap: 20px;">
+
+            <!-- Top Overview Row -->
+            <div class="stats-row">
+                <div class="stat-card">
+                    <div class="stat-icon" style="background: rgba(16, 185, 129, 0.15); color: #34d399;">🔑</div>
+                    <div>
+                        <div id="openStatPartnerId" class="stat-value" style="font-size: 1.15rem;">Chưa cấu hình</div>
+                        <div class="stat-label">Partner ID</div>
+                    </div>
+                </div>
+
+                <div class="stat-card">
+                    <div class="stat-icon" style="background: rgba(59, 130, 246, 0.15); color: #60a5fa;">🏪</div>
+                    <div>
+                        <div id="openStatShopId" class="stat-value" style="font-size: 1.15rem;">Chưa liên kết</div>
+                        <div class="stat-label">Shop ID ủy quyền</div>
+                    </div>
+                </div>
+
+                <div class="stat-card">
+                    <div class="stat-icon" style="background: rgba(245, 158, 11, 0.15); color: #fbbf24;">⏳</div>
+                    <div>
+                        <div id="openStatTokenStatus" class="stat-value" style="font-size: 1.15rem;">Chưa có Token</div>
+                        <div class="stat-label">Hạn Access Token</div>
+                    </div>
+                </div>
+
+                <div class="stat-card">
+                    <div class="stat-icon" style="background: rgba(238, 77, 45, 0.15); color: #ee4d2d;">📡</div>
+                    <div>
+                        <div id="openStatWebhookCount" class="stat-value" style="font-size: 1.15rem;">0 sự kiện</div>
+                        <div class="stat-label">Webhook nhận tự động</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Step 1 & Step 2 Grid -->
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+                <!-- Step 1: Partner Config -->
+                <div class="card panel-card">
+                    <div class="panel-header">
+                        <div class="panel-title">
+                            <span>⚙️</span> Bước 1: Cấu hình Đối tác (Partner Info)
+                        </div>
+                        <span style="font-size: 0.8rem; color: #94a3b8;">Shopee Open Platform</span>
+                    </div>
+                    <div
+                        style="padding: 18px 20px; display: flex; flex-direction: column; gap: 14px; background: var(--code-bg);">
+                        <div class="config-group">
+                            <label class="config-label">Partner ID (Mã đối tác):</label>
+                            <input type="number" id="openPartnerIdInput" class="input-field"
+                                placeholder="Ví dụ: 1234567">
+                        </div>
+
+                        <div class="config-group">
+                            <label class="config-label">Partner Key (Khóa bí mật HMAC-SHA256):</label>
+                            <input type="password" id="openPartnerKeyInput" class="input-field"
+                                placeholder="Nhập Partner Key của bạn">
+                        </div>
+
+                        <div class="config-group">
+                            <label class="config-label">Môi trường kết nối:</label>
+                            <select id="openEnvSelect" class="input-field">
+                                <option value="sandbox">Sandbox Test (partner.test-stable.shopeemobile.com)</option>
+                                <option value="production">Production Live (partner.shopeemobile.com)</option>
+                            </select>
+                        </div>
+
+                        <button id="btnSaveOpenConfig" class="btn btn-primary"
+                            style="margin-top: 6px; width: fit-content;">
+                            <span>💾</span> Lưu cấu hình Partner
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Step 2: OAuth 2.0 Auth -->
+                <div class="card panel-card">
+                    <div class="panel-header">
+                        <div class="panel-title">
+                            <span>🔐</span> Bước 2: Ủy quyền Shop (OAuth 2.0)
+                        </div>
+                        <span style="font-size: 0.8rem; color: #94a3b8;">Cấp quyền đọc Đơn & Vận đơn</span>
+                    </div>
+                    <div
+                        style="padding: 18px 20px; display: flex; flex-direction: column; gap: 14px; background: var(--code-bg);">
+                        <div>
+                            <label class="config-label" style="margin-bottom: 6px; display: block;">1. Mở trang đăng
+                                nhập Shopee để
+                                chủ shop cấp quyền:</label>
+                            <button id="btnOpenAuthUrl" class="btn btn-shopee">
+                                <span>🔗</span> Mở link Ủy Quyền Shop (Shopee Auth)
+                            </button>
+                        </div>
+
+                        <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 10px;">
+                            <div class="config-group">
+                                <label class="config-label">Authorization Code:</label>
+                                <input type="text" id="openCodeInput" class="input-field"
+                                    placeholder="Code sau khi chuyển hướng">
+                            </div>
+                            <div class="config-group">
+                                <label class="config-label">Shop ID:</label>
+                                <input type="number" id="openShopIdInput" class="input-field" placeholder="Shop ID">
+                            </div>
+                        </div>
+
+                        <div style="display: flex; gap: 10px; margin-top: 4px;">
+                            <button id="btnExchangeToken" class="btn btn-success">
+                                <span>⚡</span> Đổi Code Lấy Token
+                            </button>
+                            <button id="btnRefreshToken" class="btn btn-secondary">
+                                <span>🔄</span> Làm mới Access Token
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Step 3: Orders & Logistics API -->
+            <div class="card panel-card">
+                <div class="panel-header">
+                    <div class="panel-title">
+                        <span>📦</span> Bước 3: Tra cứu Đơn hàng & Mã Vận Đơn (Official Open APIs)
+                    </div>
+                    <div class="panel-actions">
+                        <button id="btnFetchOpenOrders" class="btn btn-shopee">
+                            <span>🚀</span> Gọi API Lấy Đơn & Mã Vận Đơn
+                        </button>
+                    </div>
+                </div>
+
+                <div class="table-container">
+                    <table class="data-table" id="openOrdersTable">
+                        <thead>
+                            <tr>
+                                <th style="width: 50px;">#</th>
+                                <th style="width: 180px;">Mã đơn hàng (Order SN)</th>
+                                <th style="min-width: 220px;">MÃ VẬN ĐƠN (Tracking No)</th>
+                                <th style="width: 170px;">Đơn vị vận chuyển</th>
+                                <th style="width: 160px;">Trạng thái đơn</th>
+                                <th style="width: 140px;">Tổng tiền</th>
+                            </tr>
+                        </thead>
+                        <tbody id="openOrdersTableBody">
+                            <tr>
+                                <td colspan="6" style="text-align: center; padding: 35px; color: #64748b;">
+                                    Bấm nút <strong>"Gọi API Lấy Đơn & Mã Vận Đơn"</strong> để tải dữ liệu trực tiếp từ
+                                    Shopee Open
+                                    Platform.
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Step 4: Webhook Monitor -->
+            <div class="card panel-card">
+                <div class="panel-header">
+                    <div class="panel-title">
+                        <span>📡</span> Bước 4: Giám sát Webhook Push Thời Gian Thực (Nhận mã tự động)
+                    </div>
+                    <div class="panel-actions">
+                        <button id="btnSimulateWebhook" class="btn btn-secondary" style="font-size: 0.78rem;">
+                            <span>⚡</span> Bắn thử Webhook mẫu
+                        </button>
+                        <button id="btnRefreshWebhooks" class="btn btn-secondary">
+                            <span>🔄</span> Làm mới nhật ký
+                        </button>
+                    </div>
+                </div>
+
+                <div
+                    style="padding: 10px 20px; background: rgba(15, 23, 42, 0.6); border-bottom: 1px solid var(--border-subtle); font-size: 0.82rem; color: #94a3b8; display: flex; justify-content: space-between; align-items: center;">
+                    <span>URL Webhook của bạn để điền vào Shopee Console: <code
+                            style="color: #38bdf8;">http://localhost:8080/webhook/shopee</code></span>
+                    <span style="color: #34d399;">● Đang lắng nghe tự động</span>
+                </div>
+
+                <div class="table-container" style="max-height: 280px;">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th style="width: 60px;">Mã</th>
+                                <th style="width: 170px;">Thời gian</th>
+                                <th style="width: 190px;">Sự kiện (Event)</th>
+                                <th style="width: 120px;">Shop ID</th>
+                                <th>Nội dung thông báo (Mã vận đơn / Trạng thái)</th>
+                            </tr>
+                        </thead>
+                        <tbody id="webhookTableBody">
+                            <tr>
+                                <td colspan="5" style="text-align: center; padding: 25px; color: #64748b;">
+                                    Chưa có sự kiện webhook nào được nhận.
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    <div id="toast" class="toast">Đã sao chép vào clipboard!</div>
+
+    <script>
+        // ================= TAB NAVIGATION =================
+        function switchTab(tab) {
+            const tabBtn1 = document.getElementById('tabBtn1');
+            const tabBtn2 = document.getElementById('tabBtn2');
+            const tabBtn3 = document.getElementById('tabBtn3');
+            const tabContent1 = document.getElementById('tabContent1');
+            const tabContent2 = document.getElementById('tabContent2');
+            const tabContent3 = document.getElementById('tabContent3');
+
+            [tabBtn1, tabBtn2, tabBtn3].forEach(b => b.classList.remove('active'));
+            [tabContent1, tabContent2, tabContent3].forEach(c => c.style.display = 'none');
+
+            if (tab === 'extractor') {
+                tabBtn1.classList.add('active');
+                tabContent1.style.display = 'flex';
+            } else if (tab === 'tracker') {
+                tabBtn2.classList.add('active');
+                tabContent2.style.display = 'flex';
+            } else if (tab === 'openplatform') {
+                tabBtn3.classList.add('active');
+                tabContent3.style.display = 'flex';
+                loadOpenConfig();
+                loadWebhooks();
+            }
+        }
+
+        function showToast(msg) {
+            const toast = document.getElementById('toast');
+            toast.textContent = msg;
+            toast.classList.add('show');
+            setTimeout(() => toast.classList.remove('show'), 2400);
+        }
+
+        // ================= TAB 1: EXTRACTOR LOGIC =================
+        const inputText = document.getElementById('inputText');
+        const prefixInput = document.getElementById('prefixInput');
+        const delimInput = document.getElementById('delimInput');
+        const keepPrefixCheck = document.getElementById('keepPrefixCheck');
+        const keyChips = document.getElementById('keyChips');
+        const resultsView = document.getElementById('resultsView');
+        const inputStats = document.getElementById('inputStats');
+        const outputStats = document.getElementById('outputStats');
+        const btnSample = document.getElementById('btnSample');
+        const btnClear = document.getElementById('btnClear');
+        const btnUpload = document.getElementById('btnUpload');
+        const filePicker = document.getElementById('filePicker');
+        const btnCopy = document.getElementById('btnCopy');
+        const btnDownload = document.getElementById('btnDownload');
+        const dropArea = document.getElementById('dropArea');
+        const dropOverlay = document.getElementById('dropOverlay');
+
+        let currentResults = [];
+
+        const SAMPLE_EXTRACTOR = `SPC_F=CHAMBER_A|MODULE=SENSOR_01|SPC_ST=CALIBRATING|PRESSURE=101.3
+SPC_F=CHAMBER_B|MODULE=SENSOR_02|SPC_ST=ACTIVE_RUNNING|PRESSURE=99.8
+SPC_F=CHAMBER_C|MODULE=SENSOR_03|SPC_ST=TEMP_OVERHEAT|PRESSURE=105.4
+SPC_F=CHAMBER_D|MODULE=SENSOR_04|SPC_ST=IDLE_STANDBY|PRESSURE=100.1
+SPC_F=CHAMBER_E|MODULE=SENSOR_05|SPC_ST=COMPLETE_PASS|PRESSURE=100.5`;
+
+        function scanKeys(text, delimiter) {
+            const keys = new Set();
+            const lines = text.split('\n').slice(0, 50);
+            lines.forEach(line => {
+                const parts = line.split(delimiter);
+                parts.forEach(p => {
+                    const idx = p.indexOf('=');
+                    if (idx > 0) {
+                        keys.add(p.substring(0, idx + 1));
+                    }
+                });
+            });
+            return Array.from(keys);
+        }
+
+        function renderKeyChips(keys) {
+            if (keys.length === 0) {
+                keyChips.innerHTML = '<span style="color: #64748b; font-size: 0.8rem; font-style: italic;">Chưa phát hiện trường nào</span>';
+                return;
+            }
+            keyChips.innerHTML = '';
+            const currentPrefix = prefixInput.value;
+
+            keys.forEach(k => {
+                const chip = document.createElement('div');
+                chip.className = `key-chip ${k === currentPrefix ? 'active' : ''}`;
+                chip.textContent = k;
+                chip.addEventListener('click', () => {
+                    prefixInput.value = k;
+                    document.querySelectorAll('.key-chip').forEach(c => c.classList.remove('active'));
+                    chip.classList.add('active');
+                    processExtraction();
+                });
+                keyChips.appendChild(chip);
+            });
+        }
+
+        function processExtraction() {
+            const text = inputText.value;
+            const delimiter = delimInput.value;
+            const prefix = prefixInput.value;
+            const keepPrefix = keepPrefixCheck.checked;
+
+            const lines = text.split('\n');
+            const nonEmptyLines = lines.filter(l => l.trim().length > 0);
+            inputStats.textContent = `${nonEmptyLines.length} dòng | ${text.length} ký tự`;
+
+            const keys = scanKeys(text, delimiter || '|');
+            renderKeyChips(keys);
+
+            currentResults = [];
+
+            if (!text.trim() || !prefix) {
+                resultsView.innerHTML = `
+          <div class="empty-state">
+            <div class="empty-icon">🔍</div>
+            <p>Vui lòng nhập dữ liệu hoặc chọn trường cần lấy.</p>
+          </div>
+        `;
+                outputStats.textContent = '0 kết quả';
+                return;
+            }
+
+            nonEmptyLines.forEach(line => {
+                const parts = delimiter ? line.split(delimiter) : [line];
+                parts.forEach(part => {
+                    const trimmedPart = part.trim();
+                    if (trimmedPart.startsWith(prefix)) {
+                        const val = keepPrefix ? trimmedPart : trimmedPart.substring(prefix.length);
+                        currentResults.push(val);
+                    }
+                });
+            });
+
+            outputStats.textContent = `${currentResults.length} kết quả tìm thấy`;
+
+            if (currentResults.length === 0) {
+                resultsView.innerHTML = `
+          <div class="empty-state">
+            <div class="empty-icon">⚠️</div>
+            <p>Không tìm thấy mục nào bắt đầu với tiền tố: <strong>${prefix}</strong></p>
+          </div>
+        `;
+                return;
+            }
+
+            resultsView.innerHTML = '';
+            currentResults.forEach((val, idx) => {
+                const row = document.createElement('div');
+                row.className = 'result-row';
+                row.title = 'Bấm để copy giá trị này';
+
+                const indexSpan = document.createElement('span');
+                indexSpan.className = 'result-index';
+                indexSpan.textContent = `#${idx + 1}`;
+
+                const valSpan = document.createElement('span');
+                valSpan.className = 'result-val';
+                valSpan.textContent = val;
+
+                row.appendChild(indexSpan);
+                row.appendChild(valSpan);
+
+                row.addEventListener('click', () => {
+                    navigator.clipboard.writeText(val);
+                    showToast(`Đã chép: "${val}"`);
+                });
+
+                resultsView.appendChild(row);
+            });
+        }
+
+        inputText.addEventListener('input', processExtraction);
+        prefixInput.addEventListener('input', processExtraction);
+        delimInput.addEventListener('input', processExtraction);
+        keepPrefixCheck.addEventListener('change', processExtraction);
+
+        btnSample.addEventListener('click', () => {
+            inputText.value = SAMPLE_EXTRACTOR;
+            prefixInput.value = 'SPC_ST=';
+            processExtraction();
+            showToast('Đã nạp dữ liệu mẫu!');
+        });
+
+        btnClear.addEventListener('click', () => {
+            inputText.value = '';
+            processExtraction();
+            showToast('Đã xóa dữ liệu đầu vào');
+        });
+
+        btnCopy.addEventListener('click', () => {
+            if (currentResults.length === 0) {
+                showToast('Không có kết quả nào để sao chép!');
+                return;
+            }
+            navigator.clipboard.writeText(currentResults.join('\n'));
+            showToast(`Đã sao chép ${currentResults.length} dòng kết quả!`);
+        });
+
+        btnDownload.addEventListener('click', () => {
+            if (currentResults.length === 0) {
+                showToast('Không có kết quả để tải về!');
+                return;
+            }
+            const blob = new Blob([currentResults.join('\n')], { type: 'text/plain;charset=utf-8' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `extracted_results.txt`;
+            a.click();
+            URL.revokeObjectURL(url);
+            showToast('Đã tải file kết quả!');
+        });
+
+        btnUpload.addEventListener('click', () => filePicker.click());
+        filePicker.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = (event) => {
+                inputText.value = event.target.result;
+                processExtraction();
+                showToast(`Đã tải file "${file.name}"`);
+            };
+            reader.readAsText(file);
+        });
+
+        dropArea.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            dropOverlay.classList.add('active');
+        });
+        dropArea.addEventListener('dragleave', (e) => {
+            if (!dropArea.contains(e.relatedTarget)) {
+                dropOverlay.classList.remove('active');
+            }
+        });
+        dropArea.addEventListener('drop', (e) => {
+            e.preventDefault();
+            dropOverlay.classList.remove('active');
+            const files = e.dataTransfer.files;
+            if (files.length > 0) {
+                const reader = new FileReader();
+                reader.onload = (event) => {
+                    inputText.value = event.target.result;
+                    processExtraction();
+                    showToast(`Đã tải file "${files[0].name}"`);
+                };
+                reader.readAsText(files[0]);
+            }
+        });
+
+        // ================= TAB 2: SHOPEE TRACKING CHECKER LOGIC =================
+        const shopeeAccountsInput = document.getElementById('shopeeAccountsInput');
+        const btnStartCheck = document.getElementById('btnStartCheck');
+        const btnStopCheck = document.getElementById('btnStopCheck');
+        const btnShopeeSample = document.getElementById('btnShopeeSample');
+        const btnShopeeClear = document.getElementById('btnShopeeClear');
+        const btnShopeeUpload = document.getElementById('btnShopeeUpload');
+        const shopeeFilePicker = document.getElementById('shopeeFilePicker');
+        const btnCopyAllTracking = document.getElementById('btnCopyAllTracking');
+        const btnDownloadTrackingTxt = document.getElementById('btnDownloadTrackingTxt');
+        const btnExportCSV = document.getElementById('btnExportCSV');
+
+        const progressBox = document.getElementById('progressBox');
+        const progressFill = document.getElementById('progressFill');
+        const progressText = document.getElementById('progressText');
+        const progressPercent = document.getElementById('progressPercent');
+        const shopeeStatusText = document.getElementById('shopeeStatusText');
+
+        const statTotalAccounts = document.getElementById('statTotalAccounts');
+        const statFoundTracking = document.getElementById('statFoundTracking');
+        const statTotalOrders = document.getElementById('statTotalOrders');
+        const statAuthFailed = document.getElementById('statAuthFailed');
+        const trackingTableBody = document.getElementById('trackingTableBody');
+
+        let isChecking = false;
+        let shouldStop = false;
+        let trackingRecords = []; // Array of processed records
+
+        const SAMPLE_SHOPEE_ACCOUNTS = `SPC_F=U78hskdj29hs8|SPC_U=102938475|SPC_ST=2a98f12c4b8e7d6a5c3b1e9f0d8a7b6c5e4d3c2b1a0f9e8d7c6b5a4f3e2d1c0b
+SPC_F=P99zkxnc8374h|SPC_U=203948576|SPC_ST=4f8b2c1d0e9a8f7e6d5c4b3a2f1e0d9c8b7a6f5e4d3c2b1a0f9e8d7c6b5a4f3e
+SPC_ST=7e6d5c4b3a2f1e0d9c8b7a6f5e4d3c2b1a0f9e8d7c6b5a4f3e2d1c0b9a8f7e6d`;
+
+        btnShopeeSample.addEventListener('click', () => {
+            shopeeAccountsInput.value = SAMPLE_SHOPEE_ACCOUNTS;
+            showToast('Đã nạp 3 tài khoản mẫu!');
+        });
+
+        btnShopeeClear.addEventListener('click', () => {
+            shopeeAccountsInput.value = '';
+            trackingRecords = [];
+            updateStats();
+            renderTable();
+            showToast('Đã xóa danh sách tài khoản');
+        });
+
+        btnShopeeUpload.addEventListener('click', () => shopeeFilePicker.click());
+        shopeeFilePicker.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = (event) => {
+                shopeeAccountsInput.value = event.target.result;
+                showToast(`Đã nạp file "${file.name}"`);
+            };
+            reader.readAsText(file);
+        });
+
+        function updateStats() {
+            statTotalAccounts.textContent = trackingRecords.length;
+            let totalOrders = 0;
+            let totalTracking = 0;
+            let totalAuthFailed = 0;
+
+            trackingRecords.forEach(rec => {
+                if (!rec.success) {
+                    totalAuthFailed++;
+                } else {
+                    totalOrders += (rec.orders ? rec.orders.length : 0);
+                    if (rec.orders) {
+                        rec.orders.forEach(o => {
+                            if (o.tracking_number && o.tracking_number.trim()) totalTracking++;
+                        });
+                    }
+                }
+            });
+
+            statFoundTracking.textContent = totalTracking;
+            statTotalOrders.textContent = totalOrders;
+            statAuthFailed.textContent = totalAuthFailed;
+        }
+
+        function renderTable() {
+            if (trackingRecords.length === 0) {
+                trackingTableBody.innerHTML = `
+          <tr>
+            <td colspan="7" style="text-align: center; padding: 40px; color: #64748b;">
+              Chưa có dữ liệu kiểm tra. Hãy nhập danh sách tài khoản và bấm <strong>"BẮT ĐẦU CHECK MÃ VẬN ĐƠN"</strong>.
+            </td>
+          </tr>
+        `;
+                return;
+            }
+
+            trackingTableBody.innerHTML = '';
+            let rowIndex = 1;
+
+            trackingRecords.forEach((rec) => {
+                if (!rec.success) {
+                    // Error or WAF row
+                    const tr = document.createElement('tr');
+                    const isWaf = rec.error_type === 'WAF_CHALLENGE';
+                    const accountDisplay = rec.is_alive
+                        ? `<span style="color: #34d399; font-weight:600;">🟢 ${rec.username || 'Cookie Sống'}</span><br><span style="color:#64748b; font-size:0.75rem;">${rec.account}</span>`
+                        : `<span style="color: #f87171;">❌ ${rec.account}</span>`;
+
+                    const pill = isWaf
+                        ? `<span class="status-pill warning" title="${rec.message}">⚠️ WAF Chặn (Mã 90309999)</span>`
+                        : `<span class="status-pill danger">❌ Hết hạn / Die</span>`;
+
+                    tr.innerHTML = `
+            <td>${rowIndex++}</td>
+            <td>${accountDisplay}</td>
+            <td>-</td>
+            <td>-</td>
+            <td>-</td>
+            <td><span style="color: #94a3b8; font-size:0.8rem;">${isWaf ? 'Shopee yêu cầu Captcha/SPC_F' : 'Không thể đăng nhập'}</span></td>
+            <td>${pill}</td>
+          `;
+                    trackingTableBody.appendChild(tr);
+                } else if (!rec.orders || rec.orders.length === 0) {
+                    // Success but 0 orders
+                    const tr = document.createElement('tr');
+                    tr.innerHTML = `
+            <td>${rowIndex++}</td>
+            <td><span style="color: #93c5fd;">${rec.account}</span></td>
+            <td>-</td>
+            <td>-</td>
+            <td>-</td>
+            <td><span style="color: #64748b;">(Không có đơn hàng)</span></td>
+            <td><span class="status-pill warning">Tài khoản trống</span></td>
+          `;
+                    trackingTableBody.appendChild(tr);
+                } else {
+                    // Render each order
+                    rec.orders.forEach((o) => {
+                        const tr = document.createElement('tr');
+                        const hasTracking = o.tracking_number && o.tracking_number.trim().length > 0;
+                        const trackingDisplay = hasTracking
+                            ? `<span class="tracking-badge found">${o.tracking_number}</span> 
+                 <button class="btn-copy-mini" title="Sao chép mã" onclick="copyText('${o.tracking_number}')">📋</button>`
+                            : `<span style="color: #64748b; font-style: italic;">Chưa có mã</span>`;
+
+                        tr.innerHTML = `
+              <td>${rowIndex++}</td>
+              <td><span style="color: #93c5fd;">${rec.account}</span></td>
+              <td>${o.order_sn || '-'}</td>
+              <td>${trackingDisplay}</td>
+              <td>${o.carrier ? `<span class="carrier-tag">${o.carrier}</span>` : '-'}</td>
+              <td><span style="color: #e2e8f0;">${o.status_desc || '-'}</span></td>
+              <td><span class="status-pill success">Thành công</span></td>
+            `;
+                        trackingTableBody.appendChild(tr);
+                    });
+                }
+            });
+        }
+
+        window.copyText = function (text) {
+            navigator.clipboard.writeText(text);
+            showToast(`Đã copy: "${text}"`);
+        };
+
+        // Main Check Execution
+        btnStartCheck.addEventListener('click', async () => {
+            const rawText = shopeeAccountsInput.value.trim();
+            if (!rawText) {
+                showToast('Vui lòng dán danh sách tài khoản trước!');
+                return;
+            }
+
+            const lines = rawText.split('\n')
+                .map(l => l.trim())
+                .filter(l => l.length > 0);
+
+            if (lines.length === 0) {
+                showToast('Không tìm thấy tài khoản hợp lệ!');
+                return;
+            }
+
+            // Reset state
+            isChecking = true;
+            shouldStop = false;
+            trackingRecords = [];
+            renderTable();
+            updateStats();
+
+            btnStartCheck.style.display = 'none';
+            btnStopCheck.style.display = 'inline-flex';
+            progressBox.style.display = 'flex';
+            shopeeStatusText.textContent = `Đang chuẩn bị kiểm tra ${lines.length} tài khoản...`;
+
+            for (let i = 0; i < lines.length; i++) {
+                if (shouldStop) {
+                    shopeeStatusText.textContent = 'Đã dừng theo yêu cầu của bạn.';
+                    break;
+                }
+
+                const accountLine = lines[i];
+                const currentNum = i + 1;
+                const percent = Math.round((currentNum / lines.length) * 100);
+
+                progressText.textContent = `Đang check tài khoản ${currentNum} / ${lines.length}`;
+                progressPercent.textContent = `${percent}%`;
+                progressFill.style.width = `${percent}%`;
+                shopeeStatusText.textContent = `Đang truy vấn Shopee API: ${accountLine.substring(0, 25)}...`;
+
+                try {
+                    const resp = await fetch('/api/shopee/check-single', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ account: accountLine })
+                    });
+
+                    const result = await resp.json();
+                    trackingRecords.push(result);
+                } catch (err) {
+                    trackingRecords.push({
+                        account: accountLine.substring(0, 20) + '...',
+                        success: false,
+                        message: `Lỗi kết nối: ${err.message}`
+                    });
+                }
+
+                renderTable();
+                updateStats();
+
+                // Small delay to be polite to Shopee endpoint (400ms)
+                await new Promise(r => setTimeout(r, 400));
+            }
+
+            isChecking = false;
+            btnStartCheck.style.display = 'inline-flex';
+            btnStopCheck.style.display = 'none';
+            shopeeStatusText.textContent = shouldStop
+                ? 'Đã dừng quá trình kiểm tra.'
+                : `Hoàn tất kiểm tra ${lines.length} tài khoản!`;
+            showToast('Đã hoàn thành kiểm tra!');
+        });
+
+        btnStopCheck.addEventListener('click', () => {
+            shouldStop = true;
+            shopeeStatusText.textContent = 'Đang dừng...';
+        });
+
+        // Copy All Tracking Numbers
+        btnCopyAllTracking.addEventListener('click', () => {
+            const trackingList = [];
+            trackingRecords.forEach(rec => {
+                if (rec.orders) {
+                    rec.orders.forEach(o => {
+                        if (o.tracking_number && o.tracking_number.trim()) {
+                            trackingList.push(o.tracking_number.trim());
+                        }
+                    });
+                }
+            });
+
+            if (trackingList.length === 0) {
+                showToast('Chưa có mã vận đơn nào để sao chép!');
+                return;
+            }
+
+            navigator.clipboard.writeText(trackingList.join('\n'));
+            showToast(`Đã sao chép ${trackingList.length} mã vận đơn vào clipboard!`);
+        });
+
+        // Download TXT
+        btnDownloadTrackingTxt.addEventListener('click', () => {
+            const trackingList = [];
+            trackingRecords.forEach(rec => {
+                if (rec.orders) {
+                    rec.orders.forEach(o => {
+                        if (o.tracking_number && o.tracking_number.trim()) {
+                            trackingList.push(o.tracking_number.trim());
+                        }
+                    });
+                }
+            });
+
+            if (trackingList.length === 0) {
+                showToast('Chưa có mã vận đơn nào!');
+                return;
+            }
+
+            const blob = new Blob([trackingList.join('\n')], { type: 'text/plain;charset=utf-8' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `shopee_tracking_codes_${new Date().toISOString().slice(0, 10)}.txt`;
+            a.click();
+            URL.revokeObjectURL(url);
+            showToast('Đã tải danh sách mã vận đơn!');
+        });
+
+        // Export CSV
+        btnExportCSV.addEventListener('click', () => {
+            if (trackingRecords.length === 0) {
+                showToast('Chưa có dữ liệu để xuất CSV!');
+                return;
+            }
+
+            let csv = '\uFEFF'; // BOM for Excel UTF-8
+            csv += 'STT,Tai_Khoan_SPC_ST,Ma_Don_Hang,Ma_Van_Don,Don_Vi_Van_Chuyen,Trang_Thai_Don,Ket_Qua_API\n';
+
+            let count = 1;
+            trackingRecords.forEach(rec => {
+                if (!rec.success) {
+                    csv += `"${count++}","${rec.account}","","","","","${rec.message || 'Loi'}"\n`;
+                } else if (!rec.orders || rec.orders.length === 0) {
+                    csv += `"${count++}","${rec.account}","","","","Khong co don","Thanh cong"\n`;
+                } else {
+                    rec.orders.forEach(o => {
+                        csv += `"${count++}","${rec.account}","${o.order_sn || ''}","${o.tracking_number || ''}","${o.carrier || ''}","${o.status_desc || ''}","Thanh cong"\n`;
+                    });
+                }
+            });
+
+            const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `shopee_orders_${new Date().toISOString().slice(0, 10)}.csv`;
+            a.click();
+            URL.revokeObjectURL(url);
+            showToast('Đã xuất file báo cáo CSV!');
+        });
+
+        // Copy Console Script for bypassing WAF
+        const btnCopyConsoleScript = document.getElementById('btnCopyConsoleScript');
+        if (btnCopyConsoleScript) {
+            btnCopyConsoleScript.addEventListener('click', () => {
+                const scriptCode = `(async function(){console.log('%cĐang quét đơn hàng Shopee...','color:#ee4d2d;font-size:16px;font-weight:bold;');try{const r=await fetch('/api/v4/order/get_all_order_and_checkout_list?limit=30&offset=0');const j=await r.json();const d=j?.data?.order_data?.details_list||[];const orders=[];for(const item of d){const oid=item?.info_card?.order_id||item?.order_id;const st=item?.status?.status_label||item?.status?.status_description||'Đã giao';let tr=item?.shipping?.tracking_number||item?.shipping?.tracking_no||'';let cr=item?.shipping?.carrier_name||item?.shipping?.shipping_carrier||'';if(!tr&&oid){try{const dr=await fetch('/api/v4/order/get_order_detail?order_id='+oid);const dj=await dr.json();tr=dj?.data?.shipping?.tracking_number||dj?.data?.package_list?.[0]?.tracking_number||'';cr=dj?.data?.shipping?.carrier_name||dj?.data?.package_list?.[0]?.logistics_channel_name||cr;}catch(e){}}orders.push({order_id:String(oid),order_sn:String(oid),tracking_number:String(tr),carrier:String(cr),status_desc:String(st)});}try{await fetch('http://localhost:8080/api/shopee/import-orders',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({orders,account:document.cookie.match(/SPC_U=(\\d+)/)?.[1]||'Browser User'})});alert('Đã quét xong '+orders.length+' đơn và gửi về bảng Shopee Suite!');}catch(e){console.log('Mã vận đơn:',orders);alert('Tìm thấy '+orders.length+' đơn! Xem tại tab Console (F12).');}}catch(err){alert('Lỗi: '+err.message);}})();`;
+                navigator.clipboard.writeText(scriptCode);
+                showToast('Đã copy mã Console! Hãy dán vào F12 Shopee để chạy.');
+            });
+        }
+
+        // ================= TAB 3: SHOPEE OPEN PLATFORM LOGIC =================
+        const openPartnerIdInput = document.getElementById('openPartnerIdInput');
+        const openPartnerKeyInput = document.getElementById('openPartnerKeyInput');
+        const openEnvSelect = document.getElementById('openEnvSelect');
+        const btnSaveOpenConfig = document.getElementById('btnSaveOpenConfig');
+        const btnOpenAuthUrl = document.getElementById('btnOpenAuthUrl');
+        const openCodeInput = document.getElementById('openCodeInput');
+        const openShopIdInput = document.getElementById('openShopIdInput');
+        const btnExchangeToken = document.getElementById('btnExchangeToken');
+        const btnRefreshToken = document.getElementById('btnRefreshToken');
+        const btnFetchOpenOrders = document.getElementById('btnFetchOpenOrders');
+        const openOrdersTableBody = document.getElementById('openOrdersTableBody');
+        const webhookTableBody = document.getElementById('webhookTableBody');
+        const btnRefreshWebhooks = document.getElementById('btnRefreshWebhooks');
+        const btnSimulateWebhook = document.getElementById('btnSimulateWebhook');
+
+        const openStatPartnerId = document.getElementById('openStatPartnerId');
+        const openStatShopId = document.getElementById('openStatShopId');
+        const openStatTokenStatus = document.getElementById('openStatTokenStatus');
+        const openStatWebhookCount = document.getElementById('openStatWebhookCount');
+
+        async function loadOpenConfig() {
+            try {
+                const res = await fetch('/api/open/config');
+                const data = await res.json();
+
+                if (data.partner_id) {
+                    openPartnerIdInput.value = data.partner_id;
+                    openStatPartnerId.textContent = data.partner_id;
+                } else {
+                    openStatPartnerId.textContent = 'Chưa có';
+                }
+
+                openEnvSelect.value = data.is_sandbox ? 'sandbox' : 'production';
+                if (data.has_partner_key) {
+                    openPartnerKeyInput.placeholder = '●●●●●●●● (Đã lưu)';
+                }
+
+                if (data.shop_id) {
+                    openShopIdInput.value = data.shop_id;
+                    openStatShopId.textContent = `Shop #${data.shop_id}`;
+                } else {
+                    openStatShopId.textContent = 'Chưa liên kết';
+                }
+
+                if (data.has_token) {
+                    const now = Math.floor(Date.now() / 1000);
+                    const remain = data.token_expire_time - now;
+                    if (remain > 0) {
+                        const minutes = Math.floor(remain / 60);
+                        openStatTokenStatus.textContent = `Hợp lệ (${minutes} phút)`;
+                        openStatTokenStatus.style.color = '#34d399';
+                    } else {
+                        openStatTokenStatus.textContent = 'Hết hạn (Cần refresh)';
+                        openStatTokenStatus.style.color = '#f87171';
+                    }
+                } else {
+                    openStatTokenStatus.textContent = 'Chưa có Token';
+                    openStatTokenStatus.style.color = '#94a3b8';
+                }
+            } catch (e) {
+                console.error('Lỗi tải cấu hình Open Platform:', e);
+            }
+        }
+
+        btnSaveOpenConfig.addEventListener('click', async () => {
+            const partner_id = parseInt(openPartnerIdInput.value) || 0;
+            const partner_key = openPartnerKeyInput.value.trim();
+            const is_sandbox = openEnvSelect.value === 'sandbox';
+
+            if (!partner_id) {
+                showToast('Vui lòng nhập Partner ID!');
+                return;
+            }
+
+            try {
+                const res = await fetch('/api/open/config', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ partner_id, partner_key, is_sandbox })
+                });
+                const d = await res.json();
+                showToast(d.message || 'Đã lưu cấu hình!');
+                loadOpenConfig();
+            } catch (err) {
+                showToast('Lỗi lưu: ' + err.message);
+            }
+        });
+
+        btnOpenAuthUrl.addEventListener('click', async () => {
+            try {
+                const res = await fetch('/api/open/auth-url');
+                const data = await res.json();
+                if (data.auth_url) {
+                    window.open(data.auth_url, '_blank');
+                    showToast('Đã mở trang đăng nhập ủy quyền Shopee!');
+                } else {
+                    showToast(data.message || 'Lỗi tạo link ủy quyền');
+                }
+            } catch (err) {
+                showToast('Lỗi: ' + err.message);
+            }
+        });
+
+        btnExchangeToken.addEventListener('click', async () => {
+            const code = openCodeInput.value.trim();
+            const shop_id = parseInt(openShopIdInput.value) || 0;
+
+            if (!code || !shop_id) {
+                showToast('Vui lòng nhập Authorization Code và Shop ID!');
+                return;
+            }
+
+            try {
+                const res = await fetch('/api/open/exchange-token', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ code, shop_id })
+                });
+                const data = await res.json();
+                if (data.access_token) {
+                    showToast('Đã đổi Token thành công!');
+                    loadOpenConfig();
+                } else {
+                    showToast('Lỗi đổi token: ' + (data.message || data.error));
+                }
+            } catch (err) {
+                showToast('Lỗi kết nối: ' + err.message);
+            }
+        });
+
+        btnRefreshToken.addEventListener('click', async () => {
+            try {
+                const res = await fetch('/api/open/refresh-token', { method: 'POST' });
+                const data = await res.json();
+                if (data.access_token) {
+                    showToast('Đã làm mới Access Token thành công!');
+                    loadOpenConfig();
+                } else {
+                    showToast('Lỗi refresh: ' + (data.message || data.error));
+                }
+            } catch (err) {
+                showToast('Lỗi: ' + err.message);
+            }
+        });
+
+        btnFetchOpenOrders.addEventListener('click', async () => {
+            openOrdersTableBody.innerHTML = `
+        <tr>
+          <td colspan="6" style="text-align: center; padding: 30px; color: #38bdf8;">
+            Đang gọi Shopee Open API v2 (v2.order + v2.logistics)...
+          </td>
+        </tr>
+      `;
+
+            try {
+                const res = await fetch('/api/open/get-orders', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ page_size: 20 })
+                });
+                const data = await res.json();
+
+                if (data.orders && data.orders.length > 0) {
+                    openOrdersTableBody.innerHTML = '';
+                    data.orders.forEach((o, idx) => {
+                        const tr = document.createElement('tr');
+                        const hasTracking = o.tracking_number && o.tracking_number.trim();
+                        const trackingBadge = hasTracking
+                            ? `<span class="tracking-badge found">${o.tracking_number}</span> <button class="btn-copy-mini" onclick="copyText('${o.tracking_number}')">📋</button>`
+                            : `<span style="color:#64748b; font-style:italic;">Chưa có mã</span>`;
+
+                        tr.innerHTML = `
+              <td>${idx + 1}</td>
+              <td><span style="color: #93c5fd; font-weight:600;">${o.order_sn}</span></td>
+              <td>${trackingBadge}</td>
+              <td>${o.carrier ? `<span class="carrier-tag">${o.carrier}</span>` : '-'}</td>
+              <td><span class="status-pill success">${o.order_status || 'READY'}</span></td>
+              <td>${o.total_amount ? o.total_amount.toLocaleString() + ' đ' : '-'}</td>
+            `;
+                        openOrdersTableBody.appendChild(tr);
+                    });
+                    showToast(`Tìm thấy ${data.orders.length} đơn hàng!`);
+                } else {
+                    openOrdersTableBody.innerHTML = `
+            <tr>
+              <td colspan="6" style="text-align: center; padding: 35px; color: #94a3b8;">
+                ${data.message || 'Không có đơn hàng nào trong khoảng thời gian này.'}
+              </td>
+            </tr>
+          `;
+                }
+            } catch (err) {
+                openOrdersTableBody.innerHTML = `
+          <tr>
+            <td colspan="6" style="text-align: center; padding: 35px; color: #f87171;">
+              Lỗi kết nối API: ${err.message}
+            </td>
+          </tr>
+        `;
+            }
+        });
+
+        async function loadWebhooks() {
+            try {
+                const res = await fetch('/api/open/webhooks');
+                const data = await res.json();
+                const events = data.events || [];
+                openStatWebhookCount.textContent = `${events.length} sự kiện`;
+
+                if (events.length > 0) {
+                    webhookTableBody.innerHTML = '';
+                    events.forEach(ev => {
+                        const tr = document.createElement('tr');
+                        const isTracking = ev.code === 4;
+                        const badge = isTracking
+                            ? `<span class="status-pill success">${ev.event_name}</span>`
+                            : `<span class="status-pill warning">${ev.event_name}</span>`;
+
+                        tr.innerHTML = `
+              <td><span style="color:#64748b;">#${ev.code}</span></td>
+              <td><span style="font-size:0.8rem; color:#cbd5e1;">${ev.time}</span></td>
+              <td>${badge}</td>
+              <td>${ev.shop_id || '-'}</td>
+              <td style="color: #38bdf8;"><strong>${ev.summary || '-'}</strong></td>
+            `;
+                        webhookTableBody.appendChild(tr);
+                    });
+                }
+            } catch (e) {
+                console.error('Lỗi nạp webhooks:', e);
+            }
+        }
+
+        btnRefreshWebhooks.addEventListener('click', () => {
+            loadWebhooks();
+            showToast('Đã làm mới danh sách Webhook!');
+        });
+
+        btnSimulateWebhook.addEventListener('click', async () => {
+            const mockPayload = {
+                code: 4,
+                shop_id: parseInt(openShopIdInput.value) || 1792369886,
+                timestamp: Math.floor(Date.now() / 1000),
+                data: {
+                    ordersn: '24' + Math.floor(1000000000 + Math.random() * 9000000000),
+                    tracking_no: 'SPXVN04' + Math.floor(10000000 + Math.random() * 90000000)
+                }
+            };
+
+            try {
+                await fetch('/webhook/shopee', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(mockPayload)
+                });
+                showToast('Đã bắn Webhook mẫu thành công!');
+                loadWebhooks();
+            } catch (err) {
+                showToast('Lỗi: ' + err.message);
+            }
+        });
+
+        // Auto poll Webhook events every 4s
+        setInterval(() => {
+            const tabBtn3 = document.getElementById('tabBtn3');
+            if (tabBtn3 && tabBtn3.classList.contains('active')) {
+                loadWebhooks();
+            }
+        }, 4000);
+
+        // Initial run Tab 1 sample
+        btnSample.click();
+    </script>
+</body>
+
+</html>
