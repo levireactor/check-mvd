@@ -1,0 +1,33 @@
+﻿================================================================
+        HƯỚNG DẪN SỬ DỤNG TOOL CHECK ĐƠN & MÃ VẬN ĐƠN SHOPEE
+================================================================
+
+1. CÁCH KHỞI ĐỘNG TOOL:
+- Nhấp đúp chuột vào file: "CHAY_TOOL.bat"
+- Cửa sổ Tool sẽ tự động bật máy chủ Python và mở trình duyệt tại:
+  http://localhost:8080/
+
+2. CÁC TÍNH NĂNG CHÍNH:
+- [➕ Thêm Cookie]: Nhập danh sách Cookie (SPC_ST=...) để quét đơn hàng hàng loạt.
+  + Hỗ trợ dạng: SPC_ST=... hoặc nguyên chuỗi Cookie dài.
+  + Hỗ trợ gắn Tên gợi nhớ: SPC_ST=xxx|Ten=Shop1
+- [Cột hiển thị ▾]: Bật/tắt tùy ý 17 cột dữ liệu (Mã đơn, MVĐ, Người nhận, SĐT, COD, Link SP...).
+- [🎨 Tùy màu ▾]:
+  + Chế độ Sáng (Light) / Tối (Dark).
+  + Đổi màu thanh tiêu đề (Đen than, Cam Shopee, Xanh dương, Xanh ngọc, Tím, Đỏ).
+  + Bật/tắt tô màu theo trạng thái (Hủy = đỏ, Giao thành công = xanh lá, Đang giao = xanh dương).
+  + Kẻ sọc hàng xen kẽ (Zebra).
+- [💾 SAVE Server] / [Phím tắt Ctrl + S]: Lưu toàn bộ dữ liệu hiện tại lên máy chủ (lưu vào draft.json).
+- [⚙️ Khôi phục nháp]: Khôi phục lại phiên làm việc trước đó.
+- [📋 Copy tất cả MVĐ]: Sao chép nhanh danh sách tất cả mã vận đơn tìm thấy để dán vào Excel/Zalo/vận chuyển.
+- [📥 Xuất Excel (CSV)]: Xuất file bảng tính đầy đủ các cột.
+- [Tìm kiếm nhanh]: Gõ SĐT, Tên, Mã vận đơn hoặc Tên sản phẩm vào ô tìm kiếm để lọc tức thì.
+
+3. DANH SÁCH FILE TRONG THƯ MỤC "D:\tool pee\":
+- CHAY_TOOL.bat           : File nhấp đúp để mở tool 1 chạm.
+- index.html              : Giao diện chính Bảng Sheet Shopee.
+- server.py               : Backend Python Mobile Gateway (xử lý cào đơn & chống chặn CAPTCHA).
+- draft.json              : File lưu trữ dữ liệu các đơn hàng đã lưu.
+- duyanh_old_backup.html  : File sao lưu phiên bản cũ trước đó của bạn.
+
+Chúc bạn sử dụng hiệu quả!
