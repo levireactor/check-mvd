@@ -2,10 +2,12 @@
 proxy_config.json
 cookie_vault.json
 telegram_config.json
+draft.json
 __pycache__/
 *.pyc
 *.pyo
 *.pyd
 .Python
 .DS_Store
+
 
