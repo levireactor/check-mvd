@@ -3182,7 +3182,7 @@
         </div>
         <div style="display:flex;gap:6px">
           <button class="top-btn" onclick="closeProxyModal()">Đóng</button>
-          <button class="top-btn btn-primary" onclick="saveProxyConfigAndApply()">
+          <button class="top-btn btn-primary" id="btn-save-proxy" onclick="saveProxyConfigAndApply()">
             💾 Lưu & Áp Dụng
           </button>
         </div>
@@ -5716,6 +5716,12 @@
     }
 
     async function saveProxyConfigAndApply() {
+      const btn = $('btn-save-proxy');
+      if (btn) {
+        btn.disabled = true;
+        btn.textContent = '⏳ Đang lưu & kết nối...';
+      }
+
       const isPvn = currentProxyTab === 'proxyvn';
       const payload = {
         provider: currentProxyTab,
@@ -5738,7 +5744,15 @@
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(payload)
         });
-        const data = await res.json();
+        
+        let data;
+        const text = await res.text();
+        try {
+          data = JSON.parse(text);
+        } catch (_) {
+          throw new Error(res.ok ? 'Máy chủ phản hồi rỗng hoặc đang khởi động lại' : `Máy chủ HTTP ${res.status}. Vui lòng thử lại sau vài giây!`);
+        }
+
         if (data.success) {
           showToast(`Đã lưu cấu hình ${isPvn ? 'ProxyVN' : 'KiotProxy'}!`, '💾');
           addLog(`[Proxy] Đã cập nhật cấu hình: ${isPvn ? 'ProxyVN' : 'KiotProxy'} (Bật: ${payload.enabled}).`);
@@ -5747,10 +5761,15 @@
             showToast('Lưu ý: ' + (data.init_res.message || 'Chưa nạp được IP'), '⚠️');
           }
         } else {
-          showToast('Lỗi lưu: ' + (data.error || 'Server error'), '❌');
+          showToast('Lỗi: ' + (data.error || 'Server error'), '❌');
         }
       } catch (e) {
         showToast('Lỗi kết nối máy chủ: ' + e.message, '❌');
+      } finally {
+        if (btn) {
+          btn.disabled = false;
+          btn.textContent = '💾 Lưu & Áp Dụng';
+        }
       }
     }
 
@@ -5769,7 +5788,14 @@
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(bodyPayload)
         });
-        const d = await res.json();
+        let d;
+        const text = await res.text();
+        try {
+          d = JSON.parse(text);
+        } catch (_) {
+          throw new Error('Máy chủ phản hồi không đúng định dạng');
+        }
+
         if (d.success && (d.data || d.proxy_url)) {
           const newIp = d.data?.ip || d.data?.realIpAddress || d.data?.host || '';
           showToast(`Đã đổi IP thành công: ${newIp}!`, '🎉');
@@ -5798,7 +5824,14 @@
 
       try {
         const res = await fetch('/api/proxy/test', { method: 'POST' });
-        const d = await res.json();
+        let d;
+        const text = await res.text();
+        try {
+          d = JSON.parse(text);
+        } catch (_) {
+          throw new Error('Máy chủ phản hồi rỗng hoặc đang khởi động lại');
+        }
+
         if (d.success) {
           resEl.style.background = '#dcfce7';
           resEl.style.color = '#15803d';
