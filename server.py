@@ -33,6 +33,12 @@ except Exception as _ar_ex:
     AUTOREG_AVAILABLE = False
     print(f"[!] Autoreg manager not loaded: {_ar_ex}")
 
+try:
+    from telegram_auth import tg_auth_mgr
+except Exception as _tg_err:
+    tg_auth_mgr = None
+    print(f"[!] Telegram auth manager not loaded: {_tg_err}")
+
 PORT = int(os.environ.get("PORT", 8080))
 DIRECTORY = os.path.dirname(os.path.abspath(__file__))
 DRAFT_FILE = os.path.join(DIRECTORY, "draft.json")
@@ -1056,6 +1062,16 @@ class TrackingRequestHandler(http.server.SimpleHTTPRequestHandler):
             except Exception as e:
                 self._json(500, {'error': str(e)})
 
+        elif self.path == '/api/telegram/status' or self.path.startswith('/api/telegram/status?'):
+            try:
+                if not tg_auth_mgr:
+                    return self._json(500, {'error': 'Telegram auth manager chưa sẵn sàng'})
+                is_refresh = 'refresh' in self.path
+                info = tg_auth_mgr.get_info(force_refresh=is_refresh)
+                self._json(200, {'success': True, 'data': info})
+            except Exception as e:
+                self._json(500, {'error': str(e)})
+
         else:
             super().do_GET()
 
@@ -1555,6 +1571,63 @@ class TrackingRequestHandler(http.server.SimpleHTTPRequestHandler):
                 self._json(200, {'success': True, 'message': 'Đã đưa vào Kho Cookie thành công!'})
             except Exception as e:
                 self._json(500, {'error': str(e)})
+
+        elif self.path == '/api/telegram/send-code':
+            try:
+                if not tg_auth_mgr:
+                    return self._json(500, {'success': False, 'error': 'Telegram auth manager chưa sẵn sàng'})
+                body = self._read_body()
+                phone = body.get('phone', '').strip()
+                if not phone:
+                    return self._json(400, {'success': False, 'error': 'Vui lòng nhập số điện thoại'})
+                res = tg_auth_mgr.send_code(phone)
+                self._json(200, res)
+            except Exception as e:
+                self._json(500, {'success': False, 'error': str(e)})
+
+        elif self.path == '/api/telegram/verify-code':
+            try:
+                if not tg_auth_mgr:
+                    return self._json(500, {'success': False, 'error': 'Telegram auth manager chưa sẵn sàng'})
+                body = self._read_body()
+                code = body.get('code', '').strip()
+                phone = body.get('phone', '').strip()
+                phone_code_hash = body.get('phone_code_hash', '').strip()
+                res = tg_auth_mgr.verify_code(code, phone=phone, phone_code_hash=phone_code_hash)
+                self._json(200, res)
+            except Exception as e:
+                self._json(500, {'success': False, 'error': str(e)})
+
+        elif self.path == '/api/telegram/verify-2fa':
+            try:
+                if not tg_auth_mgr:
+                    return self._json(500, {'success': False, 'error': 'Telegram auth manager chưa sẵn sàng'})
+                body = self._read_body()
+                password = body.get('password', '').strip()
+                res = tg_auth_mgr.verify_2fa(password)
+                self._json(200, res)
+            except Exception as e:
+                self._json(500, {'success': False, 'error': str(e)})
+
+        elif self.path == '/api/telegram/import-session':
+            try:
+                if not tg_auth_mgr:
+                    return self._json(500, {'success': False, 'error': 'Telegram auth manager chưa sẵn sàng'})
+                body = self._read_body()
+                session_str = body.get('session', '').strip()
+                res = tg_auth_mgr.import_string_session(session_str)
+                self._json(200, res)
+            except Exception as e:
+                self._json(500, {'success': False, 'error': str(e)})
+
+        elif self.path == '/api/telegram/logout':
+            try:
+                if not tg_auth_mgr:
+                    return self._json(500, {'success': False, 'error': 'Telegram auth manager chưa sẵn sàng'})
+                res = tg_auth_mgr.logout()
+                self._json(200, res)
+            except Exception as e:
+                self._json(500, {'success': False, 'error': str(e)})
 
         else:
             self._json(404, {'error': 'Endpoint không tồn tại'})

@@ -544,6 +544,175 @@
             from { transform: translateX(100%); opacity: 0; }
             to { transform: translateX(0); opacity: 1; }
         }
+
+        /* ━━━ Telegram Auth Modal Styles ━━━ */
+        .modal-overlay {
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0, 0, 0, 0.78);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            z-index: 9999;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 16px;
+            animation: fadeInModal 0.2s ease-out;
+        }
+        @keyframes fadeInModal {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+        .modal-box {
+            background: #111827;
+            border: 1px solid rgba(255, 255, 255, 0.14);
+            border-radius: var(--radius-md);
+            width: 100%;
+            max-width: 520px;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.8), 0 0 40px rgba(99, 102, 241, 0.15);
+            overflow: hidden;
+            animation: slideUpModal 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+        @keyframes slideUpModal {
+            from { transform: translateY(20px) scale(0.97); opacity: 0; }
+            to { transform: translateY(0) scale(1); opacity: 1; }
+        }
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 16px 20px;
+            border-bottom: 1px solid var(--border-color);
+            background: rgba(255, 255, 255, 0.02);
+        }
+        .modal-close-btn {
+            background: transparent;
+            border: none;
+            color: var(--text-muted);
+            font-size: 26px;
+            cursor: pointer;
+            line-height: 1;
+            padding: 0 6px;
+            border-radius: 6px;
+            transition: all 0.15s;
+        }
+        .modal-close-btn:hover {
+            color: #FFF;
+            background: rgba(255, 255, 255, 0.08);
+        }
+        .modal-body {
+            padding: 20px;
+            max-height: 82vh;
+            overflow-y: auto;
+        }
+        .tg-tabs {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 16px;
+            background: rgba(0, 0, 0, 0.35);
+            padding: 4px;
+            border-radius: 8px;
+        }
+        .tg-tab-btn {
+            flex: 1;
+            background: transparent;
+            border: none;
+            color: var(--text-muted);
+            padding: 9px 12px;
+            border-radius: 6px;
+            font-size: 12px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+        }
+        .tg-tab-btn.active {
+            background: rgba(99, 102, 241, 0.25);
+            color: #FFF;
+            border: 1px solid rgba(99, 102, 241, 0.45);
+        }
+        .btn-tg-primary {
+            width: 100%;
+            background: linear-gradient(135deg, #3B82F6, #6366F1);
+            color: #FFF;
+            border: none;
+            border-radius: var(--radius-sm);
+            padding: 11px 16px;
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            transition: all 0.2s;
+            box-shadow: 0 4px 14px rgba(99, 102, 241, 0.35);
+        }
+        .btn-tg-primary:hover {
+            background: linear-gradient(135deg, #2563EB, #4F46E5);
+            box-shadow: 0 6px 18px rgba(99, 102, 241, 0.45);
+        }
+        .btn-tg-primary:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+        .btn-tg-secondary {
+            background: rgba(255, 255, 255, 0.08);
+            color: var(--text-main);
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius-sm);
+            padding: 11px 16px;
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            transition: all 0.2s;
+        }
+        .btn-tg-secondary:hover {
+            background: rgba(255, 255, 255, 0.12);
+        }
+        .btn-sm-action {
+            background: rgba(255, 255, 255, 0.08);
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            color: var(--text-main);
+            border-radius: 6px;
+            padding: 6px 10px;
+            font-size: 11px;
+            font-weight: 500;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            transition: all 0.15s;
+        }
+        .btn-sm-action:hover {
+            background: rgba(255, 255, 255, 0.15);
+            color: #FFF;
+        }
+        .btn-sm-danger {
+            background: rgba(239, 68, 68, 0.15);
+            border: 1px solid rgba(239, 68, 68, 0.3);
+            color: #F87171;
+            border-radius: 6px;
+            padding: 6px 10px;
+            font-size: 11px;
+            font-weight: 500;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            transition: all 0.15s;
+        }
+        .btn-sm-danger:hover {
+            background: rgba(239, 68, 68, 0.25);
+            color: #FFF;
+        }
     </style>
 </head>
 <body>
@@ -565,10 +734,10 @@
 
         <div class="nav-actions">
             <!-- Telegram Userbot Status -->
-            <div class="status-chip" id="chipUserbot" onclick="refreshTelegramStatus()" title="Bấm để kiểm tra lại tài khoản Telegram">
+            <div class="status-chip" id="chipUserbot" onclick="openTelegramModal()" title="Bấm để mở trình quản lý liên kết Telegram" style="cursor: pointer;">
                 <div class="pulse-dot" id="dotUserbot"></div>
-                <span id="txtUserbot">Tele: <b>chubin (+84967193558)</b></span>
-                <i class="fa-solid fa-rotate-right" id="iconReloadTele" style="font-size: 11px; margin-left: 2px; color: var(--text-sub);"></i>
+                <span id="txtUserbot">Tele: <b>Đang tải...</b></span>
+                <i class="fa-solid fa-link" style="font-size: 11px; margin-left: 2px; color: #60A5FA;"></i>
             </div>
 
             <!-- Số dư CMSNPA -->
@@ -620,6 +789,26 @@
                 <div class="form-group">
                     <label class="form-label" for="inputDelay">Nghỉ giữa các lần (s)</label>
                     <input type="number" id="inputDelay" class="custom-input" min="3" max="300" value="10">
+                </div>
+            </div>
+
+            <!-- Telegram Userbot Linking Card -->
+            <div class="telegram-config-box" style="background: rgba(99, 102, 241, 0.07); border: 1px solid rgba(99, 102, 241, 0.28); border-radius: var(--radius-sm); padding: 14px; margin-bottom: 16px;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                    <div style="display: flex; align-items: center; gap: 8px;">
+                        <i class="fa-brands fa-telegram" style="color: #60A5FA; font-size: 18px;"></i>
+                        <span style="font-size: 13px; font-weight: 600; color: #93C5FD;">Tài khoản Telegram Userbot</span>
+                    </div>
+                    <button type="button" onclick="openTelegramModal()" style="background: linear-gradient(135deg, #3B82F6, #6366F1); border: none; color: #FFF; border-radius: 6px; padding: 5px 12px; font-size: 11px; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 5px; box-shadow: 0 2px 8px rgba(99,102,241,0.3);">
+                        <i class="fa-solid fa-link"></i> <span id="btnLblTgManage">Liên kết / Quản lý</span>
+                    </button>
+                </div>
+                <div style="display: flex; justify-content: space-between; align-items: center; background: rgba(0,0,0,0.25); padding: 8px 12px; border-radius: 6px;">
+                    <div style="display: flex; align-items: center; gap: 8px; overflow: hidden;">
+                        <div class="pulse-dot" id="dotTgBox" style="background: var(--danger);"></div>
+                        <span id="txtTgBoxAccount" style="font-size: 12px; color: var(--text-main); font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Chưa liên kết tài khoản</span>
+                    </div>
+                    <span id="badgeTgBoxStatus" style="font-size: 11px; padding: 2px 8px; border-radius: 999px; background: rgba(239,68,68,0.15); color: #F87171; font-weight: 600; white-space: nowrap;">Chưa kết nối</span>
                 </div>
             </div>
 
@@ -768,6 +957,150 @@
     </section>
 </div>
 
+<!-- Modal Liên Kết Tài Khoản Telegram -->
+<div id="modalTelegram" class="modal-overlay" style="display: none;" onclick="handleModalOverlayClick(event)">
+    <div class="modal-box" onclick="event.stopPropagation()">
+        <div class="modal-header">
+            <div style="display: flex; align-items: center; gap: 10px;">
+                <div style="width: 38px; height: 38px; border-radius: 10px; background: linear-gradient(135deg, #0088cc, #229ED9); display: flex; align-items: center; justify-content: center; color: #FFF; font-size: 20px; box-shadow: 0 4px 12px rgba(0,136,204,0.4);">
+                    <i class="fa-brands fa-telegram"></i>
+                </div>
+                <div>
+                    <h3 style="font-size: 16px; font-weight: 700; color: #FFF;">Liên Kết Tài Khoản Telegram</h3>
+                    <p style="font-size: 11px; color: var(--text-muted);">Điều phối Bot Shopee & CMSNPA (Userbot Telethon)</p>
+                </div>
+            </div>
+            <button class="modal-close-btn" onclick="closeTelegramModal()">&times;</button>
+        </div>
+
+        <div class="modal-body">
+            <!-- Account Info Display (khi đã kết nối) -->
+            <div id="tgAccountCard" style="display: none; background: rgba(16, 185, 129, 0.08); border: 1px solid rgba(16, 185, 129, 0.3); border-radius: 10px; padding: 14px; margin-bottom: 16px;">
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <div style="display: flex; gap: 12px; align-items: center;">
+                        <div style="width: 42px; height: 42px; border-radius: 50%; background: linear-gradient(135deg, #10B981, #059669); display: flex; align-items: center; justify-content: center; color: #FFF; font-size: 16px; font-weight: 700;" id="tgAvatarText">
+                            TG
+                        </div>
+                        <div>
+                            <div style="font-size: 14px; font-weight: 700; color: #FFF;" id="tgCardName">Chưa kết nối</div>
+                            <div style="font-size: 12px; color: #34D399; font-family: var(--font-mono);" id="tgCardPhone">+84...</div>
+                            <div style="font-size: 11px; color: var(--text-sub);" id="tgCardUsername">@username</div>
+                        </div>
+                    </div>
+                    <span style="font-size: 11px; padding: 3px 10px; border-radius: 999px; background: rgba(16, 185, 129, 0.2); color: #34D399; font-weight: 600; display: flex; align-items: center; gap: 5px;">
+                        <span style="width: 6px; height: 6px; border-radius: 50%; background: #10B981;"></span> Đã kết nối
+                    </span>
+                </div>
+
+                <div style="margin-top: 12px; padding-top: 10px; border-top: 1px solid rgba(255,255,255,0.06); display: flex; gap: 8px; flex-wrap: wrap;">
+                    <button type="button" class="btn-sm-action" onclick="copyTelegramSessionString()" title="Sao chép StringSession để cấu hình biến môi trường trên Render">
+                        <i class="fa-solid fa-copy"></i> Sao chép StringSession
+                    </button>
+                    <button type="button" class="btn-sm-action" onclick="refreshTelegramStatus(true)" title="Kiểm tra lại kết nối">
+                        <i class="fa-solid fa-rotate"></i> Kiểm tra lại
+                    </button>
+                    <button type="button" class="btn-sm-danger" onclick="logoutTelegramAccount()" title="Hủy liên kết tài khoản này">
+                        <i class="fa-solid fa-right-from-bracket"></i> Đăng xuất
+                    </button>
+                </div>
+            </div>
+
+            <!-- Header / Subtitle for Login Form -->
+            <div id="tgFormHeader" style="margin-bottom: 12px;">
+                <div style="font-size: 13px; font-weight: 600; color: #93C5FD; display: flex; align-items: center; gap: 6px;">
+                    <i class="fa-solid fa-arrow-right-to-bracket"></i>
+                    <span id="tgFormTitle">Đăng nhập tài khoản mới:</span>
+                </div>
+            </div>
+
+            <!-- Login Tabs -->
+            <div class="tg-tabs">
+                <button class="tg-tab-btn active" id="tabBtnOtp" onclick="switchTgTab('otp')">
+                    <i class="fa-solid fa-mobile-screen"></i> SĐT & Mã OTP
+                </button>
+                <button class="tg-tab-btn" id="tabBtnSession" onclick="switchTgTab('session')">
+                    <i class="fa-solid fa-key"></i> Dán chuỗi StringSession
+                </button>
+            </div>
+
+            <!-- TAB 1: PHONE & OTP -->
+            <div id="tabContentOtp" class="tg-tab-content">
+                <!-- Step 1: Input Phone -->
+                <div id="tgStepPhone" style="display: block;">
+                    <div class="form-group" style="margin-bottom: 12px;">
+                        <label class="form-label">Số điện thoại Telegram</label>
+                        <div style="position: relative;">
+                            <input type="tel" id="inputTgPhone" class="custom-input" placeholder="Ví dụ: +84912345678 hoặc 0912345678" style="padding-left: 36px; font-family: var(--font-mono); font-size: 13px;">
+                            <i class="fa-solid fa-phone" style="position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: var(--text-muted); font-size: 13px;"></i>
+                        </div>
+                        <div style="font-size: 11px; color: var(--text-sub); margin-top: 5px;">
+                            💡 Mã xác nhận sẽ được gửi trực tiếp vào <b>Ứng dụng Telegram</b> (tin nhắn từ Service Telegram, KHÔNG PHẢI tin nhắn SMS).
+                        </div>
+                    </div>
+                    <button type="button" class="btn-tg-primary" id="btnTgSendCode" onclick="submitTelegramPhone()">
+                        <i class="fa-solid fa-paper-plane"></i> Gửi mã OTP xác nhận
+                    </button>
+                </div>
+
+                <!-- Step 2: Input OTP -->
+                <div id="tgStepOtp" style="display: none;">
+                    <div style="background: rgba(99, 102, 241, 0.1); border: 1px solid rgba(99, 102, 241, 0.3); border-radius: 8px; padding: 10px 12px; margin-bottom: 14px; font-size: 12px; color: #C7D2FE;">
+                        📩 <b>Đã gửi mã OTP!</b> Hãy mở app Telegram trên điện thoại/máy tính ➔ Xem tin nhắn từ <b>"Telegram"</b> ➔ Nhập 5 chữ số vào dưới đây:
+                    </div>
+                    <div class="form-group" style="margin-bottom: 12px;">
+                        <label class="form-label">Mã xác nhận (OTP 5 số)</label>
+                        <input type="text" id="inputTgCode" class="custom-input" placeholder="12345" maxlength="10" style="text-align: center; letter-spacing: 6px; font-size: 20px; font-weight: 700; font-family: var(--font-mono);">
+                    </div>
+                    <div style="display: flex; gap: 8px;">
+                        <button type="button" class="btn-tg-secondary" onclick="backToPhoneStep()" style="flex: 1;">
+                            <i class="fa-solid fa-arrow-left"></i> Đổi SĐT
+                        </button>
+                        <button type="button" class="btn-tg-primary" id="btnTgVerifyCode" onclick="submitTelegramCode()" style="flex: 2;">
+                            <i class="fa-solid fa-check"></i> Xác nhận OTP
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Step 3: Two-step verification (2FA) -->
+                <div id="tgStep2FA" style="display: none;">
+                    <div style="background: rgba(245, 158, 11, 0.1); border: 1px solid rgba(245, 158, 11, 0.3); border-radius: 8px; padding: 10px 12px; margin-bottom: 14px; font-size: 12px; color: #FDE68A;">
+                        🔒 <b>Bảo mật 2 lớp:</b> Tài khoản của bạn có cài đặt Two-Step Verification. Vui lòng nhập mật khẩu để xác nhận.
+                    </div>
+                    <div class="form-group" style="margin-bottom: 12px;">
+                        <label class="form-label">Mật khẩu 2FA</label>
+                        <input type="password" id="inputTg2FA" class="custom-input" placeholder="Nhập mật khẩu 2FA của bạn..." style="font-family: var(--font-mono);">
+                    </div>
+                    <button type="button" class="btn-tg-primary" id="btnTgVerify2FA" onclick="submitTelegram2FA()">
+                        <i class="fa-solid fa-unlock"></i> Xác nhận 2FA
+                    </button>
+                </div>
+            </div>
+
+            <!-- TAB 2: STRING SESSION -->
+            <div id="tabContentSession" class="tg-tab-content" style="display: none;">
+                <div class="form-group" style="margin-bottom: 12px;">
+                    <label class="form-label">Chuỗi StringSession của Telethon</label>
+                    <textarea id="inputTgSessionString" class="custom-input" rows="3" placeholder="Dán chuỗi StringSession tại đây (dạng 1BVts...)" style="font-family: var(--font-mono); font-size: 11px; resize: vertical;"></textarea>
+                    <div style="font-size: 11px; color: var(--text-sub); margin-top: 5px;">
+                        💡 Nếu bạn đã có sẵn mã StringSession tạo từ trước, hãy dán vào đây để đăng nhập ngay mà không cần chờ OTP.
+                    </div>
+                </div>
+                <button type="button" class="btn-tg-primary" id="btnTgImportSession" onclick="submitTelegramStringSession()">
+                    <i class="fa-solid fa-bolt"></i> Kích hoạt Session
+                </button>
+            </div>
+
+            <!-- Render Helper Notice -->
+            <div style="margin-top: 16px; background: rgba(0,0,0,0.3); border: 1px dashed rgba(255,255,255,0.1); border-radius: 8px; padding: 10px 12px; font-size: 11px; color: var(--text-muted); line-height: 1.5;">
+                <div style="color: #60A5FA; font-weight: 600; margin-bottom: 3px;">
+                    <i class="fa-solid fa-cloud"></i> Duy trì đăng nhập vĩnh viễn trên Render:
+                </div>
+                Sau khi đăng nhập thành công, hãy bấm nút <b>"Sao chép StringSession"</b>, sau đó vào <b>Render Dashboard ➔ Environment Variables</b> thêm biến <code>TELEGRAM_SESSION=&lt;chuỗi_session&gt;</code> để không bao giờ bị mất tài khoản khi Render khởi động lại!
+            </div>
+        </div>
+    </div>
+</div>
+
 <!-- Toast Alert -->
 <div class="toast-container" id="toastContainer"></div>
 
@@ -796,26 +1129,59 @@
         });
     }
 
-    // ━━━ CẬP NHẬT HEADER CHIPS (Tele, Số dư, Proxy) ━━━
+    // ━━━ CẬP NHẬT HEADER CHIPS & TELEGRAM STATUS ━━━
+    let currentTgAccount = null;
+    let pendingTgPhone = '';
+    let pendingTgCodeHash = '';
+
     function updateHeaderChips(d) {
         // 1. Telegram
         const tg = d.telegram;
+        if (tg) {
+            currentTgAccount = tg;
+        }
         const txtTg = document.getElementById('txtUserbot');
         const dotTg = document.getElementById('dotUserbot');
-        if (txtTg) {
-            if (tg && tg.connected) {
-                txtTg.innerHTML = `Tele: <b>${escapeHtml(tg.name)} (${escapeHtml(tg.phone)})</b>`;
-                if (dotTg) {
-                    dotTg.style.background = 'var(--success)';
-                    dotTg.style.boxShadow = '0 0 10px var(--success)';
-                }
-            } else {
-                txtTg.innerHTML = `Tele: <b style="color:var(--danger)">Chưa kết nối</b>`;
-                if (dotTg) {
-                    dotTg.style.background = 'var(--danger)';
-                    dotTg.style.boxShadow = '0 0 10px var(--danger)';
-                }
+        const txtTgBox = document.getElementById('txtTgBoxAccount');
+        const dotTgBox = document.getElementById('dotTgBox');
+        const badgeTgBox = document.getElementById('badgeTgBoxStatus');
+        const btnManageLbl = document.getElementById('btnLblTgManage');
+
+        if (tg && tg.connected) {
+            const displayTitle = `${tg.name} (${tg.phone})`;
+            if (txtTg) txtTg.innerHTML = `Tele: <b>${escapeHtml(displayTitle)}</b>`;
+            if (dotTg) {
+                dotTg.style.background = 'var(--success)';
+                dotTg.style.boxShadow = '0 0 10px var(--success)';
             }
+            if (txtTgBox) txtTgBox.innerHTML = `<b>${escapeHtml(tg.name)}</b> <span style="color:#34D399; font-family:var(--font-mono); font-size:11px;">(${escapeHtml(tg.phone)})</span>`;
+            if (dotTgBox) {
+                dotTgBox.style.background = 'var(--success)';
+                dotTgBox.style.boxShadow = '0 0 10px var(--success)';
+            }
+            if (badgeTgBox) {
+                badgeTgBox.innerHTML = 'Đã kết nối';
+                badgeTgBox.style.background = 'rgba(16, 185, 129, 0.15)';
+                badgeTgBox.style.color = '#34D399';
+            }
+            if (btnManageLbl) btnManageLbl.textContent = 'Quản lý tài khoản';
+        } else {
+            if (txtTg) txtTg.innerHTML = `Tele: <b style="color:var(--danger)">Chưa kết nối</b>`;
+            if (dotTg) {
+                dotTg.style.background = 'var(--danger)';
+                dotTg.style.boxShadow = '0 0 10px var(--danger)';
+            }
+            if (txtTgBox) txtTgBox.innerHTML = `<span style="color:var(--text-muted)">Chưa liên kết tài khoản Telegram</span>`;
+            if (dotTgBox) {
+                dotTgBox.style.background = 'var(--danger)';
+                dotTgBox.style.boxShadow = '0 0 10px var(--danger)';
+            }
+            if (badgeTgBox) {
+                badgeTgBox.innerHTML = 'Chưa kết nối';
+                badgeTgBox.style.background = 'rgba(239, 68, 68, 0.15)';
+                badgeTgBox.style.color = '#F87171';
+            }
+            if (btnManageLbl) btnManageLbl.textContent = 'Liên kết ngay';
         }
 
         // 2. Số dư CMSNPA
@@ -842,25 +1208,302 @@
     }
 
     // Refresh Telegram Account
-    async function refreshTelegramStatus() {
+    async function refreshTelegramStatus(silent = false) {
         const icon = document.getElementById('iconReloadTele');
         if (icon) icon.classList.add('fa-spin');
         try {
-            const res = await fetch('/api/autoreg/status?refresh=1');
+            const res = await fetch('/api/telegram/status?refresh=1');
             const json = await res.json();
             if (json.success && json.data) {
-                updateHeaderChips(json.data);
-                const tg = json.data.telegram;
-                if (tg && tg.connected) {
-                    showToast(`Telegram kết nối: ${tg.name} (${tg.phone})`, 'fa-circle-check', '#10B981');
-                } else {
-                    showToast('Telegram chưa kết nối! Vui lòng đăng nhập lại.', 'fa-circle-exclamation', '#EF4444');
+                currentTgAccount = json.data;
+                updateHeaderChips({ telegram: json.data });
+                renderTelegramModalUI();
+                const tg = json.data;
+                if (!silent) {
+                    if (tg && tg.connected) {
+                        showToast(`Telegram kết nối: ${tg.name} (${tg.phone})`, 'fa-circle-check', '#10B981');
+                    } else {
+                        showToast('Telegram chưa kết nối! Vui lòng liên kết tài khoản.', 'fa-circle-exclamation', '#EF4444');
+                    }
                 }
             }
         } catch (e) {
-            showToast('Lỗi kiểm tra Telegram', 'fa-xmark', '#EF4444');
+            if (!silent) showToast('Lỗi kiểm tra Telegram', 'fa-xmark', '#EF4444');
         } finally {
             if (icon) icon.classList.remove('fa-spin');
+        }
+    }
+
+    // ━━━ MODAL LIÊN KẾT TELEGRAM ━━━
+    function handleModalOverlayClick(e) {
+        if (e.target.id === 'modalTelegram') {
+            closeTelegramModal();
+        }
+    }
+
+    function openTelegramModal() {
+        document.getElementById('modalTelegram').style.display = 'flex';
+        renderTelegramModalUI();
+        refreshTelegramStatus(true);
+    }
+
+    function closeTelegramModal() {
+        document.getElementById('modalTelegram').style.display = 'none';
+    }
+
+    function renderTelegramModalUI() {
+        const card = document.getElementById('tgAccountCard');
+        const formTitle = document.getElementById('tgFormTitle');
+
+        if (currentTgAccount && currentTgAccount.connected) {
+            card.style.display = 'block';
+            document.getElementById('tgCardName').textContent = currentTgAccount.name || 'Người dùng Telegram';
+            document.getElementById('tgCardPhone').textContent = currentTgAccount.phone || 'Không rõ SĐT';
+            document.getElementById('tgCardUsername').textContent = currentTgAccount.username ? `@${currentTgAccount.username}` : '';
+            
+            const initial = (currentTgAccount.name || 'TG').substring(0, 2).toUpperCase();
+            document.getElementById('tgAvatarText').textContent = initial;
+
+            if (formTitle) formTitle.textContent = 'Hoặc đổi sang tài khoản khác:';
+        } else {
+            card.style.display = 'none';
+            if (formTitle) formTitle.textContent = 'Đăng nhập tài khoản điều phối:';
+        }
+    }
+
+    function switchTgTab(tab) {
+        const btnOtp = document.getElementById('tabBtnOtp');
+        const btnSession = document.getElementById('tabBtnSession');
+        const contentOtp = document.getElementById('tabContentOtp');
+        const contentSession = document.getElementById('tabContentSession');
+
+        if (tab === 'otp') {
+            btnOtp.classList.add('active');
+            btnSession.classList.remove('active');
+            contentOtp.style.display = 'block';
+            contentSession.style.display = 'none';
+        } else {
+            btnSession.classList.add('active');
+            btnOtp.classList.remove('active');
+            contentSession.style.display = 'block';
+            contentOtp.style.display = 'none';
+        }
+    }
+
+    function backToPhoneStep() {
+        document.getElementById('tgStepPhone').style.display = 'block';
+        document.getElementById('tgStepOtp').style.display = 'none';
+        document.getElementById('tgStep2FA').style.display = 'none';
+    }
+
+    async function submitTelegramPhone() {
+        const phone = document.getElementById('inputTgPhone').value.trim();
+        if (!phone) {
+            showToast('Vui lòng nhập số điện thoại Telegram!', 'fa-circle-exclamation', '#F59E0B');
+            return;
+        }
+
+        const btn = document.getElementById('btnTgSendCode');
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Đang gửi yêu cầu OTP...';
+
+        try {
+            const res = await fetch('/api/telegram/send-code', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ phone })
+            });
+            const j = await res.json();
+
+            if (j.success) {
+                if (j.already_logged_in) {
+                    showToast(j.message, 'fa-circle-check', '#10B981');
+                    currentTgAccount = j.account;
+                    renderTelegramModalUI();
+                    updateHeaderChips({ telegram: j.account });
+                    return;
+                }
+
+                pendingTgPhone = j.phone;
+                pendingTgCodeHash = j.phone_code_hash;
+                showToast(j.message || 'Đã gửi mã OTP!', 'fa-paper-plane', '#10B981');
+                
+                document.getElementById('tgStepPhone').style.display = 'none';
+                document.getElementById('tgStepOtp').style.display = 'block';
+                document.getElementById('tgStep2FA').style.display = 'none';
+                const inputCode = document.getElementById('inputTgCode');
+                inputCode.value = '';
+                inputCode.focus();
+            } else {
+                showToast(j.error || 'Gửi OTP thất bại!', 'fa-circle-exclamation', '#EF4444');
+            }
+        } catch (e) {
+            showToast('Lỗi kết nối máy chủ: ' + e.message, 'fa-triangle-exclamation', '#EF4444');
+        } finally {
+            btn.disabled = false;
+            btn.innerHTML = '<i class="fa-solid fa-paper-plane"></i> Gửi mã OTP xác nhận';
+        }
+    }
+
+    async function submitTelegramCode() {
+        const code = document.getElementById('inputTgCode').value.trim();
+        if (!code) {
+            showToast('Vui lòng nhập mã OTP 5 chữ số!', 'fa-circle-exclamation', '#F59E0B');
+            return;
+        }
+
+        const btn = document.getElementById('btnTgVerifyCode');
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Đang xác thực OTP...';
+
+        try {
+            const res = await fetch('/api/telegram/verify-code', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    code,
+                    phone: pendingTgPhone,
+                    phone_code_hash: pendingTgCodeHash
+                })
+            });
+            const j = await res.json();
+
+            if (j.success) {
+                showToast(j.message || 'Đăng nhập Telegram thành công!', 'fa-circle-check', '#10B981');
+                currentTgAccount = j.account;
+                renderTelegramModalUI();
+                updateHeaderChips({ telegram: j.account });
+                backToPhoneStep();
+                document.getElementById('inputTgPhone').value = '';
+            } else if (j.need_2fa) {
+                showToast(j.message || 'Cần nhập mật khẩu 2FA!', 'fa-shield-halved', '#F59E0B');
+                document.getElementById('tgStepOtp').style.display = 'none';
+                document.getElementById('tgStep2FA').style.display = 'block';
+                const input2FA = document.getElementById('inputTg2FA');
+                input2FA.value = '';
+                input2FA.focus();
+            } else {
+                showToast(j.error || 'Mã OTP không đúng!', 'fa-circle-exclamation', '#EF4444');
+            }
+        } catch (e) {
+            showToast('Lỗi xác thực: ' + e.message, 'fa-triangle-exclamation', '#EF4444');
+        } finally {
+            btn.disabled = false;
+            btn.innerHTML = '<i class="fa-solid fa-check"></i> Xác nhận OTP';
+        }
+    }
+
+    async function submitTelegram2FA() {
+        const password = document.getElementById('inputTg2FA').value.trim();
+        if (!password) {
+            showToast('Vui lòng nhập mật khẩu 2FA!', 'fa-circle-exclamation', '#F59E0B');
+            return;
+        }
+
+        const btn = document.getElementById('btnTgVerify2FA');
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Đang xác thực 2FA...';
+
+        try {
+            const res = await fetch('/api/telegram/verify-2fa', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ password })
+            });
+            const j = await res.json();
+
+            if (j.success) {
+                showToast(j.message || 'Xác thực 2FA thành công!', 'fa-circle-check', '#10B981');
+                currentTgAccount = j.account;
+                renderTelegramModalUI();
+                updateHeaderChips({ telegram: j.account });
+                backToPhoneStep();
+                document.getElementById('inputTgPhone').value = '';
+                document.getElementById('inputTg2FA').value = '';
+            } else {
+                showToast(j.error || 'Mật khẩu 2FA không chính xác!', 'fa-circle-exclamation', '#EF4444');
+            }
+        } catch (e) {
+            showToast('Lỗi xác thực 2FA: ' + e.message, 'fa-triangle-exclamation', '#EF4444');
+        } finally {
+            btn.disabled = false;
+            btn.innerHTML = '<i class="fa-solid fa-unlock"></i> Xác nhận 2FA';
+        }
+    }
+
+    async function submitTelegramStringSession() {
+        const session = document.getElementById('inputTgSessionString').value.trim();
+        if (!session) {
+            showToast('Vui lòng dán chuỗi StringSession!', 'fa-circle-exclamation', '#F59E0B');
+            return;
+        }
+
+        const btn = document.getElementById('btnTgImportSession');
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Đang kích hoạt Session...';
+
+        try {
+            const res = await fetch('/api/telegram/import-session', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ session })
+            });
+            const j = await res.json();
+
+            if (j.success) {
+                showToast(j.message || 'Kích hoạt StringSession thành công!', 'fa-circle-check', '#10B981');
+                currentTgAccount = j.account;
+                renderTelegramModalUI();
+                updateHeaderChips({ telegram: j.account });
+                document.getElementById('inputTgSessionString').value = '';
+            } else {
+                showToast(j.error || 'StringSession không hợp lệ!', 'fa-circle-exclamation', '#EF4444');
+            }
+        } catch (e) {
+            showToast('Lỗi kích hoạt: ' + e.message, 'fa-triangle-exclamation', '#EF4444');
+        } finally {
+            btn.disabled = false;
+            btn.innerHTML = '<i class="fa-solid fa-bolt"></i> Kích hoạt Session';
+        }
+    }
+
+    function copyTelegramSessionString() {
+        if (!currentTgAccount || !currentTgAccount.string_session) {
+            showToast('Chưa có chuỗi StringSession! Đang tải lại...', 'fa-circle-exclamation', '#F59E0B');
+            fetch('/api/telegram/status?refresh=1')
+                .then(r => r.json())
+                .then(j => {
+                    if (j.success && j.data && j.data.string_session) {
+                        currentTgAccount = j.data;
+                        copyText(j.data.string_session, 'StringSession Telethon');
+                    } else {
+                        showToast('Không lấy được chuỗi StringSession!', 'fa-xmark', '#EF4444');
+                    }
+                });
+            return;
+        }
+        copyText(currentTgAccount.string_session, 'StringSession (Dán vào TELEGRAM_SESSION trên Render)');
+    }
+
+    async function logoutTelegramAccount() {
+        if (!confirm('Bạn có chắc chắn muốn hủy liên kết tài khoản Telegram này không?')) {
+            return;
+        }
+
+        try {
+            const res = await fetch('/api/telegram/logout', { method: 'POST' });
+            const j = await res.json();
+            if (j.success) {
+                showToast('Đã hủy liên kết Telegram!', 'fa-right-from-bracket', '#10B981');
+                currentTgAccount = { connected: false, name: 'Chưa kết nối', phone: '', username: '' };
+                renderTelegramModalUI();
+                updateHeaderChips({ telegram: currentTgAccount });
+                backToPhoneStep();
+            } else {
+                showToast(j.error || 'Hủy liên kết thất bại!', 'fa-circle-exclamation', '#EF4444');
+            }
+        } catch (e) {
+            showToast('Lỗi khi đăng xuất: ' + e.message, 'fa-triangle-exclamation', '#EF4444');
         }
     }
 

@@ -108,52 +108,21 @@ SERVICES = {
     "dyn_a3a3ad627f": {"name": "Shopee bò (3.500đ)", "price": 3500}
 }
 
-_tg_cache = {"info": None, "ts": 0}
+try:
+    from telegram_auth import tg_auth_mgr
+except Exception as _tga_err:
+    tg_auth_mgr = None
 
 def get_telegram_account_info(force_refresh=False):
-    """Lấy thông tin tài khoản Telegram đang đăng nhập từ session_master"""
-    now = time.time()
-    if not force_refresh and _tg_cache["info"] and now - _tg_cache["ts"] < 300:
-        return _tg_cache["info"]
-    
-    try:
-        loop = asyncio.new_event_loop()
-        async def _fetch():
-            client = TelegramClient(SESSION_NAME, API_ID, API_HASH)
-            await client.connect()
-            if await client.is_user_authorized():
-                me = await client.get_me()
-                name_parts = [me.first_name or "", me.last_name or ""]
-                full_name = " ".join([p for p in name_parts if p]).strip() or me.username or "User"
-                phone_str = f"+{me.phone}" if me.phone else ""
-                res = {
-                    "connected": True,
-                    "name": full_name,
-                    "phone": phone_str,
-                    "username": me.username or ""
-                }
-            else:
-                res = {
-                    "connected": False,
-                    "name": "Chưa kết nối",
-                    "phone": "",
-                    "username": ""
-                }
-            await client.disconnect()
-            return res
-
-        res = loop.run_until_complete(_fetch())
-        loop.close()
-        _tg_cache["info"] = res
-        _tg_cache["ts"] = now
-        return res
-    except Exception:
-        return {
-            "connected": True,
-            "name": "chubin",
-            "phone": "+84967193558",
-            "username": ""
-        }
+    """Lấy thông tin tài khoản Telegram đang đăng nhập từ tg_auth_mgr"""
+    if tg_auth_mgr:
+        return tg_auth_mgr.get_info(force_refresh=force_refresh)
+    return {
+        "connected": False,
+        "name": "Chưa kết nối",
+        "phone": "",
+        "username": ""
+    }
 
 class AutoRegManager:
     def __init__(self):
