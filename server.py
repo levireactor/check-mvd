@@ -113,11 +113,15 @@ def clean_cookie_str(raw):
                 return p[7:].strip()
     return raw
 
-# ━━━ KIOTPROXY INTEGRATION (api.kiotproxy.com) ━━━━━━━━━━━━━━━━━
+# ━━━ PROXY INTEGRATION (KiotProxy + ProxyVN) ━━━━━━━━━━━━━━━━━━━
 PROXY_CONFIG_FILE = os.path.join(DIRECTORY, "proxy_config.json")
 KIOTPROXY_API_BASE = "https://api.kiotproxy.com/api/public/proxies"
+PROXYVN_API_URL = "https://proxyxoay.shop/api/get.php"
 
 proxy_state = {
+    # Loại provider: "kiotproxy" hoặc "proxyvn"
+    "provider": "proxyvn",
+    # Shared
     "key": "",
     "enabled": False,
     "auto_rotate": True,
@@ -125,7 +129,15 @@ proxy_state = {
     "current_proxy": None,
     "proxy_url": None,
     "last_check": None,
-    "last_error": None
+    "last_error": None,
+    # ProxyVN specific
+    "proxyvn_key": "",
+    "proxyvn_nhamang": "Random",
+    "proxyvn_tinhthanh": "0",
+    "proxyvn_current_ip": "",
+    "proxyvn_location": "",
+    "proxyvn_expire_s": 0,
+    "proxyvn_expire_at": "",
 }
 
 def _load_proxy_config():
@@ -137,26 +149,86 @@ def _load_proxy_config():
                 proxy_state.update(saved)
         except Exception as e:
             print(f"[!] Lỗi đọc proxy_config.json: {e}")
+    # Fallback env vars
     if not proxy_state.get('key'):
         env_key = os.environ.get("KIOTPROXY_KEY", "")
         if env_key:
             proxy_state['key'] = env_key
+    if not proxy_state.get('proxyvn_key'):
+        env_key = os.environ.get("PROXYVN_KEY", "")
+        if env_key:
+            proxy_state['proxyvn_key'] = env_key
 
 _load_proxy_config()
 
 def _save_proxy_config():
     try:
         to_save = {
+            "provider": proxy_state.get("provider", "proxyvn"),
             "key": proxy_state.get("key", ""),
             "enabled": proxy_state.get("enabled", False),
             "auto_rotate": proxy_state.get("auto_rotate", True),
             "region": proxy_state.get("region", ""),
-            "last_check": proxy_state.get("last_check")
+            "last_check": proxy_state.get("last_check"),
+            "proxyvn_key": proxy_state.get("proxyvn_key", ""),
+            "proxyvn_nhamang": proxy_state.get("proxyvn_nhamang", "Random"),
+            "proxyvn_tinhthanh": proxy_state.get("proxyvn_tinhthanh", "0"),
         }
         with open(PROXY_CONFIG_FILE, 'w', encoding='utf-8') as f:
             json.dump(to_save, f, ensure_ascii=False, indent=2)
     except Exception as e:
         print(f"[!] Lỗi ghi proxy_config.json: {e}")
+
+# ━━━ PROXYVN HELPERS (proxyxoay.shop) ━━━━━━━━━━━━━━━━━━━━━━━━━━
+def proxyvn_get_ip(key=None, nhamang=None, tinhthanh=None):
+    """Gọi ProxyVN API để lấy IP xoay mới. Trả về proxy_url dạng http://ip:port"""
+    global proxy_state
+    k = (key or proxy_state.get('proxyvn_key') or '').strip()
+    if not k:
+        return {'success': False, 'message': 'Chưa nhập Key ProxyVN'}
+    nm = nhamang or proxy_state.get('proxyvn_nhamang') or 'Random'
+    tt = tinhthanh if tinhthanh is not None else proxy_state.get('proxyvn_tinhthanh', '0')
+    url = f"{PROXYVN_API_URL}?key={k}&nhamang={nm}&tinhthanh={tt}"
+    try:
+        req = urllib.request.Request(url, headers={'User-Agent': 'ShopeeTracker/4.2'})
+        with urllib.request.urlopen(req, context=ssl_ctx, timeout=12) as res:
+            data = json.loads(res.read().decode('utf-8'))
+        if data.get('status') == 100:
+            proxy_http = data.get('proxyhttp', '')
+            # Format: "IP:PORT::" hoặc "IP:PORT:user:pass"
+            parts = proxy_http.split(':')
+            ip = parts[0] if len(parts) >= 1 else ''
+            port = parts[1] if len(parts) >= 2 else ''
+            user = parts[2] if len(parts) >= 3 else ''
+            pwd = parts[3] if len(parts) >= 4 else ''
+            if user and pwd:
+                p_url = f"http://{user}:{pwd}@{ip}:{port}"
+            else:
+                p_url = f"http://{ip}:{port}"
+            proxy_state['proxyvn_current_ip'] = ip
+            proxy_state['proxyvn_location'] = data.get('Vi Tri', '')
+            proxy_state['proxyvn_expire_s'] = int(data.get('message', '').replace('proxy nay se die sau ', '').replace('s', '').strip() or 0) if 'die sau' in str(data.get('message','')) else 0
+            proxy_state['proxyvn_expire_at'] = data.get('Token expiration date', '')
+            proxy_state['proxy_url'] = p_url
+            proxy_state['current_proxy'] = {
+                'ip': ip, 'port': port,
+                'nhamang': data.get('Nha Mang', nm),
+                'location': data.get('Vi Tri', ''),
+                'expire_at': data.get('Token expiration date', ''),
+                'proxy_url': p_url
+            }
+            proxy_state['last_check'] = datetime.datetime.now().strftime("%H:%M:%S %d/%m/%Y")
+            proxy_state['last_error'] = None
+            print(f"[ProxyVN] Đã lấy IP mới: {ip}:{port} ({data.get('Vi Tri','')}) - {data.get('Nha Mang','')}")
+            return {'success': True, 'data': proxy_state['current_proxy'], 'proxy_url': p_url}
+        else:
+            msg = f"ProxyVN Error status={data.get('status')}: {data.get('message', 'Lỗi không xác định')}"
+            proxy_state['last_error'] = msg
+            return {'success': False, 'message': msg}
+    except Exception as e:
+        msg = f"Lỗi kết nối ProxyVN: {str(e)}"
+        proxy_state['last_error'] = msg
+        return {'success': False, 'message': msg}
 
 def _format_proxy_url(p_data):
     if not p_data or not isinstance(p_data, dict):
@@ -241,9 +313,9 @@ def kiotproxy_out(key=None):
 def fetch_shopee_json(url, headers, timeout=10):
     req = urllib.request.Request(url, headers=headers)
     
-    # Sử dụng Proxy KiotProxy nếu đang bật
     if proxy_state.get('enabled') and proxy_state.get('proxy_url'):
         p_url = proxy_state['proxy_url']
+        provider = proxy_state.get('provider', 'proxyvn')
         try:
             proxy_handler = urllib.request.ProxyHandler({'http': p_url, 'https': p_url})
             https_handler = urllib.request.HTTPSHandler(context=ssl_ctx)
@@ -251,16 +323,18 @@ def fetch_shopee_json(url, headers, timeout=10):
             with opener.open(req, timeout=timeout) as res:
                 return json.loads(res.read().decode('utf-8'))
         except urllib.error.HTTPError as e:
-            # Nếu bị Shopee chặn (429, 403) và bật auto_rotate
             if e.code in (403, 429) and proxy_state.get('auto_rotate'):
-                print(f"[Proxy] Gặp mã HTTP {e.code} từ Shopee, tự động gọi đổi IP KiotProxy...")
+                print(f"[Proxy-{provider}] Gặp HTTP {e.code} từ Shopee, đổi IP...")
                 try:
-                    kiotproxy_get_new()
+                    if provider == 'proxyvn':
+                        proxyvn_get_ip()
+                    else:
+                        kiotproxy_get_new()
                 except Exception:
                     pass
             raise
         except Exception as e:
-            print(f"[Proxy] Lỗi kết nối qua proxy ({p_url}): {e}")
+            print(f"[Proxy-{provider}] Lỗi kết nối ({p_url}): {e}")
             raise
     else:
         with urllib.request.urlopen(req, context=ssl_ctx, timeout=timeout) as res:
@@ -854,15 +928,30 @@ class TrackingRequestHandler(http.server.SimpleHTTPRequestHandler):
                 })
 
         elif self.path == '/api/proxy/info':
-            k = proxy_state.get('key', '')
-            k_preview = (k[:4] + '...' + k[-4:]) if len(k) > 8 else (k or '')
+            kp_k = proxy_state.get('key', '')
+            kp_preview = (kp_k[:4] + '...' + kp_k[-4:]) if len(kp_k) > 8 else (kp_k or '')
+            pvn_k = proxy_state.get('proxyvn_key', '')
+            pvn_preview = (pvn_k[:4] + '...' + pvn_k[-4:]) if len(pvn_k) > 8 else (pvn_k or '')
             self._json(200, {
+                'provider': proxy_state.get('provider', 'proxyvn'),
                 'enabled': proxy_state.get('enabled', False),
-                'has_key': bool(k),
-                'key_preview': k_preview,
-                'key_raw': k,
                 'auto_rotate': proxy_state.get('auto_rotate', True),
+                # KiotProxy
+                'key_raw': kp_k,
+                'key_preview': kp_preview,
+                'has_key': bool(kp_k),
                 'region': proxy_state.get('region', ''),
+                # ProxyVN
+                'proxyvn_key': pvn_k,
+                'proxyvn_key_preview': pvn_preview,
+                'has_proxyvn_key': bool(pvn_k),
+                'proxyvn_nhamang': proxy_state.get('proxyvn_nhamang', 'Random'),
+                'proxyvn_tinhthanh': proxy_state.get('proxyvn_tinhthanh', '0'),
+                'proxyvn_current_ip': proxy_state.get('proxyvn_current_ip', ''),
+                'proxyvn_location': proxy_state.get('proxyvn_location', ''),
+                'proxyvn_expire_s': proxy_state.get('proxyvn_expire_s', 0),
+                'proxyvn_expire_at': proxy_state.get('proxyvn_expire_at', ''),
+                # Common state
                 'current': proxy_state.get('current_proxy'),
                 'proxy_url': proxy_state.get('proxy_url'),
                 'last_check': proxy_state.get('last_check'),
@@ -1004,30 +1093,41 @@ class TrackingRequestHandler(http.server.SimpleHTTPRequestHandler):
         elif self.path == '/api/proxy/save':
             try:
                 body = self._read_body()
-                key = body.get('key', '').strip()
+                provider = body.get('provider', 'proxyvn').strip()
                 enabled = bool(body.get('enabled', False))
                 auto_rotate = bool(body.get('auto_rotate', True))
-                region = body.get('region', '').strip()
-                
-                if key:
-                    proxy_state['key'] = key
+
+                proxy_state['provider'] = provider
                 proxy_state['enabled'] = enabled
                 proxy_state['auto_rotate'] = auto_rotate
-                proxy_state['region'] = region
-                
-                kp_res = None
-                if proxy_state.get('key'):
-                    kp_res = kiotproxy_get_current()
-                
+
+                init_res = None
+                if provider == 'proxyvn':
+                    pv_key = body.get('proxyvn_key', '').strip()
+                    if pv_key:
+                        proxy_state['proxyvn_key'] = pv_key
+                    proxy_state['proxyvn_nhamang'] = body.get('nhamang', 'Random').strip()
+                    proxy_state['proxyvn_tinhthanh'] = str(body.get('tinhthanh', '0')).strip()
+                    if proxy_state.get('proxyvn_key') and enabled:
+                        init_res = proxyvn_get_ip()
+                else:
+                    # KiotProxy
+                    kp_key = body.get('key', '').strip()
+                    if kp_key:
+                        proxy_state['key'] = kp_key
+                    proxy_state['region'] = body.get('region', '').strip()
+                    if proxy_state.get('key'):
+                        init_res = kiotproxy_get_current()
+
                 _save_proxy_config()
                 self._json(200, {
                     'success': True,
+                    'provider': provider,
                     'enabled': proxy_state['enabled'],
                     'auto_rotate': proxy_state['auto_rotate'],
-                    'region': proxy_state['region'],
                     'current': proxy_state.get('current_proxy'),
-                    'kp_res': kp_res,
-                    'message': 'Đã lưu cấu hình Proxy thành công'
+                    'init_res': init_res,
+                    'message': f'Đã lưu cấu hình {provider} thành công'
                 })
             except Exception as e:
                 self._json(500, {'error': f'Lỗi lưu cấu hình: {str(e)}'})
@@ -1036,8 +1136,11 @@ class TrackingRequestHandler(http.server.SimpleHTTPRequestHandler):
             try:
                 body = self._read_body()
                 proxy_state['enabled'] = bool(body.get('enabled', False))
-                if proxy_state['enabled'] and not proxy_state.get('current_proxy') and proxy_state.get('key'):
-                    kiotproxy_get_current()
+                if proxy_state['enabled'] and not proxy_state.get('current_proxy'):
+                    if proxy_state.get('provider') == 'proxyvn' and proxy_state.get('proxyvn_key'):
+                        proxyvn_get_ip()
+                    elif proxy_state.get('key'):
+                        kiotproxy_get_current()
                 _save_proxy_config()
                 self._json(200, {
                     'success': True,
@@ -1050,8 +1153,21 @@ class TrackingRequestHandler(http.server.SimpleHTTPRequestHandler):
         elif self.path == '/api/proxy/new-ip':
             try:
                 body = self._read_body()
-                region = body.get('region')
-                res = kiotproxy_get_new(region=region)
+                if proxy_state.get('provider') == 'proxyvn':
+                    res = proxyvn_get_ip()
+                else:
+                    region = body.get('region')
+                    res = kiotproxy_get_new(region=region)
+                self._json(200, res)
+            except Exception as e:
+                self._json(500, {'error': str(e)})
+
+        elif self.path == '/api/proxy/proxyvn-get-ip':
+            try:
+                body = self._read_body()
+                nhamang = body.get('nhamang')
+                tinhthanh = body.get('tinhthanh')
+                res = proxyvn_get_ip(nhamang=nhamang, tinhthanh=tinhthanh)
                 self._json(200, res)
             except Exception as e:
                 self._json(500, {'error': str(e)})
@@ -1065,12 +1181,15 @@ class TrackingRequestHandler(http.server.SimpleHTTPRequestHandler):
 
         elif self.path == '/api/proxy/test':
             try:
+                # Nếu chưa có proxy_url thì thử lấy
                 if not proxy_state.get('proxy_url'):
-                    if proxy_state.get('key'):
+                    if proxy_state.get('provider') == 'proxyvn' and proxy_state.get('proxyvn_key'):
+                        proxyvn_get_ip()
+                    elif proxy_state.get('key'):
                         kiotproxy_get_current()
                 p_url = proxy_state.get('proxy_url')
                 if not p_url:
-                    return self._json(400, {'error': 'Chưa có thông tin Proxy hoạt động để kiểm tra. Hãy kiểm tra lại Key Proxy.'})
+                    return self._json(400, {'error': 'Chưa có Proxy đang hoạt động. Kiểm tra lại Key.'})
                 
                 t0 = time.time()
                 proxy_handler = urllib.request.ProxyHandler({'http': p_url, 'https': p_url})
@@ -1084,11 +1203,17 @@ class TrackingRequestHandler(http.server.SimpleHTTPRequestHandler):
                 with opener.open(test_req, timeout=10) as res:
                     ip_data = json.loads(res.read().decode('utf-8'))
                     latency_ms = round((time.time() - t0) * 1000)
+                    provider = proxy_state.get('provider', 'proxyvn')
+                    cp = proxy_state.get('current_proxy') or {}
                     self._json(200, {
                         'success': True,
                         'ip': ip_data.get('ip'),
                         'latency_ms': latency_ms,
-                        'proxy_url': p_url
+                        'proxy_url': p_url,
+                        'provider': provider,
+                        'nhamang': cp.get('nhamang', ''),
+                        'location': cp.get('location', ''),
+                        'expire_at': cp.get('expire_at', '')
                     })
             except Exception as e:
                 self._json(500, {'error': f'Kiểm tra kết nối Proxy thất bại: {str(e)}'})

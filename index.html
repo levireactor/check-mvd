@@ -2921,149 +2921,262 @@
     </div>
   </div>
 
-  <!-- ━━━ MODAL: QUẢN LÝ PROXY KIOTPROXY (api.kiotproxy.com) ━━━ -->
+  <!-- ━━━ MODAL: QUẢN LÝ PROXY (ProxyVN + KiotProxy) ━━━ -->
   <div class="modal-overlay" id="modal-proxy" onclick="if(event.target===this) closeProxyModal()">
-    <div class="modal-box" style="max-width: 620px;">
+    <div class="modal-box" style="max-width:660px">
       <div class="modal-header">
         <div style="display:flex;align-items:center;gap:10px">
-          <span style="font-size:1.4rem">🌐</span>
+          <span style="font-size:1.5rem">🛡️</span>
           <div>
-            <h3 style="margin:0;font-size:1.02rem">Cài Đặt Proxy KiotProxy</h3>
-            <div style="font-size:0.75rem;color:var(--text-muted)">Hệ thống đổi IP tự động chống chặn Shopee
-              (api.kiotproxy.com)</div>
+            <h3 style="margin:0;font-size:1.05rem">Cấu hình Proxy IP Việt Nam</h3>
+            <div style="font-size:0.74rem;color:var(--text-muted)">Bypass chặn Shopee — chạy IP dân cư (Residential) VN</div>
           </div>
         </div>
         <button class="modal-close" onclick="closeProxyModal()">&times;</button>
       </div>
 
-      <div class="modal-body" style="padding:1.15rem;gap:0.95rem">
-        <!-- 1. Input Key Proxy -->
-        <div class="proxy-card">
-          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
-            <label style="font-weight:700;font-size:0.83rem">🔑 Key Proxy (KiotProxy)</label>
-            <a href="https://kiotproxy.com" target="_blank"
-              style="font-size:0.74rem;color:#2563eb;text-decoration:underline">Mua key tại KiotProxy.com ↗</a>
-          </div>
-          <div style="display:flex;gap:6px">
-            <div style="position:relative;flex:1">
-              <input type="password" id="input-proxy-key" class="proxy-input"
-                placeholder="Dán mã key KiotProxy của bạn tại đây...">
-              <button type="button" class="btn-eye-toggle" onclick="toggleProxyKeyVisibility()"
-                title="Ẩn/Hiện key">👁️</button>
-            </div>
-            <button class="top-btn" onclick="pasteProxyKeyFromClipboard()" title="Dán từ Clipboard">📋 Dán</button>
-          </div>
-          <div style="font-size:0.74rem;color:var(--text-muted);margin-top:5px">
-            Đầu vào là mã Key được cung cấp từ KiotProxy. Hệ thống sẽ tự động gọi API lấy IP và cấu hình cho backend.
-          </div>
+      <div class="modal-body" style="padding:0;gap:0">
+
+        <!-- ── Tab Switcher ── -->
+        <div id="proxy-tab-bar" style="display:flex;border-bottom:2px solid var(--border-light);background:var(--bg-card)">
+          <button id="tab-proxyvn" onclick="switchProxyTab('proxyvn')"
+            style="flex:1;padding:10px 0;font-size:0.85rem;font-weight:700;border:none;cursor:pointer;
+                   background:transparent;border-bottom:3px solid #2563eb;color:#2563eb;transition:all 0.2s">
+            🇻🇳 ProxyVN <span style="font-size:0.7rem;font-weight:400;opacity:0.8">(proxyxoay.shop)</span>
+          </button>
+          <button id="tab-kiotproxy" onclick="switchProxyTab('kiotproxy')"
+            style="flex:1;padding:10px 0;font-size:0.85rem;font-weight:700;border:none;cursor:pointer;
+                   background:transparent;border-bottom:3px solid transparent;color:var(--text-muted);transition:all 0.2s">
+            ⚙️ KiotProxy <span style="font-size:0.7rem;font-weight:400;opacity:0.8">(api.kiotproxy.com)</span>
+          </button>
         </div>
 
-        <!-- 2. Tùy chọn Bật/Tắt & Khu vực -->
-        <div class="proxy-card">
-          <div style="display:flex;flex-direction:column;gap:10px">
-            <!-- Toggle kích hoạt -->
-            <div style="display:flex;align-items:center;justify-content:space-between">
+        <div style="padding:1rem;display:flex;flex-direction:column;gap:0.85rem">
+
+          <!-- ══ PANEL: PROXYVN ══ -->
+          <div id="panel-proxyvn">
+
+            <!-- Banner giới thiệu -->
+            <div style="background:linear-gradient(135deg,#1e40af 0%,#1d4ed8 50%,#2563eb 100%);
+                        border-radius:10px;padding:12px 15px;margin-bottom:12px;display:flex;align-items:center;gap:12px">
+              <span style="font-size:2rem">🌐</span>
               <div>
-                <div style="font-weight:700;font-size:0.83rem">Kích hoạt sử dụng Proxy</div>
-                <div style="font-size:0.74rem;color:var(--text-muted)">Mọi lượt Quét Cookie & Renew đơn Shopee sẽ đi qua
-                  Proxy này</div>
+                <div style="font-weight:700;font-size:0.9rem;color:#fff">ProxyVN — Proxy Xoay Việt Nam</div>
+                <div style="font-size:0.74rem;color:#bfdbfe;margin-top:2px">IP dân cư VN (Viettel/FPT/VNPT) — Shopee không chặn được</div>
               </div>
-              <label class="switch-toggle">
-                <input type="checkbox" id="chk-proxy-enabled">
-                <span class="slider-toggle"></span>
-              </label>
+              <a href="https://proxy.vn" target="_blank"
+                style="margin-left:auto;background:#fff;color:#1d4ed8;font-size:0.75rem;font-weight:700;
+                       padding:5px 12px;border-radius:20px;text-decoration:none;white-space:nowrap">
+                Mua Key ↗
+              </a>
             </div>
 
-            <div style="height:1px;background:var(--border-light)"></div>
-
-            <!-- Toggle auto rotate -->
-            <div style="display:flex;align-items:center;justify-content:space-between">
-              <div>
-                <div style="font-weight:700;font-size:0.83rem">Tự động đổi IP khi bị chặn (Auto-rotate)</div>
-                <div style="font-size:0.74rem;color:var(--text-muted)">Tự gọi API lấy IP mới khi gặp lỗi rate-limit
-                  (403, 429) từ Shopee</div>
+            <!-- Key ProxyVN -->
+            <div class="proxy-card">
+              <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:7px">
+                <label style="font-weight:700;font-size:0.83rem">🔑 Key Xoay ProxyVN</label>
+                <span style="font-size:0.72rem;color:var(--text-muted)">Key nhận từ <strong>proxy.vn</strong> sau khi mua gói</span>
               </div>
-              <label class="switch-toggle">
-                <input type="checkbox" id="chk-proxy-autorotate" checked>
-                <span class="slider-toggle"></span>
-              </label>
+              <div style="display:flex;gap:6px">
+                <div style="position:relative;flex:1">
+                  <input type="password" id="input-proxyvn-key" class="proxy-input"
+                    placeholder="Dán key xoay ProxyVN tại đây (vd: rwywzSOvFNZOWDVJJ...)">
+                  <button type="button" class="btn-eye-toggle" onclick="togglePvnKeyVisibility()" title="Ẩn/Hiện">👁️</button>
+                </div>
+                <button class="top-btn" onclick="pastePvnKey()" title="Dán từ Clipboard">📋 Dán</button>
+              </div>
             </div>
 
-            <div style="height:1px;background:var(--border-light)"></div>
-
-            <!-- Chọn Region -->
-            <div style="display:flex;align-items:center;justify-content:space-between">
-              <div>
-                <div style="font-weight:700;font-size:0.83rem">Khu vực ưu tiên (Region)</div>
-                <div style="font-size:0.74rem;color:var(--text-muted)">Chọn tỉnh thành hoặc để ngẫu nhiên toàn quốc
+            <!-- Nhà mạng + Tỉnh thành -->
+            <div class="proxy-card">
+              <div style="font-weight:700;font-size:0.83rem;margin-bottom:10px">📡 Tùy chọn IP</div>
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+                <div>
+                  <label style="font-size:0.76rem;font-weight:600;color:var(--text-muted);display:block;margin-bottom:4px">Nhà mạng</label>
+                  <select id="pvn-nhamang" style="width:100%;padding:6px 8px;border-radius:7px;border:1px solid var(--border-light);font-size:0.82rem;background:var(--bg-input)">
+                    <option value="Random">🔀 Random (Tất cả)</option>
+                    <option value="viettel">📶 Viettel</option>
+                    <option value="fpt">📶 FPT</option>
+                    <option value="vnpt">📶 VNPT</option>
+                  </select>
+                </div>
+                <div>
+                  <label style="font-size:0.76rem;font-weight:600;color:var(--text-muted);display:block;margin-bottom:4px">Tỉnh / Thành phố</label>
+                  <select id="pvn-tinhthanh" style="width:100%;padding:6px 8px;border-radius:7px;border:1px solid var(--border-light);font-size:0.82rem;background:var(--bg-input)">
+                    <option value="0">🗺️ Toàn quốc (Random)</option>
+                    <option value="3">Hà Nội</option>
+                    <option value="6">Hồ Chí Minh</option>
+                    <option value="16">Đà Nẵng</option>
+                    <option value="1">Phú Thọ</option>
+                    <option value="2">Tuyên Quang</option>
+                    <option value="4">Hải Dương</option>
+                    <option value="5">Bắc Giang</option>
+                    <option value="7">Tây Ninh</option>
+                    <option value="8">Đồng Nai</option>
+                    <option value="9">Vũng Tàu</option>
+                    <option value="10">Bình Dương</option>
+                    <option value="11">Nghệ An</option>
+                    <option value="12">Hà Tĩnh</option>
+                    <option value="25">Hải Phòng</option>
+                    <option value="26">Quảng Ninh</option>
+                  </select>
                 </div>
               </div>
-              <select id="select-proxy-region"
-                style="padding:4px 8px;border-radius:6px;border:1px solid #cbd5e1;font-size:0.8rem">
-                <option value="">Ngẫu nhiên (Tất cả)</option>
-                <option value="Hà Nội">Hà Nội</option>
-                <option value="Hồ Chí Minh">TP. Hồ Chí Minh</option>
-                <option value="Đà Nẵng">Đà Nẵng</option>
-              </select>
             </div>
-          </div>
-        </div>
 
-        <!-- 3. Bảng thông tin IP Proxy Live -->
-        <div class="proxy-card" id="proxy-live-card">
-          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
-            <div style="font-weight:700;font-size:0.83rem;display:flex;align-items:center;gap:6px">
-              <span class="proxy-status-pill" id="proxy-live-status-pill">Chưa kích hoạt</span>
-              <span>Thông tin IP Proxy</span>
+            <!-- Bật/Tắt + Auto-rotate -->
+            <div class="proxy-card">
+              <div style="display:flex;flex-direction:column;gap:10px">
+                <div style="display:flex;align-items:center;justify-content:space-between">
+                  <div>
+                    <div style="font-weight:700;font-size:0.83rem">Kích hoạt ProxyVN</div>
+                    <div style="font-size:0.74rem;color:var(--text-muted)">Mọi request Shopee sẽ đi qua IP Việt Nam</div>
+                  </div>
+                  <label class="switch-toggle">
+                    <input type="checkbox" id="chk-proxy-enabled">
+                    <span class="slider-toggle"></span>
+                  </label>
+                </div>
+                <div style="height:1px;background:var(--border-light)"></div>
+                <div style="display:flex;align-items:center;justify-content:space-between">
+                  <div>
+                    <div style="font-weight:700;font-size:0.83rem">Tự động đổi IP khi bị chặn</div>
+                    <div style="font-size:0.74rem;color:var(--text-muted)">Gọi lại API lấy IP mới khi Shopee trả 403/429</div>
+                  </div>
+                  <label class="switch-toggle">
+                    <input type="checkbox" id="chk-proxy-autorotate" checked>
+                    <span class="slider-toggle"></span>
+                  </label>
+                </div>
+              </div>
             </div>
-            <button class="top-btn" style="padding:2px 8px;font-size:0.75rem" onclick="refreshProxyInfo()"
-              title="Cập nhật lại trạng thái">🔄 Làm mới</button>
+
+          </div><!-- /panel-proxyvn -->
+
+          <!-- ══ PANEL: KIOTPROXY ══ (ẩn mặc định) -->
+          <div id="panel-kiotproxy" style="display:none">
+
+            <div style="background:linear-gradient(135deg,#065f46 0%,#047857 100%);
+                        border-radius:10px;padding:12px 15px;margin-bottom:12px;display:flex;align-items:center;gap:12px">
+              <span style="font-size:2rem">⚙️</span>
+              <div>
+                <div style="font-weight:700;font-size:0.9rem;color:#fff">KiotProxy</div>
+                <div style="font-size:0.74rem;color:#a7f3d0;margin-top:2px">Proxy API — api.kiotproxy.com</div>
+              </div>
+              <a href="https://kiotproxy.com" target="_blank"
+                style="margin-left:auto;background:#fff;color:#065f46;font-size:0.75rem;font-weight:700;
+                       padding:5px 12px;border-radius:20px;text-decoration:none;white-space:nowrap">
+                Mua Key ↗
+              </a>
+            </div>
+
+            <div class="proxy-card">
+              <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:7px">
+                <label style="font-weight:700;font-size:0.83rem">🔑 Key KiotProxy</label>
+              </div>
+              <div style="display:flex;gap:6px">
+                <div style="position:relative;flex:1">
+                  <input type="password" id="input-proxy-key" class="proxy-input"
+                    placeholder="Dán mã key KiotProxy của bạn tại đây...">
+                  <button type="button" class="btn-eye-toggle" onclick="toggleProxyKeyVisibility()" title="Ẩn/Hiện key">👁️</button>
+                </div>
+                <button class="top-btn" onclick="pasteProxyKeyFromClipboard()" title="Dán từ Clipboard">📋 Dán</button>
+              </div>
+            </div>
+
+            <div class="proxy-card">
+              <div style="display:flex;flex-direction:column;gap:10px">
+                <div style="display:flex;align-items:center;justify-content:space-between">
+                  <div>
+                    <div style="font-weight:700;font-size:0.83rem">Kích hoạt KiotProxy</div>
+                    <div style="font-size:0.74rem;color:var(--text-muted)">Dùng KiotProxy thay ProxyVN</div>
+                  </div>
+                  <label class="switch-toggle">
+                    <input type="checkbox" id="chk-kp-enabled">
+                    <span class="slider-toggle"></span>
+                  </label>
+                </div>
+                <div style="height:1px;background:var(--border-light)"></div>
+                <div style="display:flex;align-items:center;justify-content:space-between">
+                  <div>
+                    <div style="font-weight:700;font-size:0.83rem">Tự động đổi IP (Auto-rotate)</div>
+                    <div style="font-size:0.74rem;color:var(--text-muted)">Đổi IP tự động khi gặp 403/429</div>
+                  </div>
+                  <label class="switch-toggle">
+                    <input type="checkbox" id="chk-proxy-autorotate-kp" checked>
+                    <span class="slider-toggle"></span>
+                  </label>
+                </div>
+                <div style="height:1px;background:var(--border-light)"></div>
+                <div style="display:flex;align-items:center;justify-content:space-between">
+                  <div style="font-weight:700;font-size:0.83rem">Khu vực ưu tiên</div>
+                  <select id="select-proxy-region"
+                    style="padding:5px 8px;border-radius:7px;border:1px solid var(--border-light);font-size:0.8rem;background:var(--bg-input)">
+                    <option value="">Ngẫu nhiên</option>
+                    <option value="Hà Nội">Hà Nội</option>
+                    <option value="Hồ Chí Minh">TP. HCM</option>
+                    <option value="Đà Nẵng">Đà Nẵng</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+
+          </div><!-- /panel-kiotproxy -->
+
+          <!-- ── Card IP Live (chung 2 provider) ── -->
+          <div class="proxy-card" id="proxy-live-card">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+              <div style="font-weight:700;font-size:0.83rem;display:flex;align-items:center;gap:6px">
+                <span class="proxy-status-pill" id="proxy-live-status-pill">Chưa kích hoạt</span>
+                <span>Thông tin IP Proxy</span>
+              </div>
+              <button class="top-btn" style="padding:2px 9px;font-size:0.75rem" onclick="refreshProxyInfo()"
+                title="Cập nhật lại trạng thái">🔄 Làm mới</button>
+            </div>
+
+            <div class="proxy-grid-info">
+              <div class="proxy-info-item">
+                <span class="pi-label">IP Hiện tại:</span>
+                <span class="pi-val" id="pi-ip" style="font-family:var(--mono);color:var(--primary-blue)">--</span>
+              </div>
+              <div class="proxy-info-item">
+                <span class="pi-label">Nhà mạng:</span>
+                <span class="pi-val" id="pi-nhamang">--</span>
+              </div>
+              <div class="proxy-info-item">
+                <span class="pi-label">Vị trí (Location):</span>
+                <span class="pi-val" id="pi-location">--</span>
+              </div>
+              <div class="proxy-info-item">
+                <span class="pi-label">Cổng HTTP:</span>
+                <span class="pi-val" id="pi-port" style="font-family:var(--mono)">--</span>
+              </div>
+              <div class="proxy-info-item">
+                <span class="pi-label">Hết hạn IP lúc:</span>
+                <span class="pi-val" id="pi-ttl" style="color:#d97706">--</span>
+              </div>
+              <div class="proxy-info-item">
+                <span class="pi-label">Hạn gói dịch vụ:</span>
+                <span class="pi-val" id="pi-expiration">--</span>
+              </div>
+            </div>
+
+            <div id="proxy-test-result"
+              style="display:none;margin-top:8px;padding:7px 11px;border-radius:7px;font-size:0.78rem"></div>
           </div>
 
-          <div class="proxy-grid-info">
-            <div class="proxy-info-item">
-              <span class="pi-label">IP Hiện tại:</span>
-              <span class="pi-val" id="pi-ip" style="font-family:var(--mono);color:var(--primary-blue)">--</span>
-            </div>
-            <div class="proxy-info-item">
-              <span class="pi-label">Cổng HTTP:</span>
-              <span class="pi-val" id="pi-port" style="font-family:var(--mono)">--</span>
-            </div>
-            <div class="proxy-info-item">
-              <span class="pi-label">Vị trí (Location):</span>
-              <span class="pi-val" id="pi-location">--</span>
-            </div>
-            <div class="proxy-info-item">
-              <span class="pi-label">Sống còn lại (TTL):</span>
-              <span class="pi-val" id="pi-ttl">--</span>
-            </div>
-            <div class="proxy-info-item">
-              <span class="pi-label">Chờ đổi IP (TTC):</span>
-              <span class="pi-val" id="pi-ttc" style="color:#d97706">--</span>
-            </div>
-            <div class="proxy-info-item">
-              <span class="pi-label">Hạn dùng gói:</span>
-              <span class="pi-val" id="pi-expiration">--</span>
-            </div>
-          </div>
-
-          <div id="proxy-test-result"
-            style="display:none;margin-top:8px;padding:6px 10px;border-radius:6px;font-size:0.78rem"></div>
-        </div>
-      </div>
+        </div><!-- /padding wrapper -->
+      </div><!-- /modal-body -->
 
       <div class="modal-footer" style="display:flex;justify-content:space-between;align-items:center">
         <div style="display:flex;gap:6px">
-          <button class="top-btn" id="btn-proxy-rotate" onclick="actionRotateIp()"
-            title="Lấy ngay IP proxy mới từ KiotProxy">
+          <button class="top-btn" id="btn-proxy-rotate" onclick="actionRotateIp()" title="Lấy IP mới ngay">
             🔄 Đổi IP Mới
           </button>
-          <button class="top-btn" id="btn-proxy-test" onclick="actionTestProxy()"
-            title="Kiểm tra kết nối và độ trễ Ping thực tế">
+          <button class="top-btn" id="btn-proxy-test" onclick="actionTestProxy()" title="Kiểm tra ping & IP thực">
             ⚡ Test Ping
           </button>
-          <button class="top-btn" style="color:#ef4444" onclick="actionOutProxy()"
-            title="Giải phóng key proxy trên KiotProxy">
+          <button class="top-btn" style="color:#ef4444;display:none" id="btn-proxy-out" onclick="actionOutProxy()" title="Giải phóng key KiotProxy">
             ⏹️ Trả Key (Out)
           </button>
         </div>
@@ -5422,6 +5535,77 @@
       }
     }
 
+    let currentProxyTab = 'proxyvn';
+
+    function switchProxyTab(tab) {
+      currentProxyTab = tab;
+      const tabPvn = $('tab-proxyvn');
+      const tabKp = $('tab-kiotproxy');
+      const panelPvn = $('panel-proxyvn');
+      const panelKp = $('panel-kiotproxy');
+      const btnOut = $('btn-proxy-out');
+
+      if (tab === 'proxyvn') {
+        if (tabPvn) {
+          tabPvn.style.borderBottom = '3px solid #2563eb';
+          tabPvn.style.color = '#2563eb';
+        }
+        if (tabKp) {
+          tabKp.style.borderBottom = '3px solid transparent';
+          tabKp.style.color = 'var(--text-muted)';
+        }
+        if (panelPvn) panelPvn.style.display = 'block';
+        if (panelKp) panelKp.style.display = 'none';
+        if (btnOut) btnOut.style.display = 'none';
+      } else {
+        if (tabPvn) {
+          tabPvn.style.borderBottom = '3px solid transparent';
+          tabPvn.style.color = 'var(--text-muted)';
+        }
+        if (tabKp) {
+          tabKp.style.borderBottom = '3px solid #059669';
+          tabKp.style.color = '#059669';
+        }
+        if (panelPvn) panelPvn.style.display = 'none';
+        if (panelKp) panelKp.style.display = 'block';
+        if (btnOut) btnOut.style.display = 'inline-block';
+      }
+    }
+
+    function togglePvnKeyVisibility() {
+      const inp = $('input-proxyvn-key');
+      if (inp) inp.type = inp.type === 'password' ? 'text' : 'password';
+    }
+
+    async function pastePvnKey() {
+      try {
+        const text = await navigator.clipboard.readText();
+        if (text) {
+          $('input-proxyvn-key').value = text.trim();
+          showToast('Đã dán Key ProxyVN từ Clipboard!', '📋');
+        }
+      } catch (e) {
+        showToast('Không thể đọc Clipboard: ' + e.message, '⚠️');
+      }
+    }
+
+    function toggleProxyKeyVisibility() {
+      const inp = $('input-proxy-key');
+      if (inp) inp.type = inp.type === 'password' ? 'text' : 'password';
+    }
+
+    async function pasteProxyKeyFromClipboard() {
+      try {
+        const text = await navigator.clipboard.readText();
+        if (text) {
+          $('input-proxy-key').value = text.trim();
+          showToast('Đã dán Key KiotProxy từ Clipboard!', '📋');
+        }
+      } catch (e) {
+        showToast('Không thể đọc Clipboard: ' + e.message, '⚠️');
+      }
+    }
+
     function updateTopProxyButton(info) {
       const btn = $('btn-top-proxy');
       const txt = $('top-proxy-text');
@@ -5429,18 +5613,19 @@
 
       if (info && info.enabled) {
         btn.classList.add('active');
-        const ip = info.current?.realIpAddress || info.current?.host;
+        const ip = info.current?.ip || info.current?.realIpAddress || info.current?.host || info.proxyvn_current_ip;
+        const prov = (info.provider === 'kiotproxy') ? 'KP' : 'VN';
         if (ip) {
-          txt.textContent = `Proxy: ${ip}`;
-          btn.title = `Proxy Đang BẬT - IP: ${ip} (${info.current?.location || ''})`;
+          txt.textContent = `🛡️ ${prov}: ${ip}`;
+          btn.title = `Proxy Đang BẬT (${info.provider || 'ProxyVN'}) - IP: ${ip} (${info.current?.location || ''})`;
         } else {
-          txt.textContent = 'Proxy: BẬT';
-          btn.title = 'Proxy đang bật nhưng chưa có dữ liệu IP';
+          txt.textContent = `🛡️ Proxy: BẬT`;
+          btn.title = 'Proxy đang bật nhưng chưa có kết nối IP';
         }
       } else {
         btn.classList.remove('active');
-        txt.textContent = 'Proxy: Tắt';
-        btn.title = 'Proxy KiotProxy đang tắt. Bấm để cài đặt & kích hoạt';
+        txt.textContent = '🛡️ Proxy: Tắt';
+        btn.title = 'Proxy đang tắt. Bấm để mở cấu hình & kích hoạt';
       }
     }
 
@@ -5454,35 +5639,35 @@
       if (ttcCountdownTimer) clearInterval(ttcCountdownTimer);
     }
 
-    function toggleProxyKeyVisibility() {
-      const inp = $('input-proxy-key');
-      if (!inp) return;
-      inp.type = inp.type === 'password' ? 'text' : 'password';
-    }
-
-    async function pasteProxyKeyFromClipboard() {
-      try {
-        const text = await navigator.clipboard.readText();
-        if (text) {
-          $('input-proxy-key').value = text.trim();
-          showToast('Đã dán key từ Clipboard!', '📋');
-        }
-      } catch (e) {
-        showToast('Không thể đọc Clipboard: ' + e.message, '⚠️');
-      }
-    }
-
     async function refreshProxyInfo() {
       try {
         const res = await fetch('/api/proxy/info');
         const info = await res.json();
         currentProxyData = info;
 
+        // Cập nhật tab phù hợp theo provider đang lưu
+        const prov = info.provider || 'proxyvn';
+        switchProxyTab(prov);
+
+        // Fill ProxyVN fields
+        if (info.proxyvn_key) {
+          $('input-proxyvn-key').value = info.proxyvn_key;
+        }
+        if (info.proxyvn_nhamang) {
+          $('pvn-nhamang').value = info.proxyvn_nhamang;
+        }
+        if (info.proxyvn_tinhthanh !== undefined) {
+          $('pvn-tinhthanh').value = String(info.proxyvn_tinhthanh);
+        }
+        $('chk-proxy-enabled').checked = Boolean(info.enabled && prov === 'proxyvn');
+        $('chk-proxy-autorotate').checked = info.auto_rotate !== false;
+
+        // Fill KiotProxy fields
         if (info.key_raw) {
           $('input-proxy-key').value = info.key_raw;
         }
-        $('chk-proxy-enabled').checked = Boolean(info.enabled);
-        $('chk-proxy-autorotate').checked = info.auto_rotate !== false;
+        $('chk-kp-enabled').checked = Boolean(info.enabled && prov === 'kiotproxy');
+        $('chk-proxy-autorotate-kp').checked = info.auto_rotate !== false;
         if (info.region !== undefined) {
           $('select-proxy-region').value = info.region || '';
         }
@@ -5497,81 +5682,69 @@
     function renderProxyCard(info) {
       const pill = $('proxy-live-status-pill');
       const ipEl = $('pi-ip');
+      const nmEl = $('pi-nhamang');
       const portEl = $('pi-port');
       const locEl = $('pi-location');
       const ttlEl = $('pi-ttl');
-      const ttcEl = $('pi-ttc');
       const expEl = $('pi-expiration');
 
+      const isPvn = (info.provider || 'proxyvn') === 'proxyvn';
       const p = info.current;
+
       if (p) {
         pill.textContent = info.enabled ? '🟢 Đang hoạt động' : '⚪ Đã tắt';
         pill.className = 'proxy-status-pill ' + (info.enabled ? 'active' : '');
 
-        ipEl.textContent = p.realIpAddress || p.host || '--';
-        portEl.textContent = p.httpPort ? `${p.httpPort} (HTTP) / ${p.socks5Port || '--'} (SOCKS5)` : (p.http || '--');
-        locEl.textContent = p.location || p.region || 'Việt Nam';
-
-        ttlEl.textContent = p.ttl !== undefined ? `${p.ttl}s (${Math.round(p.ttl / 60)} phút)` : '--';
-
-        if (ttcCountdownTimer) clearInterval(ttcCountdownTimer);
-        let ttcVal = parseInt(p.ttc, 10);
-        if (!isNaN(ttcVal) && ttcVal > 0) {
-          ttcEl.textContent = `${ttcVal}s`;
-          ttcCountdownTimer = setInterval(() => {
-            ttcVal--;
-            if (ttcVal <= 0) {
-              clearInterval(ttcCountdownTimer);
-              ttcEl.textContent = 'Có thể đổi IP ngay ⚡';
-            } else {
-              ttcEl.textContent = `${ttcVal}s`;
-            }
-          }, 1000);
-        } else {
-          ttcEl.textContent = 'Có thể đổi IP ngay ⚡';
-        }
-
-        if (p.expirationAt) {
-          try {
-            const d = new Date(p.expirationAt);
-            expEl.textContent = d.toLocaleString('vi-VN');
-          } catch (e) {
-            expEl.textContent = p.expirationAt;
-          }
-        } else {
-          expEl.textContent = '--';
-        }
+        const curIp = p.ip || p.realIpAddress || p.host || '--';
+        ipEl.textContent = curIp;
+        if (nmEl) nmEl.textContent = p.nhamang || p.telecom || (isPvn ? info.proxyvn_nhamang : '--');
+        if (portEl) portEl.textContent = p.port ? `${p.port} (HTTP)` : (p.httpPort ? `${p.httpPort} (HTTP)` : '--');
+        if (locEl) locEl.textContent = p.location || p.region || (info.proxyvn_location || 'Việt Nam');
+        if (ttlEl) ttlEl.textContent = p.expire_at || (info.proxyvn_expire_s ? `${info.proxyvn_expire_s}s` : (p.ttl ? `${p.ttl}s` : '--'));
+        if (expEl) expEl.textContent = info.proxyvn_expire_at || p.expirationAt || '--';
       } else {
-        pill.textContent = info.has_key ? '⚠️ Chưa nạp được IP' : 'Chưa có Key';
-        pill.className = 'proxy-status-pill ' + (info.has_key ? 'error' : '');
-        ipEl.textContent = '--';
-        portEl.textContent = '--';
-        locEl.textContent = '--';
-        ttlEl.textContent = '--';
-        ttcEl.textContent = '--';
-        expEl.textContent = '--';
+        const hasKey = isPvn ? info.has_proxyvn_key : info.has_key;
+        pill.textContent = hasKey ? '⚠️ Chưa nạp IP' : 'Chưa có Key';
+        pill.className = 'proxy-status-pill ' + (hasKey ? 'error' : '');
+        if (ipEl) ipEl.textContent = '--';
+        if (nmEl) nmEl.textContent = '--';
+        if (portEl) portEl.textContent = '--';
+        if (locEl) locEl.textContent = '--';
+        if (ttlEl) ttlEl.textContent = '--';
+        if (expEl) expEl.textContent = '--';
       }
     }
 
     async function saveProxyConfigAndApply() {
-      const key = $('input-proxy-key').value.trim();
-      const enabled = $('chk-proxy-enabled').checked;
-      const autoRotate = $('chk-proxy-autorotate').checked;
-      const region = $('select-proxy-region').value;
+      const isPvn = currentProxyTab === 'proxyvn';
+      const payload = {
+        provider: currentProxyTab,
+        enabled: isPvn ? $('chk-proxy-enabled').checked : $('chk-kp-enabled').checked,
+        auto_rotate: isPvn ? $('chk-proxy-autorotate').checked : $('chk-proxy-autorotate-kp').checked
+      };
+
+      if (isPvn) {
+        payload.proxyvn_key = $('input-proxyvn-key').value.trim();
+        payload.nhamang = $('pvn-nhamang').value;
+        payload.tinhthanh = $('pvn-tinhthanh').value;
+      } else {
+        payload.key = $('input-proxy-key').value.trim();
+        payload.region = $('select-proxy-region').value;
+      }
 
       try {
         const res = await fetch('/api/proxy/save', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ key, enabled, auto_rotate: autoRotate, region })
+          body: JSON.stringify(payload)
         });
         const data = await res.json();
         if (data.success) {
-          showToast('Đã lưu cấu hình Proxy thành công!', '💾');
-          addLog(`[Proxy KiotProxy] Đã cập nhật cấu hình (Bật: ${enabled}, Vùng: ${region || 'Mặc định'}).`);
+          showToast(`Đã lưu cấu hình ${isPvn ? 'ProxyVN' : 'KiotProxy'}!`, '💾');
+          addLog(`[Proxy] Đã cập nhật cấu hình: ${isPvn ? 'ProxyVN' : 'KiotProxy'} (Bật: ${payload.enabled}).`);
           await refreshProxyInfo();
-          if (data.kp_res && !data.kp_res.success) {
-            showToast('Cảnh báo KiotProxy: ' + (data.kp_res.message || 'Key không hợp lệ'), '⚠️');
+          if (data.init_res && !data.init_res.success) {
+            showToast('Lưu ý: ' + (data.init_res.message || 'Chưa nạp được IP'), '⚠️');
           }
         } else {
           showToast('Lỗi lưu: ' + (data.error || 'Server error'), '❌');
@@ -5586,19 +5759,24 @@
       btn.disabled = true;
       btn.textContent = '⏳ Đang đổi...';
       try {
-        const region = $('select-proxy-region').value;
+        const isPvn = currentProxyTab === 'proxyvn';
+        const bodyPayload = isPvn
+          ? { nhamang: $('pvn-nhamang').value, tinhthanh: $('pvn-tinhthanh').value }
+          : { region: $('select-proxy-region').value };
+
         const res = await fetch('/api/proxy/new-ip', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ region })
+          body: JSON.stringify(bodyPayload)
         });
         const d = await res.json();
-        if (d.success && d.data) {
-          showToast(`Đã đổi sang IP mới: ${d.data.realIpAddress || d.data.host}!`, '🎉');
-          addLog(`[Proxy Đổi IP] IP mới: ${d.data.realIpAddress} (${d.data.location || ''})`);
+        if (d.success && (d.data || d.proxy_url)) {
+          const newIp = d.data?.ip || d.data?.realIpAddress || d.data?.host || '';
+          showToast(`Đã đổi IP thành công: ${newIp}!`, '🎉');
+          addLog(`[Proxy Đổi IP] IP mới: ${newIp} (${d.data?.location || d.data?.Vi_Tri || ''})`);
           await refreshProxyInfo();
         } else {
-          showToast(`Không thể đổi IP: ${d.message || 'Chưa hết thời gian chờ TTC'}`, '⚠️');
+          showToast(`Không thể đổi IP: ${d.message || 'Vui lòng kiểm tra lại Key'}`, '⚠️');
         }
       } catch (e) {
         showToast('Lỗi gọi API đổi IP: ' + e.message, '❌');
@@ -5616,7 +5794,7 @@
       resEl.style.display = 'block';
       resEl.style.background = '#f1f5f9';
       resEl.style.color = '#475569';
-      resEl.innerHTML = '⏳ Đang gửi request kiểm tra qua Proxy KiotProxy...';
+      resEl.innerHTML = '⏳ Đang gửi request kiểm tra qua Proxy...';
 
       try {
         const res = await fetch('/api/proxy/test', { method: 'POST' });
@@ -5624,9 +5802,9 @@
         if (d.success) {
           resEl.style.background = '#dcfce7';
           resEl.style.color = '#15803d';
-          resEl.innerHTML = `✅ <b>Kết nối Proxy thành công!</b> IP ra ngoài: <b>${d.ip}</b> | Ping độ trễ: <b>${d.latency_ms} ms</b>`;
+          resEl.innerHTML = `✅ <b>Proxy kết nối tốt!</b> IP ra ngoài: <b>${d.ip}</b> | Ping độ trễ: <b>${d.latency_ms} ms</b>`;
           showToast(`Test Ping: ${d.latency_ms}ms (IP: ${d.ip})`, '⚡');
-          addLog(`[Proxy Test] Thành công. IP: ${d.ip}, Độ trễ: ${d.latency_ms}ms.`);
+          addLog(`[Proxy Test] Thành công! IP: ${d.ip}, Độ trễ: ${d.latency_ms}ms.`);
         } else {
           resEl.style.background = '#fee2e2';
           resEl.style.color = '#b91c1c';
