@@ -4360,7 +4360,10 @@
         vaultList = data.items || [];
         renderVaultTable();
       } catch (e) {
-        showToast('Lỗi đọc kho cookie: ' + e.message, '⚠️');
+        console.warn('Kho cookie:', e);
+        if (!vaultList.length) {
+          renderVaultTable();
+        }
       }
     }
 

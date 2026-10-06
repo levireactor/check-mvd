@@ -1,14 +1,16 @@
 """
-Script chuyển dữ liệu từ draft.json lên Supabase.
+Script chuyển dữ liệu từ draft.json và cookie_vault.json lên Supabase.
 Chạy 1 lần sau khi đã điền SUPABASE_URL và SUPABASE_KEY vào file .env
 """
-import json, os, datetime, sys
+import json, os, datetime, sys, re
 if hasattr(sys.stdout, 'reconfigure'):
     sys.stdout.reconfigure(encoding='utf-8', errors='replace')
     sys.stderr.reconfigure(encoding='utf-8', errors='replace')
 
-ENV_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), '.env')
-DRAFT_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'draft.json')
+DIRECTORY = os.path.dirname(os.path.abspath(__file__))
+ENV_FILE = os.path.join(DIRECTORY, '.env')
+DRAFT_FILE = os.path.join(DIRECTORY, 'draft.json')
+VAULT_FILE = os.path.join(DIRECTORY, 'cookie_vault.json')
 
 SUPABASE_URL = ""
 SUPABASE_KEY = ""
@@ -36,35 +38,63 @@ except ImportError:
     print("❌ Chưa cài supabase-py. Chạy: pip install supabase")
     exit(1)
 
-if not os.path.exists(DRAFT_FILE):
-    print("⚠️  Không tìm thấy draft.json. Không có dữ liệu để migrate.")
-    exit(0)
-
-with open(DRAFT_FILE, 'r', encoding='utf-8') as f:
-    data = json.load(f)
-
-rows = data.get('rows', [])
-if not rows:
-    print("⚠️  draft.json rỗng. Không có dữ liệu để migrate.")
-    exit(0)
-
-print(f"🔍 Tìm thấy {len(rows)} đơn hàng trong draft.json")
-print(f"🌐 Đang kết nối Supabase: {SUPABASE_URL[:40]}...")
-
 sb = create_client(SUPABASE_URL, SUPABASE_KEY)
-now_iso = datetime.datetime.utcnow().isoformat()
+now_iso = datetime.datetime.now(datetime.timezone.utc).isoformat()
 
-# Thêm timestamp vào mỗi row
-for r in rows:
-    r['updated_at'] = now_iso
+# ── 1. MIGRATE ORDERS ──
+if os.path.exists(DRAFT_FILE):
+    with open(DRAFT_FILE, 'r', encoding='utf-8') as f:
+        data = json.load(f)
+    rows = data.get('rows', [])
+    if rows:
+        print(f"🔍 Tìm thấy {len(rows)} đơn hàng trong draft.json")
+        for r in rows:
+            r['updated_at'] = now_iso
+            r.pop('created_at', None)
 
-BATCH = 500
-total = 0
-for i in range(0, len(rows), BATCH):
-    batch = rows[i:i+BATCH]
-    sb.table('orders').upsert(batch, on_conflict='id').execute()
-    total += len(batch)
-    print(f"   ✅ Đã migrate {total}/{len(rows)} đơn hàng...")
+        def _safe_upsert(batch):
+            clean_batch = [dict(it) for it in batch]
+            for _ in range(6):
+                try:
+                    sb.table('orders').upsert(clean_batch, on_conflict='id').execute()
+                    return
+                except Exception as ex:
+                    m = re.search(r"Could not find the '([^']+)' column", str(ex))
+                    if m:
+                        c = m.group(1)
+                        print(f"   [!] Bảng orders thiếu cột '{c}', tự động bỏ qua để tiếp tục lưu...")
+                        for it in clean_batch:
+                            it.pop(c, None)
+                        continue
+                    raise ex
 
-print(f"\n🎉 Hoàn tất! Đã migrate {len(rows)} đơn hàng lên Supabase.")
-print("   Bạn có thể kiểm tra trong Supabase Dashboard → Table Editor → orders")
+        BATCH = 500
+        for i in range(0, len(rows), BATCH):
+            _safe_upsert(rows[i:i+BATCH])
+        print(f"🎉 Hoàn tất migrate {len(rows)} đơn hàng lên Supabase 'orders'!")
+    else:
+        print("ℹ️  draft.json không có đơn hàng nào để migrate.")
+else:
+    print("⚠️  Không tìm thấy draft.json.")
+
+# ── 2. MIGRATE COOKIE VAULT ──
+if os.path.exists(VAULT_FILE):
+    try:
+        with open(VAULT_FILE, 'r', encoding='utf-8') as f:
+            v_items = json.load(f)
+        if isinstance(v_items, list) and v_items:
+            print(f"🔍 Tìm thấy {len(v_items)} shop/cookie trong cookie_vault.json")
+            try:
+                sb.table('cookie_vault').upsert(v_items, on_conflict='id').execute()
+                print(f"🎉 Hoàn tất migrate {len(v_items)} shop lên Supabase 'cookie_vault'!")
+            except Exception as e:
+                err_s = str(e)
+                if 'PGRST205' in err_s or 'schema cache' in err_s:
+                    print("⚠️  Bảng 'cookie_vault' chưa được tạo trên Supabase.")
+                    print("   👉 Hãy mở file 'supabase_setup.sql' và dán vào Supabase SQL Editor để kích hoạt lưu Cloud!")
+                else:
+                    print(f"⚠️  Lỗi migrate cookie_vault: {e}")
+    except Exception as e:
+        print(f"⚠️  Lỗi đọc cookie_vault.json: {e}")
+
+print("\n✅ Quá trình kiểm tra và migrate hoàn tất!")

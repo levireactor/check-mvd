@@ -849,8 +849,19 @@ class AutoRegManager:
             "created_at": now_str,
             "updated_at": now_str
         })
-        with open(vault_file, "w", encoding="utf-8") as f:
-            json.dump(vault, f, ensure_ascii=False, indent=2)
+        try:
+            with open(vault_file, "w", encoding="utf-8") as f:
+                json.dump(vault, f, ensure_ascii=False, indent=2)
+        except Exception:
+            pass
+
+        # Đồng bộ qua server._save_vault (để lưu vào Supabase nếu có)
+        try:
+            import server
+            if hasattr(server, '_save_vault'):
+                server._save_vault(vault)
+        except Exception:
+            pass
 
 # Global instance
 auto_reg_mgr = AutoRegManager()

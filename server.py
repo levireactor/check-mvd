@@ -379,24 +379,106 @@ def fetch_shopee_json(url, headers, timeout=10, retries=1):
             return json.loads(res.read().decode('utf-8'))
 
 # ━━━ COOKIE VAULT / KHO QUẢN LÝ SHOP ━━━━━━━━━━━━━━━━━━━━━━━━━
+_SUPABASE_VAULT_ENABLED = True
+
 def _load_vault():
+    global _SUPABASE_VAULT_ENABLED
+    local_vault = []
     if os.path.exists(VAULT_FILE):
         try:
             with open(VAULT_FILE, 'r', encoding='utf-8') as f:
-                return json.load(f)
+                local_vault = json.load(f)
+                if not isinstance(local_vault, list):
+                    local_vault = []
         except Exception as e:
             print(f"[!] Lỗi đọc cookie_vault.json: {e}")
-            return []
-    return []
+            local_vault = []
+
+    # Nếu Supabase được cấu hình, thử nạp từ bảng cookie_vault trên cloud
+    if _is_supabase_configured() and _SUPABASE_VAULT_ENABLED:
+        try:
+            sb = get_supabase()
+            if sb:
+                res = sb.table('cookie_vault').select('*').order('created_at', desc=True).execute()
+                cloud_vault = res.data or []
+                if cloud_vault:
+                    # Đồng bộ xuống file cục bộ làm bản cache
+                    try:
+                        with open(VAULT_FILE, 'w', encoding='utf-8') as f:
+                            json.dump(cloud_vault, f, ensure_ascii=False, indent=2)
+                    except Exception:
+                        pass
+                    return cloud_vault
+                elif local_vault:
+                    # Cloud đang rỗng nhưng local có sẵn tài khoản -> Tự động đẩy lên Supabase
+                    try:
+                        sb.table('cookie_vault').upsert(local_vault, on_conflict='id').execute()
+                    except Exception:
+                        pass
+        except Exception as e:
+            err_msg = str(e)
+            if 'PGRST205' in err_msg or 'schema cache' in err_msg:
+                _SUPABASE_VAULT_ENABLED = False
+                print("[!] Supabase: Bảng 'cookie_vault' chưa được tạo trong database. Sử dụng kho cookie file cục bộ an toàn.")
+            else:
+                print(f"[!] Supabase load vault warning: {e}")
+
+    return local_vault
 
 def _save_vault(items):
+    global _SUPABASE_VAULT_ENABLED
+    if not isinstance(items, list):
+        items = []
+
+    # 1. Luôn lưu vào file cục bộ trước tiên
+    saved_ok = False
     try:
         with open(VAULT_FILE, 'w', encoding='utf-8') as f:
             json.dump(items, f, ensure_ascii=False, indent=2)
-        return True
+        saved_ok = True
     except Exception as e:
         print(f"[!] Lỗi ghi cookie_vault.json: {e}")
-        return False
+
+    # 2. Đồng bộ lên Supabase nếu có cấu hình
+    if _is_supabase_configured() and _SUPABASE_VAULT_ENABLED:
+        try:
+            sb = get_supabase()
+            if sb:
+                if not items:
+                    sb.table('cookie_vault').delete().neq('id', '').execute()
+                else:
+                    clean_items = []
+                    for it in items:
+                        c = dict(it)
+                        if not c.get('id'):
+                            c['id'] = str(int(time.time() * 1000))
+                        clean_items.append(c)
+
+                    # Tự động loại bỏ cột không hợp lệ nếu schema Supabase khác biệt
+                    for attempt in range(5):
+                        try:
+                            sb.table('cookie_vault').upsert(clean_items, on_conflict='id').execute()
+                            break
+                        except Exception as ex:
+                            err_msg = str(ex)
+                            import re
+                            match = re.search(r"Could not find the '([^']+)' column", err_msg)
+                            if match:
+                                missing_col = match.group(1)
+                                for r in clean_items:
+                                    r.pop(missing_col, None)
+                                continue
+                            raise ex
+        except Exception as e:
+            err_msg = str(e)
+            if 'PGRST205' in err_msg or 'schema cache' in err_msg:
+                _SUPABASE_VAULT_ENABLED = False
+                print("[!] Supabase: Bảng 'cookie_vault' chưa tạo trên Cloud. Dữ liệu đã lưu cục bộ.")
+            else:
+                print(f"[!] Supabase save vault warning: {e}")
+
+    return saved_ok
+
 
 def check_cookie_health(spc_st):
     """Kiểm tra tình trạng cookie Shopee còn sống hay hết hạn"""
@@ -999,9 +1081,17 @@ class TrackingRequestHandler(http.server.SimpleHTTPRequestHandler):
         elif self.path == '/api/vault/list':
             try:
                 items = _load_vault()
-                self._json(200, {'success': True, 'items': items})
+                self._json(200, {'success': True, 'items': items or []})
             except Exception as e:
-                self._json(500, {'error': f'Lỗi đọc kho cookie: {str(e)}'})
+                print(f"[!] Lỗi đọc kho cookie: {e}")
+                fb_items = []
+                if os.path.exists(VAULT_FILE):
+                    try:
+                        with open(VAULT_FILE, 'r', encoding='utf-8') as f:
+                            fb_items = json.load(f)
+                    except Exception:
+                        pass
+                self._json(200, {'success': True, 'items': fb_items, 'warning': str(e)})
 
         elif self.path == '/api/templates/list':
             try:
@@ -1149,13 +1239,28 @@ class TrackingRequestHandler(http.server.SimpleHTTPRequestHandler):
                                         row_data['all_products'] = row_data['all_products']
                                     upsert_rows.append(row_data)
 
+                                def _safe_upsert_batch(batch):
+                                    clean_batch = [dict(item) for item in batch]
+                                    for _ in range(6):
+                                        try:
+                                            sb.table('orders').upsert(clean_batch, on_conflict='id').execute()
+                                            return
+                                        except Exception as ex:
+                                            err_msg = str(ex)
+                                            import re
+                                            m = re.search(r"Could not find the '([^']+)' column", err_msg)
+                                            if m:
+                                                missing_c = m.group(1)
+                                                for item in clean_batch:
+                                                    item.pop(missing_c, None)
+                                                continue
+                                            raise ex
+
                                 # Upsert theo batch 500
                                 BATCH = 500
                                 for i in range(0, len(upsert_rows), BATCH):
-                                    sb.table('orders').upsert(
-                                        upsert_rows[i:i+BATCH],
-                                        on_conflict='id'
-                                    ).execute()
+                                    _safe_upsert_batch(upsert_rows[i:i+BATCH])
+
 
                             print(f"[Supabase] Đã lưu {len(rows)} đơn hàng lên cloud.")
                             self._json(200, {
@@ -1340,8 +1445,11 @@ class TrackingRequestHandler(http.server.SimpleHTTPRequestHandler):
                 vault = _load_vault()
                 now_str = datetime.datetime.now().strftime("%H:%M:%S %d/%m/%Y")
                 
-                # Kiểm tra sức khỏe cookie trước khi lưu
-                health = check_cookie_health(token)
+                # Kiểm tra sức khỏe cookie trước khi lưu (bọc an toàn tránh lỗi mạng làm hỏng việc lưu)
+                try:
+                    health = check_cookie_health(token)
+                except Exception as ex:
+                    health = {'status': 'unknown', 'error': str(ex)[:80]}
                 
                 if item_id:
                     found = False
@@ -1413,7 +1521,10 @@ class TrackingRequestHandler(http.server.SimpleHTTPRequestHandler):
                 if check_all:
                     for it in vault:
                         ck = it.get('cookie', '')
-                        h = check_cookie_health(ck)
+                        try:
+                            h = check_cookie_health(ck)
+                        except Exception as ex:
+                            h = {'status': 'error', 'error': str(ex)[:80]}
                         it['status'] = h.get('status', 'unknown')
                         it['last_checked'] = now_str
                         if h.get('username'):
@@ -1432,7 +1543,10 @@ class TrackingRequestHandler(http.server.SimpleHTTPRequestHandler):
                             break
                     if not target_item:
                         return self._json(404, {'error': 'Không tìm thấy shop này trong kho'})
-                    h = check_cookie_health(target_item.get('cookie', ''))
+                    try:
+                        h = check_cookie_health(target_item.get('cookie', ''))
+                    except Exception as ex:
+                        h = {'status': 'error', 'error': str(ex)[:80]}
                     target_item['status'] = h.get('status', 'unknown')
                     target_item['last_checked'] = now_str
                     if h.get('username'):
