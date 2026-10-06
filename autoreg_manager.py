@@ -254,24 +254,19 @@ class AutoRegManager:
             loop.close()
 
     async def cancel_pending_session_on_bot_b(self, client):
-        """Tìm nút '❌ Hủy Tạo Acc' trên Bot B và bấm hủy (hoặc gửi lệnh /huyreg)"""
+        """Tìm nút '❌ Hủy Tạo Acc' trên Bot B và bấm hủy"""
         try:
-            msgs = await client.get_messages(BOT_B, limit=6)
+            msgs = await client.get_messages(BOT_B, limit=4)
             for m in msgs:
                 if m.buttons:
                     for row in m.buttons:
                         for btn in row:
                             if "hủy" in btn.text.lower() or "cancel" in btn.text.lower():
-                                self.log(f"🛑 Tìm thấy nút '{btn.text}' trên Bot B. Đang bấm hủy...", "warning")
+                                self.log(f"🛑 Đang bấm nút '{btn.text}' để hủy phiên treo trên Bot B...", "warning")
                                 await btn.click()
-                                await asyncio.sleep(2.5)
-                                self.log("✅ Đã hủy yêu cầu reg trên Bot B thành công!", "success")
+                                await asyncio.sleep(2)
                                 return True
-            # Nếu không thấy nút bấm, gửi lệnh /huyreg trực tiếp
-            self.log("🛑 Gửi lệnh /huyreg để làm sạch hàng đợi Bot B...", "info")
-            await client.send_message(BOT_B, "/huyreg")
-            await asyncio.sleep(2)
-            return True
+            return False
         except Exception as e:
             self.log(f"⚠️ Lỗi khi hủy phiên Bot B: {e}", "warning")
         return False
@@ -279,7 +274,7 @@ class AutoRegManager:
     async def click_resend_otp_on_bot_b(self, client):
         """Tìm nút '📲 Gửi Lại Mã' trên Bot B và click sau 70s"""
         try:
-            msgs = await client.get_messages(BOT_B, limit=6)
+            msgs = await client.get_messages(BOT_B, limit=4)
             for m in msgs:
                 if m.buttons:
                     for row in m.buttons:
@@ -294,22 +289,52 @@ class AutoRegManager:
             self.log(f"⚠️ Lỗi khi bấm gửi lại mã trên Bot B: {e}", "warning")
         return False
 
+    def _handle_success_account(self, clean_txt, phone_clean, cmsnpa_price, bot_fee):
+        """Hàm xử lý và lưu tài khoản khi Bot B báo TẠO ACCOUNT THÀNH CÔNG"""
+        clean_txt = clean_txt.replace("`", "").strip()
+        total_spent_cycle = cmsnpa_price + bot_fee
+        self.log(f"🎉 TẠO ACCOUNT THÀNH CÔNG CHO SĐT {phone_clean}! Chi phí phiên: {total_spent_cycle:,}đ (SIM: {cmsnpa_price:,}đ + Bot: {bot_fee:,}đ)", "success")
+        
+        acc_match = re.search(r'([a-zA-Z0-9_\-\.]+)\|([^\|\n]+)\|(\d+)\|(SPC_F=[^\s\n\r]+)', clean_txt)
+        spc_st_match = re.search(r'(SPC_ST=[^\s\n\r]+)', clean_txt)
+
+        acc_raw = acc_match.group(0) if acc_match else f"Acc_{phone_clean}|Shopee"
+        spc_st = spc_st_match.group(1) if spc_st_match else ""
+
+        # Lưu vào danh sách accounts_reg
+        self.save_account_record(acc_raw, spc_st, phone_clean)
+        
+        # Tự động nạp luôn vào Cookie Vault của tool
+        try:
+            f_cookie = acc_match.group(4) if acc_match else acc_raw
+            self.save_to_cookie_vault(phone_clean, f_cookie, spc_st)
+            self.log(f"💾 Đã tự động lưu vào Kho Cookie & Danh sách!", "success")
+        except Exception as _ex:
+            self.log(f"⚠️ Lỗi nạp Kho Cookie: {_ex}", "warning")
+
+        return True, "SUCCESS", total_spent_cycle
+
     async def _async_run(self, server_id, count, delay, kiotproxy_key, use_proxy):
         client = TelegramClient(SESSION_NAME, API_ID, API_HASH)
         await client.connect()
         if not await client.is_user_authorized():
-            self.log("Chưa đăng nhập Telegram! Vui lòng chạy DANG_NHAP_TELEGRAM.bat trước.", "error")
+            self.log("Chưa đăng nhập Telegram! Vui lòng liên kết tài khoản Telegram trên giao diện trước.", "error")
             return
 
         async with aiohttp.ClientSession() as http:
             current_success = 0
             cycle_count = 0
             consecutive_fails = 0
+            max_attempts = max(count * 4, 10)  # Giới hạn tối đa số lần thử tránh chạy vô tận
 
             while current_success < count and not self.should_stop:
+                if cycle_count >= max_attempts:
+                    self.log(f"🛑 Đã đạt giới hạn tối đa {max_attempts} lượt thử. Dừng tiến trình.", "warning")
+                    break
+
                 cycle_count += 1
                 self.stats["current_index"] = current_success + 1
-                self.log(f"--- [MỤC TIÊU: {current_success + 1}/{count}] Bắt đầu phiên reg (Lượt thử #{cycle_count}) ---", "info")
+                self.log(f"--- [TIẾN ĐỘ: Đã xong {current_success}/{count} Acc | Lượt thử #{cycle_count}] ---", "info")
 
                 success, reason, spent_cycle = await self._run_single_reg_cycle(client, http, server_id, kiotproxy_key, use_proxy)
                 if success:
@@ -318,9 +343,13 @@ class AutoRegManager:
                     self.stats["total_spent"] += spent_cycle
                     consecutive_fails = 0
                     
-                    if current_success < count and not self.should_stop:
+                    if current_success >= count:
+                        self.log(f"🎉🎉 ĐÃ HOÀN THÀNH MỤC TIÊU! Tạo thành công {current_success}/{count} tài khoản Shopee.", "success")
+                        break
+                    
+                    if not self.should_stop:
                         self.current_step = f"RESTING ({delay}s)"
-                        self.log(f"Nghỉ {delay} giây trước khi chạy lượt tiếp theo...", "info")
+                        self.log(f"Nghỉ {delay} giây trước khi chạy tài khoản tiếp theo...", "info")
                         for _ in range(delay):
                             if self.should_stop:
                                 break
@@ -329,9 +358,14 @@ class AutoRegManager:
                     self.stats["failed"] += 1
                     consecutive_fails += 1
                     if reason == "EXPIRED":
-                        self.log("🔄 SIM QUÁ HẠN ➡️ Đã hủy phiên Bot B. Tự động thuê số mới chạy tiếp phiên...", "warning")
+                        self.log("🔄 SIM KHÔNG CÓ OTP ➡️ Đã dọn dẹp phiên. Tự động thuê số mới chạy tiếp...", "warning")
+                    elif reason == "INSUFFICIENT_BALANCE":
+                        self.log("❌ Số dư trên Bot B không đủ. Dừng tiến trình ngay lập tức!", "error")
+                        break
+                    elif reason == "PHONE_REJECTED":
+                        self.log("ℹ️ SĐT cũ bị từ chối. Đang thử lại với SĐT mới...", "info")
                     else:
-                        self.log("⚠️ Phiên reg thất bại. Tự động thử lại...", "warning")
+                        self.log("⚠️ Phiên thử thất bại. Tự động thử lại lượt tiếp theo...", "warning")
 
                     if consecutive_fails >= 5:
                         self.log("❌ Đã thất bại liên tiếp 5 lần! Dừng tiến trình để tránh tiêu tốn chi phí.", "error")
@@ -346,8 +380,23 @@ class AutoRegManager:
         headers = {"Authorization": f"Bearer {CMSNPA_KEY}", "Content-Type": "application/json"}
         cmsnpa_price = SERVICES.get(server_id, {}).get("price", 3200)
 
-        # Dọn dẹp: Hủy phiên treo cũ trên Bot B nếu có trước khi bắt đầu
-        await self.cancel_pending_session_on_bot_b(client)
+        # 0. Kiểm tra nếu Bot B đang có phiên cũ đang chạy: Chờ kết thúc
+        try:
+            recent_b = await client.get_messages(BOT_B, limit=3)
+            for m in recent_b:
+                if not m.out:
+                    txt = (m.text or "").lower()
+                    if "đang tạo account" in txt or "shopee đang gọi điện" in txt:
+                        self.log("⏳ Bot B đang có phiên reg đang chạy. Đang chờ 15s cho phiên cũ hoàn tất...", "info")
+                        for _ in range(5):
+                            await asyncio.sleep(3)
+                            msgs_check = await client.get_messages(BOT_B, limit=3)
+                            for mc in msgs_check:
+                                if not mc.out and "tạo account thành công" in (mc.text or "").lower():
+                                    self.log("🎉 Phiên cũ trên Bot B đã hoàn tất thành công!", "success")
+                                    return self._handle_success_account(mc.text, "Acc_Saved", cmsnpa_price, 700)
+        except Exception:
+            pass
 
         # 1. Thuê SĐT từ CMSNPA
         self.current_step = "RENTING_PHONE"
@@ -411,13 +460,13 @@ class AutoRegManager:
         sent_msg = await client.send_message(BOT_B, reg_cmd)
         sent_msg_id = sent_msg.id
 
-        # 3.1 Kiểm tra phản hồi khoa học từ Bot B (Chỉ đọc tin sinh ra SAU tin nhắn vừa gửi)
+        # 3.1 Kiểm tra phản hồi từ Bot B
         self.log("Đang đợi Bot B xác nhận tiếp nhận đơn...", "info")
         is_accepted = False
         is_rejected = False
         check_start = time.time()
 
-        while time.time() - check_start < 14:
+        while time.time() - check_start < 12:
             await asyncio.sleep(2)
             recent_msgs = await client.get_messages(BOT_B, limit=5)
             new_replies = [m for m in recent_msgs if m.id > sent_msg_id and not m.out]
@@ -433,7 +482,16 @@ class AutoRegManager:
                     is_rejected = True
                     break
                 elif "proxy" in txt and ("lỗi" in txt or "thất bại" in txt or "die" in txt):
-                    self.log(f"❌ Bot B báo lỗi Proxy: {txt[:80]}", "error")
+                    self.log(f"❌ Bot B báo lỗi Proxy: {m.text[:80]}", "error")
+                    is_rejected = True
+                    break
+                elif "số dư không đủ" in txt or "không đủ tiền" in txt or "hết tiền" in txt:
+                    self.log(f"❌ Bot B báo số dư không đủ để thực hiện!", "error")
+                    is_rejected = True
+                    return False, "INSUFFICIENT_BALANCE", 0
+                elif "đang có phiên tạo acc đang chạy" in txt:
+                    self.log("⚠️ Bot B đang bận phiên khác. Chờ 8s...", "warning")
+                    await asyncio.sleep(8)
                     is_rejected = True
                     break
 
@@ -447,20 +505,20 @@ class AutoRegManager:
                 break
 
         if is_rejected:
-            self.log(f"🔄 Bỏ qua số {phone_clean}. Bên A sẽ tự hoàn tiền sau 300s. Đang chuyển sang thuê số mới...", "warning")
-            await asyncio.sleep(3)
+            self.log(f"🔄 Bỏ qua số {phone_clean}. CMSNPA sẽ tự hoàn tiền sau 300s. Đang chuyển sang thuê số mới...", "warning")
+            await asyncio.sleep(2)
             return False, "PHONE_REJECTED", 0
 
         if not is_accepted:
-            self.log("ℹ️ Bot B đang xử lý ngầm (không phát sinh lỗi). Tiếp tục chuyển sang bước chờ OTP.", "info")
+            self.log("ℹ️ Bot B đang xử lý. Tiếp tục chuyển sang bước theo dõi OTP & kết quả...", "info")
 
-        # 4. Chờ OTP (API Polling + Lắng nghe Bot A)
+        # 4. Chờ OTP & Đồng thời theo dõi Bot B
         self.current_step = "WAITING_OTP"
-        self.log(f"Đang chờ OTP cho số {phone_clean} (Theo chu kỳ 300s của bên A)...", "info")
+        self.log(f"Đang chờ OTP cho số {phone_clean}...", "info")
         otp_found = None
         is_expired = False
         start_wait = time.time()
-        timeout_sim = 310
+        timeout_sim = 150  # 150 giây là thời gian tối đa hợp lý cho 1 mã OTP
 
         captured_otp = {"code": None}
         clean_num = phone_clean.lstrip("0")
@@ -486,14 +544,30 @@ class AutoRegManager:
                 await self.cancel_pending_session_on_bot_b(client)
                 return False, "USER_STOPPED", 0
 
-            # Tự động bấm '📲 Gửi Lại Mã' trên Bot B sau 100 giây nếu chưa có OTP
+            # 4.0 KIỂM TRA BOT B XEM ĐÃ TẠO XONG CHƯA HOẶC CÓ BÁO LỖI GÌ KHÔNG!
+            try:
+                msgs_b = await client.get_messages(BOT_B, limit=5)
+                for mb in msgs_b:
+                    if mb.id > sent_msg_id and not mb.out:
+                        txt_b = mb.text or ""
+                        if "TẠO ACCOUNT THÀNH CÔNG" in txt_b:
+                            client.remove_event_handler(bot_a_handler)
+                            return self._handle_success_account(txt_b, phone_clean, cmsnpa_price, bot_fee)
+                        elif "hết lượt thử" in txt_b.lower() or "thất bại" in txt_b.lower():
+                            self.log(f"❌ Bot B báo thất bại: {txt_b[:80]}", "warning")
+                            client.remove_event_handler(bot_a_handler)
+                            return False, "BOT_B_FAILED", 0
+            except Exception:
+                pass
+
+            # Tự động bấm '📲 Gửi Lại Mã' trên Bot B sau 75 giây nếu chưa có OTP
             elapsed_wait = time.time() - start_wait
-            if elapsed_wait >= 100 and not resend_clicked:
+            if elapsed_wait >= 75 and not resend_clicked:
                 resend_clicked = True
-                self.log(f"⏰ Đã qua 100 giây chưa có OTP. Đang bấm nút '📲 Gửi Lại Mã' trên Bot B...", "info")
+                self.log(f"⏰ Đã qua 75s chưa có OTP. Đang thử bấm '📲 Gửi Lại Mã' trên Bot B...", "info")
                 await self.click_resend_otp_on_bot_b(client)
 
-            # 1. Đọc trực tiếp hộp thư Bot A trên Telegram (chống miss event)
+            # 4.1 Đọc trực tiếp hộp thư Bot A trên Telegram
             try:
                 msgs_a = await client.get_messages(BOT_A, limit=5)
                 for m in msgs_a:
@@ -516,18 +590,16 @@ class AutoRegManager:
             if otp_found:
                 break
 
-            # 2. Nếu Bot A chính thức phát thông báo hoàn tiền cho số này
             if is_expired:
-                self.log(f"⚠️ Bot A (@simclonenpa_bot) ĐÃ XÁC NHẬN: Sim {phone_clean} hết hạn & đã được hoàn tiền!", "warning")
+                self.log(f"⚠️ Bot A (@simclonenpa_bot) ĐÃ BÁO: Sim {phone_clean} hết hạn & hoàn tiền!", "warning")
                 break
 
-            # 3. Nếu nhận được OTP từ Telegram Bot A event
             if captured_otp["code"]:
                 otp_found = captured_otp["code"]
                 self.log(f"⚡ Bắt được OTP từ Bot A (@simclonenpa_bot): {otp_found}", "otp")
                 break
 
-            # 4. Hỏi qua API CMSNPA (polling song song)
+            # 4.2 Hỏi qua API CMSNPA (polling)
             try:
                 async with http.post(f"{CMSNPA_BASE}/api/v1/check_code", headers=headers, json={"id": str(rental_id)}, timeout=8) as r:
                     res_data = await r.json()
@@ -541,16 +613,15 @@ class AutoRegManager:
             except Exception:
                 pass
 
-            await asyncio.sleep(3)
+            await asyncio.sleep(2.5)
 
         client.remove_event_handler(bot_a_handler)
 
-        # 5. Nếu sim hết hạn / hoàn trả hoặc quá 310s không có OTP:
+        # 5. Nếu không có OTP:
         if not otp_found:
-            self.log(f"🛑 Sim {phone_clean} đã hết hạn/hoàn tiền xong. Bắt đầu bấm '❌ Hủy Tạo Acc' bên Bot B...", "warning")
+            self.log(f"🛑 Sim {phone_clean} không có OTP sau {timeout_sim}s. Đang dọn dẹp phiên...", "warning")
             await self.cancel_pending_session_on_bot_b(client)
-            self.log(f"⏳ Chờ 5 giây dọn dẹp hàng đợi Bot B trước khi bắt đầu phiên mới...", "info")
-            await asyncio.sleep(5)
+            await asyncio.sleep(3)
             return False, "EXPIRED", 0
 
         # 6. Gửi OTP sang Bot B khi có mã hợp lệ
@@ -560,43 +631,22 @@ class AutoRegManager:
         sent_otp_msg = await client.send_message(BOT_B, otp_cmd)
         sent_otp_id = sent_otp_msg.id
 
-        # 7. Chờ kết quả tạo tài khoản từ Bot B (Chỉ xét tin nhắn sinh ra SAU KHI GỬI /otp)
+        # 7. Chờ kết quả tạo tài khoản từ Bot B
         self.current_step = "WAITING_RESULT"
         self.log("Chờ Bot B hoàn tất tạo tài khoản...", "info")
         start_res = time.time()
-        while time.time() - start_res < 90:
+        while time.time() - start_res < 60:
             if self.should_stop:
                 return False, "USER_STOPPED", 0
-            await asyncio.sleep(3)
+            await asyncio.sleep(2.5)
             msgs = await client.get_messages(BOT_B, limit=10)
-            new_msgs = [m for m in msgs if m.id > sent_otp_id and not m.out]
+            new_msgs = [m for m in msgs if m.id > sent_msg_id and not m.out]
             for m in new_msgs:
                 txt = m.text or ""
                 if "TẠO ACCOUNT THÀNH CÔNG" in txt:
-                    clean_txt = txt.replace("`", "").strip()
-                    total_spent_cycle = cmsnpa_price + bot_fee
-                    self.log(f"🎉 TẠO ACCOUNT THÀNH CÔNG CHO SĐT {phone_clean}! Chi phí phiên: {total_spent_cycle:,}đ (SIM: {cmsnpa_price:,}đ + Bot: {bot_fee:,}đ)", "success")
-                    
-                    acc_match = re.search(r'([a-zA-Z0-9_\-\.]+)\|([^\|\n]+)\|(\d+)\|(SPC_F=[^\s\n\r]+)', clean_txt)
-                    spc_st_match = re.search(r'(SPC_ST=[^\s\n\r]+)', clean_txt)
-
-                    acc_raw = acc_match.group(0) if acc_match else f"Acc_{phone_clean}|Shopee"
-                    spc_st = spc_st_match.group(1) if spc_st_match else ""
-
-                    # Lưu vào danh sách accounts_reg
-                    self.save_account_record(acc_raw, spc_st, phone_clean)
-                    
-                    # Tự động nạp luôn vào Cookie Vault của tool
-                    try:
-                        f_cookie = acc_match.group(4) if acc_match else acc_raw
-                        self.save_to_cookie_vault(phone_clean, f_cookie, spc_st)
-                        self.log(f"💾 Đã tự động lưu vào Kho Cookie & Danh sách!", "success")
-                    except Exception as _ex:
-                        self.log(f"⚠️ Lỗi nạp Kho Cookie: {_ex}", "warning")
-
-                    return True, "SUCCESS", total_spent_cycle
+                    return self._handle_success_account(txt, phone_clean, cmsnpa_price, bot_fee)
                 elif "mã otp nhập không đúng" in txt.lower() or "hết lượt thử" in txt.lower():
-                    self.log(f"Bot B báo tạo tài khoản thất bại: {txt[:80]}", "error")
+                    self.log(f"❌ Bot B báo OTP sai hoặc hết lượt thử: {txt[:80]}", "error")
                     return False, "FAILED", 0
 
         self.log(f"Hết thời gian chờ kết quả từ Bot B cho số {phone_clean}.", "warning")
