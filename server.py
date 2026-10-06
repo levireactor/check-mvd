@@ -558,7 +558,16 @@ def extract_cookie_orders(spc_st, note_name="", order_limit=30):
             
             # 2. Vận chuyển & MVĐ
             shipping = d.get('shipping', {}) or {}
-            tracking_no = shipping.get('tracking_number') or ''
+            tracking_no = (shipping.get('tracking_number') or 
+                           shipping.get('tracking_no') or 
+                           shipping.get('carrier_tracking_number') or '')
+            
+            # Dự phòng lấy MVĐ từ package_list nếu shipping chưa có
+            if not tracking_no and isinstance(d.get('package_list'), list) and d['package_list']:
+                pkg = d['package_list'][0]
+                if isinstance(pkg, dict):
+                    tracking_no = pkg.get('tracking_number') or pkg.get('tracking_no') or ''
+            
             carrier = (shipping.get('fulfilment_carrier', {}).get('text') or 
                        shipping.get('masked_carrier', {}).get('text') or 
                        'SPX Express')
@@ -595,46 +604,65 @@ def extract_cookie_orders(spc_st, note_name="", order_limit=30):
             receiver_phone = addr.get('shipping_phone') or ''
             receiver_address = addr.get('shipping_address') or ''
 
-            # 5. Sản phẩm & Link Sản Phẩm
+            # 5. Sản phẩm & Link Sản Phẩm & Ảnh (Bọc try-except tuyệt đối an toàn)
             products = []
             product_images = []
             product_url = ""
-            info_card = d.get('info_card', {}) or {}
-            for pc in info_card.get('parcel_cards', []):
-                for grp in pc.get('product_info', {}).get('item_groups', []):
-                    for it in grp.get('items', []):
-                        name = it.get('name')
-                        if name:
-                            products.append(name)
-                        img_h = it.get('image') or (it.get('images', [None])[0] if isinstance(it.get('images'), list) and it.get('images') else None)
-                        if img_h and isinstance(img_h, str):
-                            if not img_h.startswith('http'):
-                                product_images.append(f"https://down-vn.img.susercontent.com/file/{img_h}")
-                            else:
-                                product_images.append(img_h)
-                        if not product_url and it.get('item_id') and it.get('shop_id'):
-                            product_url = f"https://shopee.vn/product/{it.get('shop_id')}/{it.get('item_id')}"
+            try:
+                info_card = d.get('info_card', {}) or {}
+                for pc in (info_card.get('parcel_cards') or []):
+                    if not isinstance(pc, dict): continue
+                    pinfo = pc.get('product_info') or {}
+                    for grp in (pinfo.get('item_groups') or []):
+                        if not isinstance(grp, dict): continue
+                        for it in (grp.get('items') or []):
+                            if not isinstance(it, dict): continue
+                            name = it.get('name')
+                            if name:
+                                products.append(name)
+                            img_h = it.get('image') or (it.get('images', [None])[0] if isinstance(it.get('images'), list) and it.get('images') else None)
+                            if img_h and isinstance(img_h, str):
+                                if not img_h.startswith('http'):
+                                    product_images.append(f"https://down-vn.img.susercontent.com/file/{img_h}")
+                                else:
+                                    product_images.append(img_h)
+                            if not product_url and it.get('item_id') and it.get('shop_id'):
+                                product_url = f"https://shopee.vn/product/{it.get('shop_id')}/{it.get('item_id')}"
+            except Exception:
+                pass
             
             product_display = products[0] if products else '--'
             product_image = product_images[0] if product_images else ''
 
-            # Lộ trình bưu cục nhanh (nếu có trong tracking_info)
-            raw_timeline = tracking_info.get('tracking_list') or tracking_info.get('list') or shipping.get('tracking_list') or []
+            # Lộ trình bưu cục nhanh (Bọc try-except an toàn)
             timeline = []
-            for ev in raw_timeline:
-                ev_time = ev.get('ctime') or ev.get('time') or 0
-                time_str = datetime.datetime.fromtimestamp(ev_time).strftime("%H:%M %d/%m/%Y") if ev_time else ''
-                timeline.append({
-                    'time': time_str,
-                    'timestamp': ev_time,
-                    'description': ev.get('description') or ev.get('text') or '',
-                    'status': ev.get('status') or '',
-                    'driver_name': ev.get('driver_name') or '',
-                    'driver_phone': ev.get('driver_phone') or ''
-                })
+            try:
+                raw_timeline = tracking_info.get('tracking_list') or tracking_info.get('list') or shipping.get('tracking_list') or []
+                if isinstance(raw_timeline, list):
+                    for ev in raw_timeline:
+                        if not isinstance(ev, dict): continue
+                        ev_time = ev.get('ctime') or ev.get('time') or 0
+                        time_str = ''
+                        if ev_time:
+                            try:
+                                t_val = int(ev_time)
+                                if t_val > 100000000000: t_val = t_val // 1000
+                                time_str = datetime.datetime.fromtimestamp(t_val).strftime("%H:%M %d/%m/%Y")
+                            except Exception:
+                                time_str = ''
+                        timeline.append({
+                            'time': time_str,
+                            'timestamp': ev_time,
+                            'description': ev.get('description') or ev.get('text') or '',
+                            'status': ev.get('status') or '',
+                            'driver_name': ev.get('driver_name') or '',
+                            'driver_phone': ev.get('driver_phone') or ''
+                        })
+            except Exception:
+                timeline = []
 
             # 6. COD & Thanh toán
-            payment_info = info_card.get('parcel_cards', [{}])[0].get('payment_info', {})
+            payment_info = info_card.get('parcel_cards', [{}])[0].get('payment_info', {}) if isinstance(info_card.get('parcel_cards'), list) and info_card.get('parcel_cards') else {}
             extra_info = payment_info.get('extra_info', {})
             channel_name = d.get('payment_method', {}).get('payment_channel_name', {}).get('text', '')
             is_cod = 'nhận hàng' in channel_name.lower() or 'cod' in channel_name.lower()
@@ -648,11 +676,20 @@ def extract_cookie_orders(spc_st, note_name="", order_limit=30):
             cod_str = f"{cod_val:,} đ".replace(',', '.')
 
             # 7. Thời gian & ngày đặt
-            ctime = tracking_info.get('ctime') or d.get('ctime') or int(time.time())
-            dt = datetime.datetime.fromtimestamp(ctime)
-            order_date = dt.strftime('%Y-%m-%d')
-            order_day = dt.strftime('%d')
-            order_time = dt.strftime('%H:%M %d/%m/%Y')
+            try:
+                ctime = tracking_info.get('ctime') or d.get('ctime') or int(time.time())
+                t_val = int(ctime)
+                if t_val > 100000000000: t_val = t_val // 1000
+                dt = datetime.datetime.fromtimestamp(t_val)
+                order_date = dt.strftime('%Y-%m-%d')
+                order_day = dt.strftime('%d')
+                order_time = dt.strftime('%H:%M %d/%m/%Y')
+            except Exception:
+                dt = datetime.datetime.now()
+                order_date = dt.strftime('%Y-%m-%d')
+                order_day = dt.strftime('%d')
+                order_time = dt.strftime('%H:%M %d/%m/%Y')
+                ctime = int(time.time())
 
             # 8. Tag Đơn (ví dụ: 'Đơn 2' nếu tài khoản có nhiều đơn)
             order_tag = f"Đơn {order_idx}" if total_orders > 1 else ""
