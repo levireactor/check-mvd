@@ -1,0 +1,22 @@
+[
+  {
+    "id": "tpl_1",
+    "name": "Báo khách có mã vận đơn",
+    "content": "Chào {receiver_name}, đơn hàng Shopee \"{product_name}\" của bạn đã được đóng gói và có mã vận đơn {tracking_no} ({carrier}). Tiền COD cần thanh toán: {cod_amount}. Bạn vui lòng để ý điện thoại để shipper liên hệ giao hàng nhé!"
+  },
+  {
+    "id": "tpl_2",
+    "name": "Giục shipper giao hàng",
+    "content": "Chào shipper ({driver_phone}), mình là người nhận đơn Shopee {tracking_no}. Đơn hàng \"{product_name}\" giao về địa chỉ: {receiver_address}. Nhờ shipper hỗ trợ giao sớm giúp mình trong hôm nay với ạ, sđt mình: {receiver_phone}. Cảm ơn bạn!"
+  },
+  {
+    "id": "tpl_3",
+    "name": "Báo giao thành công / Cảm ơn",
+    "content": "Chào {receiver_name}, đơn hàng Shopee {order_sn} (MVĐ {tracking_no}) báo đã giao thành công. Cảm ơn bạn đã tin tưởng mua hàng, nếu sản phẩm có vấn đề gì bạn cứ nhắn lại shop hỗ trợ nhé!"
+  },
+  {
+    "id": "tpl_4",
+    "name": "Đối soát nội bộ / Kế toán",
+    "content": "[ĐỐI SOÁT ĐƠN]\n- Mã đơn: {order_sn}\n- MVĐ: {tracking_no} ({carrier})\n- Khách hàng: {receiver_name} - {receiver_phone}\n- Tiền COD: {cod_amount}\n- Trạng thái: {status_desc}\n- Thời gian: {order_time}"
+  }
+]

@@ -1,0 +1,11 @@
+.env
+proxy_config.json
+cookie_vault.json
+telegram_config.json
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+.DS_Store
+

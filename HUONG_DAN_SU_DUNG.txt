@@ -1,33 +1,63 @@
-﻿================================================================
-        HƯỚNG DẪN SỬ DỤNG TOOL CHECK ĐƠN & MÃ VẬN ĐƠN SHOPEE
+================================================================
+        HƯỚNG DẪN SỬ DỤNG TOOL CHECK ĐƠN & MÃ VẬN ĐƠN SHOPEE (PRO)
 ================================================================
 
 1. CÁCH KHỞI ĐỘNG TOOL:
 - Nhấp đúp chuột vào file: "CHAY_TOOL.bat"
-- Cửa sổ Tool sẽ tự động bật máy chủ Python và mở trình duyệt tại:
+- Cửa sổ Tool sẽ tự động khởi chạy máy chủ Python và mở trình duyệt tại:
   http://localhost:8080/
 
-2. CÁC TÍNH NĂNG CHÍNH:
-- [➕ Thêm Cookie]: Nhập danh sách Cookie (SPC_ST=...) để quét đơn hàng hàng loạt.
-  + Hỗ trợ dạng: SPC_ST=... hoặc nguyên chuỗi Cookie dài.
-  + Hỗ trợ gắn Tên gợi nhớ: SPC_ST=xxx|Ten=Shop1
-- [Cột hiển thị ▾]: Bật/tắt tùy ý 17 cột dữ liệu (Mã đơn, MVĐ, Người nhận, SĐT, COD, Link SP...).
-- [🎨 Tùy màu ▾]:
-  + Chế độ Sáng (Light) / Tối (Dark).
-  + Đổi màu thanh tiêu đề (Đen than, Cam Shopee, Xanh dương, Xanh ngọc, Tím, Đỏ).
-  + Bật/tắt tô màu theo trạng thái (Hủy = đỏ, Giao thành công = xanh lá, Đang giao = xanh dương).
-  + Kẻ sọc hàng xen kẽ (Zebra).
-- [💾 SAVE Server] / [Phím tắt Ctrl + S]: Lưu toàn bộ dữ liệu hiện tại lên máy chủ (lưu vào draft.json).
-- [⚙️ Khôi phục nháp]: Khôi phục lại phiên làm việc trước đó.
-- [📋 Copy tất cả MVĐ]: Sao chép nhanh danh sách tất cả mã vận đơn tìm thấy để dán vào Excel/Zalo/vận chuyển.
-- [📥 Xuất Excel (CSV)]: Xuất file bảng tính đầy đủ các cột.
-- [Tìm kiếm nhanh]: Gõ SĐT, Tên, Mã vận đơn hoặc Tên sản phẩm vào ô tìm kiếm để lọc tức thì.
+2. CÁC TÍNH NĂNG MỚI NÂNG CẤP ĐỘT PHÁ:
+----------------------------------------------------------------
+A. KHO COOKIE & QUẢN LÝ SHOP (COOKIE VAULT):
+   - Mở qua: Menu "⚙️ Tiện ích & Cài đặt ▾" -> "🗄️ Kho Cookie & Shop"
+   - Giúp lưu trữ cố định danh sách tài khoản / shop kèm tên gợi nhớ.
+   - Nút "Kiểm tra tất cả (Health Check)": Tự động test từng Cookie xem còn Sống (Active) hay đã Hết hạn (Expired / Lỗi 19) để kịp thời thay mới.
+   - Nút "🚀 Quét đơn từ Cookie chọn": Chọn các shop muốn quét và chạy ngay mà không cần copy paste lại token.
 
-3. DANH SÁCH FILE TRONG THƯ MỤC "D:\tool pee\":
-- CHAY_TOOL.bat           : File nhấp đúp để mở tool 1 chạm.
-- index.html              : Giao diện chính Bảng Sheet Shopee.
-- server.py               : Backend Python Mobile Gateway (xử lý cào đơn & chống chặn CAPTCHA).
-- draft.json              : File lưu trữ dữ liệu các đơn hàng đã lưu.
-- duyanh_old_backup.html  : File sao lưu phiên bản cũ trước đó của bạn.
+B. BỘ LỌC THÔNG MINH (FILTER CHIPS) & MINI KPI:
+   - Thanh Sub-bar ngay trên bảng hiển thị tổng quan: Tổng đơn | Đang giao | Thành công | Đã hủy | Bất thường.
+   - Click các chip lọc để xem nhanh:
+     + "⚠️ Bất thường": Các đơn Giao thất bại, Chờ hủy hoặc Trả hàng cần xử lý gấp.
+     + "🚚 Đang giao": Lọc nhanh các đơn đang luân chuyển.
+     + "📦 Đang chuẩn bị", "✅ Giao thành công", "❌ Đã hủy".
+   - Cột STT, Mã đơn hàng, Mã vận đơn được cố định (Sticky Columns) khi cuộn ngang giúp dễ theo dõi.
 
-Chúc bạn sử dụng hiệu quả!
+C. XEM LỘ TRÌNH BƯU CỤC CHI TIẾT (TRACKING TIMELINE):
+   - Mỗi mã vận đơn trên bảng có nút biểu tượng xe tải 🚚.
+   - Nhấp vào để mở Popup hiển thị toàn bộ lịch trình luân chuyển hàng:
+     Kho xuất bưu cục -> Trung tâm phân loại -> Shipper đang phát -> Thời gian từng mốc chi tiết.
+
+D. MẪU TIN NHẮN TÙY BIẾN GỬI KHÁCH / SHIPPER (MESSAGE TEMPLATES):
+   - Mở qua: Menu "⚙️ Tiện ích & Cài đặt ▾" -> "💬 Mẫu Tin Nhắn Tùy Biến"
+   - Mỗi dòng đơn hàng có nút tin nhắn 💬: Nhấp vào để chọn mẫu tin soạn sẵn (Thông báo đang giao, Cảnh báo giao thất bại, Hướng dẫn nhận hàng, Nhắn tin cho shipper).
+   - Hệ thống tự động thay thế biến: {name}, {phone}, {ordersn}, {mvd}, {shop}, {carrier}.
+   - Nút "Sao chép tin nhắn" 1 chạm để dán trực tiếp vào Zalo, SMS hoặc Shopee Chat.
+
+E. CẢNH BÁO TỰ ĐỘNG QUA TELEGRAM BOT:
+   - Mở qua: Menu "⚙️ Tiện ích & Cài đặt ▾" -> "🔔 Cấu hình Telegram Bot"
+   - Điền Bot Token & Chat ID để nhận thông báo tự động mỗi khi quét đơn hoặc phát hiện đơn giao thất bại / đơn bất thường.
+   - Có nút "Gửi tin thử nghiệm" để kiểm tra kết nối ngay lập tức.
+
+3. CÁC TÍNH NĂNG CƠ BẢN & DỮ LIỆU:
+- [📁 Tệp & Dữ liệu ▾]:
+  + Lưu Server (Ctrl + S) / Khôi phục nháp từ draft.json.
+  + Xuất file Excel (.csv) đầy đủ 17 cột dữ liệu.
+  + Nhập file Excel / CSV hoặc Xóa toàn bộ dữ liệu.
+  + Đồng bộ Đám mây Supabase Cloud.
+- [📋 Copy MVĐ]: Sao chép toàn bộ danh sách mã vận đơn để nộp cho đối tác vận chuyển.
+- [Cột hiển thị ▾]: Tùy chọn ẩn / hiện 17 cột dữ liệu.
+- [🎨 Tùy màu ▾]: Giao diện Sáng/Tối, sọc Zebra, đổi màu thanh tiêu đề, làm nổi bật trạng thái đơn.
+
+4. CẤU TRÚC FILE HỆ THỐNG ("D:\tool pee\"):
+- CHAY_TOOL.bat          : Khởi động 1 chạm.
+- index.html             : Giao diện bảng điều khiển Shopee Pro.
+- server.py              : Backend xử lý API Shopee, Cookie Vault, Lộ trình & Telegram.
+- draft.json             : Dữ liệu đơn hàng lưu nháp.
+- cookie_vault.json      : Kho lưu trữ Cookie & danh sách shop.
+- templates_config.json  : Cấu hình mẫu tin nhắn gửi khách.
+- telegram_config.json   : Cấu hình Bot Telegram.
+- proxy_config.json      : Cấu hình Proxy xoay (nếu có).
+
+Chúc bạn kinh doanh hồng phát và quản lý đơn hàng Shopee hiệu quả!
+

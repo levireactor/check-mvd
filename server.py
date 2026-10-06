@@ -3,6 +3,8 @@ Shopee Tracking Sheet Backend
 Direct Shopee Mobile Gateway (x-api-source: rn)
 Supports Sheet View: Order SN, Tracking MVĐ, Receiver, Address, COD, Status Badges, Draft Save/Load
 Additional Columns: Product Link, Shipper Phone, Order Time, Last Check, Full Detail
+
+V2: Supabase PostgreSQL integration — data stored in cloud, local draft.json as offline fallback
 """
 
 import http.server
@@ -16,9 +18,78 @@ import urllib.request
 import urllib.error
 from concurrent.futures import ThreadPoolExecutor
 
+try:
+    from supabase import create_client, Client as SupabaseClient
+    SUPABASE_AVAILABLE = True
+except ImportError:
+    SUPABASE_AVAILABLE = False
+    print("[!] supabase-py not installed. Run: pip install supabase")
+
 PORT = 8080
 DIRECTORY = os.path.dirname(os.path.abspath(__file__))
 DRAFT_FILE = os.path.join(DIRECTORY, "draft.json")
+ENV_FILE = os.path.join(DIRECTORY, ".env")
+VAULT_FILE = os.path.join(DIRECTORY, "cookie_vault.json")
+TEMPLATES_FILE = os.path.join(DIRECTORY, "templates_config.json")
+TELEGRAM_CONFIG_FILE = os.path.join(DIRECTORY, "telegram_config.json")
+
+# ━━━ ĐỌC CONFIG TỪ FILE .env ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+SUPABASE_URL = ""
+SUPABASE_KEY = ""
+
+def _load_env():
+    """Đọc SUPABASE_URL và SUPABASE_KEY từ file .env"""
+    global SUPABASE_URL, SUPABASE_KEY
+    # Ưu tiên biến môi trường hệ thống
+    SUPABASE_URL = os.environ.get("SUPABASE_URL", "")
+    SUPABASE_KEY = os.environ.get("SUPABASE_KEY", "")
+    # Nếu chưa có thì đọc từ file .env
+    if not SUPABASE_URL and os.path.exists(ENV_FILE):
+        try:
+            with open(ENV_FILE, 'r', encoding='utf-8') as f:
+                for line in f:
+                    line = line.strip()
+                    if line.startswith('#') or '=' not in line:
+                        continue
+                    key, _, val = line.partition('=')
+                    key = key.strip()
+                    val = val.strip()
+                    if key == 'SUPABASE_URL':
+                        SUPABASE_URL = val
+                    elif key == 'SUPABASE_KEY':
+                        SUPABASE_KEY = val
+        except Exception as e:
+            print(f"[!] Không thể đọc .env: {e}")
+
+_load_env()
+
+def get_supabase():
+    """Trả về Supabase client nếu đã cấu hình đúng, ngược lại trả None."""
+    if not SUPABASE_AVAILABLE:
+        return None
+    if not SUPABASE_URL or not SUPABASE_KEY:
+        return None
+    # Kiểm tra URL hợp lệ (chưa điền placeholder)
+    if 'your-project-id' in SUPABASE_URL or 'your-anon' in SUPABASE_KEY:
+        return None
+    try:
+        return create_client(SUPABASE_URL, SUPABASE_KEY)
+    except Exception as e:
+        print(f"[!] Không thể kết nối Supabase: {e}")
+        return None
+
+def _is_supabase_configured():
+    """Kiểm tra nhanh xem Supabase đã được cấu hình chưa."""
+    return (
+        SUPABASE_AVAILABLE
+        and bool(SUPABASE_URL)
+        and bool(SUPABASE_KEY)
+        and 'your-project-id' not in SUPABASE_URL
+        and 'your-anon' not in SUPABASE_KEY
+    )
+
+# Columns không cần lưu vào Supabase (chỉ dùng nội bộ frontend)
+_EXCLUDED_COLS = {'created_at'}
 
 # SSL context
 ssl_ctx = ssl.create_default_context()
@@ -42,10 +113,356 @@ def clean_cookie_str(raw):
                 return p[7:].strip()
     return raw
 
+# ━━━ KIOTPROXY INTEGRATION (api.kiotproxy.com) ━━━━━━━━━━━━━━━━━
+PROXY_CONFIG_FILE = os.path.join(DIRECTORY, "proxy_config.json")
+KIOTPROXY_API_BASE = "https://api.kiotproxy.com/api/public/proxies"
+
+proxy_state = {
+    "key": "",
+    "enabled": False,
+    "auto_rotate": True,
+    "region": "",
+    "current_proxy": None,
+    "proxy_url": None,
+    "last_check": None,
+    "last_error": None
+}
+
+def _load_proxy_config():
+    global proxy_state
+    if os.path.exists(PROXY_CONFIG_FILE):
+        try:
+            with open(PROXY_CONFIG_FILE, 'r', encoding='utf-8') as f:
+                saved = json.load(f)
+                proxy_state.update(saved)
+        except Exception as e:
+            print(f"[!] Lỗi đọc proxy_config.json: {e}")
+    if not proxy_state.get('key'):
+        env_key = os.environ.get("KIOTPROXY_KEY", "")
+        if env_key:
+            proxy_state['key'] = env_key
+
+_load_proxy_config()
+
+def _save_proxy_config():
+    try:
+        to_save = {
+            "key": proxy_state.get("key", ""),
+            "enabled": proxy_state.get("enabled", False),
+            "auto_rotate": proxy_state.get("auto_rotate", True),
+            "region": proxy_state.get("region", ""),
+            "last_check": proxy_state.get("last_check")
+        }
+        with open(PROXY_CONFIG_FILE, 'w', encoding='utf-8') as f:
+            json.dump(to_save, f, ensure_ascii=False, indent=2)
+    except Exception as e:
+        print(f"[!] Lỗi ghi proxy_config.json: {e}")
+
+def _format_proxy_url(p_data):
+    if not p_data or not isinstance(p_data, dict):
+        return None
+    user = p_data.get('proxyUser')
+    pwd = p_data.get('proxyPass')
+    host = p_data.get('host')
+    port = p_data.get('httpPort')
+    if host and port:
+        if user and pwd:
+            return f"http://{user}:{pwd}@{host}:{port}"
+        return f"http://{host}:{port}"
+    http_str = p_data.get('http')
+    if http_str:
+        parts = http_str.split(':')
+        if len(parts) == 4:
+            return f"http://{parts[2]}:{parts[3]}@{parts[0]}:{parts[1]}"
+        elif len(parts) == 2:
+            return f"http://{parts[0]}:{parts[1]}"
+        return f"http://{http_str}"
+    return None
+
+def kiotproxy_api_request(endpoint, payload):
+    url = f"{KIOTPROXY_API_BASE}/{endpoint}"
+    req = urllib.request.Request(
+        url,
+        data=json.dumps(payload).encode('utf-8'),
+        headers={'Content-Type': 'application/json', 'User-Agent': 'ShopeeTracker/4.2'}
+    )
+    try:
+        with urllib.request.urlopen(req, context=ssl_ctx, timeout=12) as res:
+            return json.loads(res.read().decode('utf-8'))
+    except urllib.error.HTTPError as e:
+        err_body = e.read().decode('utf-8', errors='replace')
+        try:
+            return json.loads(err_body)
+        except Exception:
+            return {'success': False, 'code': e.code, 'message': err_body}
+    except Exception as e:
+        return {'success': False, 'message': str(e)}
+
+def kiotproxy_get_current(key=None):
+    global proxy_state
+    k = (key or proxy_state.get('key') or '').strip()
+    if not k:
+        return {'success': False, 'message': 'Chưa nhập Key Proxy'}
+    res = kiotproxy_api_request('get-current', {'keyValue': k})
+    if res.get('success') and res.get('data'):
+        proxy_state['current_proxy'] = res['data']
+        proxy_state['proxy_url'] = _format_proxy_url(res['data'])
+        proxy_state['last_check'] = datetime.datetime.now().strftime("%H:%M:%S %d/%m/%Y")
+        proxy_state['last_error'] = None
+    else:
+        proxy_state['last_error'] = res.get('message', 'Không lấy được proxy hiện tại')
+    return res
+
+def kiotproxy_get_new(key=None, region=None):
+    global proxy_state
+    k = (key or proxy_state.get('key') or '').strip()
+    if not k:
+        return {'success': False, 'message': 'Chưa nhập Key Proxy'}
+    payload = {'keyValue': k}
+    reg = region if region is not None else proxy_state.get('region')
+    if reg:
+        payload['region'] = reg
+    res = kiotproxy_api_request('get-new', payload)
+    if res.get('success') and res.get('data'):
+        proxy_state['current_proxy'] = res['data']
+        proxy_state['proxy_url'] = _format_proxy_url(res['data'])
+        proxy_state['last_check'] = datetime.datetime.now().strftime("%H:%M:%S %d/%m/%Y")
+        proxy_state['last_error'] = None
+    else:
+        proxy_state['last_error'] = res.get('message', 'Không thể đổi proxy mới')
+    return res
+
+def kiotproxy_out(key=None):
+    k = (key or proxy_state.get('key') or '').strip()
+    if not k:
+        return {'success': False, 'message': 'Chưa nhập Key Proxy'}
+    return kiotproxy_api_request('out', {'keyValue': k})
+
 def fetch_shopee_json(url, headers, timeout=10):
     req = urllib.request.Request(url, headers=headers)
-    with urllib.request.urlopen(req, context=ssl_ctx, timeout=timeout) as res:
-        return json.loads(res.read().decode('utf-8'))
+    
+    # Sử dụng Proxy KiotProxy nếu đang bật
+    if proxy_state.get('enabled') and proxy_state.get('proxy_url'):
+        p_url = proxy_state['proxy_url']
+        try:
+            proxy_handler = urllib.request.ProxyHandler({'http': p_url, 'https': p_url})
+            https_handler = urllib.request.HTTPSHandler(context=ssl_ctx)
+            opener = urllib.request.build_opener(proxy_handler, https_handler)
+            with opener.open(req, timeout=timeout) as res:
+                return json.loads(res.read().decode('utf-8'))
+        except urllib.error.HTTPError as e:
+            # Nếu bị Shopee chặn (429, 403) và bật auto_rotate
+            if e.code in (403, 429) and proxy_state.get('auto_rotate'):
+                print(f"[Proxy] Gặp mã HTTP {e.code} từ Shopee, tự động gọi đổi IP KiotProxy...")
+                try:
+                    kiotproxy_get_new()
+                except Exception:
+                    pass
+            raise
+        except Exception as e:
+            print(f"[Proxy] Lỗi kết nối qua proxy ({p_url}): {e}")
+            raise
+    else:
+        with urllib.request.urlopen(req, context=ssl_ctx, timeout=timeout) as res:
+            return json.loads(res.read().decode('utf-8'))
+
+# ━━━ COOKIE VAULT / KHO QUẢN LÝ SHOP ━━━━━━━━━━━━━━━━━━━━━━━━━
+def _load_vault():
+    if os.path.exists(VAULT_FILE):
+        try:
+            with open(VAULT_FILE, 'r', encoding='utf-8') as f:
+                return json.load(f)
+        except Exception as e:
+            print(f"[!] Lỗi đọc cookie_vault.json: {e}")
+            return []
+    return []
+
+def _save_vault(items):
+    try:
+        with open(VAULT_FILE, 'w', encoding='utf-8') as f:
+            json.dump(items, f, ensure_ascii=False, indent=2)
+        return True
+    except Exception as e:
+        print(f"[!] Lỗi ghi cookie_vault.json: {e}")
+        return False
+
+def check_cookie_health(spc_st):
+    """Kiểm tra tình trạng cookie Shopee còn sống hay hết hạn"""
+    token = clean_cookie_str(spc_st)
+    if not token or len(token) < 20:
+        return {'status': 'invalid', 'error': 'Cookie không hợp lệ hoặc quá ngắn', 'account': None}
+    acc_url = 'https://shopee.vn/api/v4/account/basic/get_account_info'
+    acc_headers = {**MOBILE_HEADERS, 'Cookie': f'SPC_ST={token};'}
+    try:
+        data = fetch_shopee_json(acc_url, acc_headers, timeout=8)
+        err = data.get('error')
+        if err == 0 and data.get('data'):
+            u = data['data']
+            return {
+                'status': 'alive',
+                'username': u.get('username') or f"User_{u.get('userid')}",
+                'userid': u.get('userid'),
+                'phone': u.get('phone') or '',
+                'error': None
+            }
+        elif err == 19 or 'auth' in str(data.get('error_msg', '')).lower():
+            return {'status': 'expired', 'error': 'Cookie đã hết hạn đăng nhập (Error 19)', 'account': None}
+        else:
+            return {'status': 'error', 'error': data.get('error_msg') or f'Lỗi Code {err}', 'account': None}
+    except Exception as e:
+        return {'status': 'error', 'error': str(e)[:100], 'account': None}
+
+# ━━━ TIN NHẮN TÙY BIẾN (TEMPLATES) ━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+def _load_templates():
+    if os.path.exists(TEMPLATES_FILE):
+        try:
+            with open(TEMPLATES_FILE, 'r', encoding='utf-8') as f:
+                return json.load(f)
+        except Exception:
+            pass
+    return []
+
+def _save_templates(items):
+    try:
+        with open(TEMPLATES_FILE, 'w', encoding='utf-8') as f:
+            json.dump(items, f, ensure_ascii=False, indent=2)
+        return True
+    except Exception:
+        return False
+
+# ━━━ TELEGRAM BOT THÔNG BÁO ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+def _load_telegram_config():
+    if os.path.exists(TELEGRAM_CONFIG_FILE):
+        try:
+            with open(TELEGRAM_CONFIG_FILE, 'r', encoding='utf-8') as f:
+                return json.load(f)
+        except Exception:
+            pass
+    return {
+        "bot_token": "",
+        "chat_id": "",
+        "enabled": False,
+        "notify_new_mvd": True,
+        "notify_completed": True,
+        "notify_cancelled": True
+    }
+
+def _save_telegram_config(cfg):
+    try:
+        with open(TELEGRAM_CONFIG_FILE, 'w', encoding='utf-8') as f:
+            json.dump(cfg, f, ensure_ascii=False, indent=2)
+        return True
+    except Exception:
+        return False
+
+def send_telegram_alert(text):
+    """Gửi tin nhắn Telegram thông báo nếu được kích hoạt"""
+    cfg = _load_telegram_config()
+    if not cfg.get('enabled'):
+        return False, "Telegram chưa bật"
+    token = (cfg.get('bot_token') or '').strip()
+    chat_id = (cfg.get('chat_id') or '').strip()
+    if not token or not chat_id:
+        return False, "Thiếu Token hoặc Chat ID"
+    url = f"https://api.telegram.org/bot{token}/sendMessage"
+    payload = json.dumps({'chat_id': chat_id, 'text': text, 'parse_mode': 'HTML'}).encode('utf-8')
+    req = urllib.request.Request(url, data=payload, headers={'Content-Type': 'application/json'})
+    try:
+        with urllib.request.urlopen(req, context=ssl_ctx, timeout=8) as res:
+            res_data = json.loads(res.read().decode('utf-8'))
+            if res_data.get('ok'):
+                return True, "Gửi thành công"
+            return False, res_data.get('description', 'Lỗi không xác định')
+    except urllib.error.HTTPError as e:
+        err_msg = e.read().decode('utf-8', errors='replace')
+        return False, f"HTTP {e.code}: {err_msg}"
+    except Exception as e:
+        return False, str(e)
+
+# ━━━ HÀNH TRÌNH VẬN CHUYỂN BƯU CỤC (TRACKING TIMELINE) ━━━━━━━━
+def fetch_order_tracking_timeline(order_id, spc_st):
+    """Lấy chi tiết toàn bộ các mốc hành trình bưu cục của đơn hàng"""
+    token = clean_cookie_str(spc_st)
+    headers = {**MOBILE_HEADERS, 'Cookie': f'SPC_ST={token};'}
+    timeline = []
+    carrier = ''
+    tracking_no = ''
+    order_sn = ''
+    driver_info = {}
+
+    # 1. Gọi API get_order_tracking_info của Shopee
+    try:
+        tr_url = f'https://shopee.vn/api/v4/order/get_order_tracking_info?order_id={order_id}'
+        tr_data = fetch_shopee_json(tr_url, headers, timeout=8)
+        data = tr_data.get('data') or {}
+        carrier = data.get('carrier_name') or ''
+        tracking_no = data.get('tracking_number') or ''
+        list_events = data.get('tracking_list') or data.get('list') or []
+        for ev in list_events:
+            ev_time = ev.get('ctime') or ev.get('time') or 0
+            time_str = datetime.datetime.fromtimestamp(ev_time).strftime("%H:%M %d/%m/%Y") if ev_time else ''
+            timeline.append({
+                'time': time_str,
+                'timestamp': ev_time,
+                'description': ev.get('description') or ev.get('text') or '',
+                'status': ev.get('status') or '',
+                'driver_name': ev.get('driver_name') or '',
+                'driver_phone': ev.get('driver_phone') or ''
+            })
+    except Exception as e:
+        print(f"[Timeline] Lỗi get_order_tracking_info: {e}")
+
+    # 2. Fallback gọi get_order_detail nếu timeline chưa có mốc nào
+    try:
+        dt_url = f'https://shopee.vn/api/v4/order/get_order_detail?order_id={order_id}'
+        d = fetch_shopee_json(dt_url, headers, timeout=8).get('data', {})
+        order_sn = d.get('processing_info', {}).get('order_sn') or str(order_id)
+        shipping = d.get('shipping', {}) or {}
+        if not tracking_no:
+            tracking_no = shipping.get('tracking_number') or ''
+        if not carrier:
+            carrier = (shipping.get('fulfilment_carrier', {}).get('text') or 
+                       shipping.get('masked_carrier', {}).get('text') or 'SPX Express')
+        tracking_info = shipping.get('tracking_info', {}) or {}
+        driver_info = {
+            'driver_name': tracking_info.get('driver_name') or '',
+            'driver_phone': tracking_info.get('driver_phone') or ''
+        }
+        if not timeline:
+            raw_list = tracking_info.get('tracking_list') or tracking_info.get('list') or shipping.get('tracking_list') or []
+            for ev in raw_list:
+                ev_time = ev.get('ctime') or ev.get('time') or 0
+                time_str = datetime.datetime.fromtimestamp(ev_time).strftime("%H:%M %d/%m/%Y") if ev_time else ''
+                timeline.append({
+                    'time': time_str,
+                    'timestamp': ev_time,
+                    'description': ev.get('description') or ev.get('text') or '',
+                    'status': ev.get('status') or '',
+                    'driver_name': ev.get('driver_name') or '',
+                    'driver_phone': ev.get('driver_phone') or ''
+                })
+        if not timeline and tracking_info.get('description'):
+            ctime = tracking_info.get('ctime') or int(time.time())
+            time_str = datetime.datetime.fromtimestamp(ctime).strftime("%H:%M %d/%m/%Y")
+            timeline.append({
+                'time': time_str,
+                'timestamp': ctime,
+                'description': tracking_info.get('description'),
+                'status': 'current',
+                'driver_name': tracking_info.get('driver_name') or '',
+                'driver_phone': tracking_info.get('driver_phone') or ''
+            })
+    except Exception as e:
+        print(f"[Timeline] Lỗi fallback get_order_detail: {e}")
+
+    return {
+        'order_id': str(order_id),
+        'order_sn': order_sn,
+        'tracking_no': tracking_no,
+        'carrier': carrier,
+        'driver_info': driver_info,
+        'timeline': timeline
+    }
 
 def extract_cookie_orders(spc_st, note_name="", order_limit=30):
     """
@@ -180,6 +597,7 @@ def extract_cookie_orders(spc_st, note_name="", order_limit=30):
 
             # 5. Sản phẩm & Link Sản Phẩm
             products = []
+            product_images = []
             product_url = ""
             info_card = d.get('info_card', {}) or {}
             for pc in info_card.get('parcel_cards', []):
@@ -188,10 +606,32 @@ def extract_cookie_orders(spc_st, note_name="", order_limit=30):
                         name = it.get('name')
                         if name:
                             products.append(name)
+                        img_h = it.get('image') or (it.get('images', [None])[0] if isinstance(it.get('images'), list) and it.get('images') else None)
+                        if img_h and isinstance(img_h, str):
+                            if not img_h.startswith('http'):
+                                product_images.append(f"https://down-vn.img.susercontent.com/file/{img_h}")
+                            else:
+                                product_images.append(img_h)
                         if not product_url and it.get('item_id') and it.get('shop_id'):
                             product_url = f"https://shopee.vn/product/{it.get('shop_id')}/{it.get('item_id')}"
             
             product_display = products[0] if products else '--'
+            product_image = product_images[0] if product_images else ''
+
+            # Lộ trình bưu cục nhanh (nếu có trong tracking_info)
+            raw_timeline = tracking_info.get('tracking_list') or tracking_info.get('list') or shipping.get('tracking_list') or []
+            timeline = []
+            for ev in raw_timeline:
+                ev_time = ev.get('ctime') or ev.get('time') or 0
+                time_str = datetime.datetime.fromtimestamp(ev_time).strftime("%H:%M %d/%m/%Y") if ev_time else ''
+                timeline.append({
+                    'time': time_str,
+                    'timestamp': ev_time,
+                    'description': ev.get('description') or ev.get('text') or '',
+                    'status': ev.get('status') or '',
+                    'driver_name': ev.get('driver_name') or '',
+                    'driver_phone': ev.get('driver_phone') or ''
+                })
 
             # 6. COD & Thanh toán
             payment_info = info_card.get('parcel_cards', [{}])[0].get('payment_info', {})
@@ -231,8 +671,10 @@ def extract_cookie_orders(spc_st, note_name="", order_limit=30):
                 'receiver_address': receiver_address,
                 'product_name': product_display,
                 'product_url': product_url,
+                'product_image': product_image,
                 'driver_phone': driver_phone,
                 'all_products': products,
+                'timeline': timeline,
                 'cod_val': cod_val,
                 'cod_amount': cod_str,
                 'payment_status': 'Chưa thanh toán' if cod_val > 0 else '—',
@@ -261,8 +703,10 @@ def extract_cookie_orders(spc_st, note_name="", order_limit=30):
                 'receiver_address': '',
                 'product_name': '--',
                 'product_url': '',
+                'product_image': '',
                 'driver_phone': '',
                 'all_products': [],
+                'timeline': [],
                 'cod_val': 0,
                 'cod_amount': '0 đ',
                 'payment_status': '—',
@@ -308,17 +752,116 @@ class TrackingRequestHandler(http.server.SimpleHTTPRequestHandler):
 
     def do_GET(self):
         if self.path == '/api/ping':
-            self._json(200, {'status': 'ok', 'engine': 'shopee-sheet-v4.1'})
+            sb_ok = _is_supabase_configured()
+            self._json(200, {
+                'status': 'ok',
+                'engine': 'shopee-sheet-v4.2-supabase',
+                'supabase': sb_ok,
+                'supabase_url': SUPABASE_URL[:40] + '...' if SUPABASE_URL else ''
+            })
+
         elif self.path == '/api/load-draft':
+            # ── Thử tải từ Supabase trước ──
+            if _is_supabase_configured():
+                try:
+                    sb = get_supabase()
+                    if sb:
+                        result = sb.table('orders').select('*').order('stt').execute()
+                        rows = result.data or []
+                        # Loại bỏ cột nội bộ Supabase (created_at, updated_at)
+                        for row in rows:
+                            row.pop('created_at', None)
+                            row.pop('updated_at', None)
+                        now_str = datetime.datetime.now().strftime("%H:%M:%S %d/%m/%Y")
+                        print(f"[Supabase] Đã tải {len(rows)} đơn hàng từ cloud.")
+                        self._json(200, {
+                            'rows': rows,
+                            'count': len(rows),
+                            'updated_at': now_str,
+                            'source': 'supabase'
+                        })
+                        return
+                except Exception as e:
+                    print(f"[!] Supabase load lỗi, fallback local: {e}")
+
+            # ── Fallback: đọc từ draft.json cục bộ ──
             try:
                 if os.path.exists(DRAFT_FILE):
                     with open(DRAFT_FILE, 'r', encoding='utf-8') as f:
                         data = json.load(f)
+                    data['source'] = 'local'
                     self._json(200, data)
                 else:
-                    self._json(200, {'rows': [], 'count': 0, 'updated_at': None})
+                    self._json(200, {'rows': [], 'count': 0, 'updated_at': None, 'source': 'empty'})
             except Exception as e:
-                self._json(500, {'error': f'Không thể đọc draft: {str(e)}'})
+                self._json(500, {'error': f'Không thể đọc dữ liệu: {str(e)}'})
+
+        elif self.path == '/api/supabase-status':
+            """Endpoint kiểm tra trạng thái kết nối Supabase."""
+            configured = _is_supabase_configured()
+            if configured:
+                try:
+                    sb = get_supabase()
+                    sb.table('orders').select('id').limit(1).execute()
+                    self._json(200, {
+                        'connected': True,
+                        'url': SUPABASE_URL[:40] + '...'
+                    })
+                except Exception as e:
+                    self._json(200, {'connected': False, 'error': str(e)})
+            else:
+                self._json(200, {
+                    'connected': False,
+                    'configured': False,
+                    'message': 'Chưa cấu hình SUPABASE_URL và SUPABASE_KEY trong file .env'
+                })
+
+        elif self.path == '/api/proxy/info':
+            k = proxy_state.get('key', '')
+            k_preview = (k[:4] + '...' + k[-4:]) if len(k) > 8 else (k or '')
+            self._json(200, {
+                'enabled': proxy_state.get('enabled', False),
+                'has_key': bool(k),
+                'key_preview': k_preview,
+                'key_raw': k,
+                'auto_rotate': proxy_state.get('auto_rotate', True),
+                'region': proxy_state.get('region', ''),
+                'current': proxy_state.get('current_proxy'),
+                'proxy_url': proxy_state.get('proxy_url'),
+                'last_check': proxy_state.get('last_check'),
+                'last_error': proxy_state.get('last_error')
+            })
+
+        elif self.path == '/api/vault/list':
+            try:
+                items = _load_vault()
+                self._json(200, {'success': True, 'items': items})
+            except Exception as e:
+                self._json(500, {'error': f'Lỗi đọc kho cookie: {str(e)}'})
+
+        elif self.path == '/api/templates/list':
+            try:
+                items = _load_templates()
+                self._json(200, {'success': True, 'items': items})
+            except Exception as e:
+                self._json(500, {'error': f'Lỗi đọc mẫu tin nhắn: {str(e)}'})
+
+        elif self.path == '/api/telegram/info':
+            try:
+                cfg = _load_telegram_config()
+                token = cfg.get('bot_token', '')
+                masked_token = (token[:6] + '...' + token[-4:]) if len(token) > 12 else (token or '')
+                self._json(200, {
+                    'enabled': cfg.get('enabled', False),
+                    'chat_id': cfg.get('chat_id', ''),
+                    'bot_token_masked': masked_token,
+                    'has_token': bool(token),
+                    'notify_new_mvd': cfg.get('notify_new_mvd', True),
+                    'notify_completed': cfg.get('notify_completed', True),
+                    'notify_cancelled': cfg.get('notify_cancelled', True)
+                })
+            except Exception as e:
+                self._json(500, {'error': f'Lỗi đọc Telegram config: {str(e)}'})
         else:
             super().do_GET()
 
@@ -341,17 +884,355 @@ class TrackingRequestHandler(http.server.SimpleHTTPRequestHandler):
                 body = self._read_body()
                 rows = body.get('rows', [])
                 now_str = datetime.datetime.now().strftime("%H:%M:%S %d/%m/%Y")
-                data = {
-                    'rows': rows,
+
+                # ── 1. Luôn lưu backup local trước (đảm bảo không mất dữ liệu) ──
+                local_data = {'rows': rows, 'count': len(rows), 'updated_at': now_str}
+                try:
+                    with open(DRAFT_FILE, 'w', encoding='utf-8') as f:
+                        json.dump(local_data, f, ensure_ascii=False, indent=2)
+                except Exception as e:
+                    print(f"[!] Không thể ghi draft.json: {e}")
+
+                # ── 2. Thử lưu lên Supabase ──
+                if _is_supabase_configured():
+                    try:
+                        sb = get_supabase()
+                        if sb:
+                            now_iso = datetime.datetime.utcnow().isoformat()
+
+                            if not rows:
+                                # Xóa sạch toàn bộ trên Supabase
+                                sb.table('orders').delete().neq('id', '').execute()
+                                print("[Supabase] Đã xóa sạch toàn bộ đơn hàng.")
+                            else:
+                                # Lấy danh sách id đang tồn tại trên Supabase
+                                existing_res = sb.table('orders').select('id').execute()
+                                existing_ids = {r['id'] for r in (existing_res.data or [])}
+                                new_ids = {r['id'] for r in rows if r.get('id')}
+
+                                # Xóa các đơn đã bị remove ở frontend
+                                to_delete = existing_ids - new_ids
+                                if to_delete:
+                                    sb.table('orders').delete().in_('id', list(to_delete)).execute()
+                                    print(f"[Supabase] Đã xóa {len(to_delete)} đơn đã hủy.")
+
+                                # Chuẩn bị dữ liệu upsert (thêm updated_at)
+                                upsert_rows = []
+                                for r in rows:
+                                    row_data = dict(r)
+                                    row_data['updated_at'] = now_iso
+                                    # Đảm bảo all_products là JSON-serializable
+                                    if 'all_products' in row_data and isinstance(row_data['all_products'], list):
+                                        row_data['all_products'] = row_data['all_products']
+                                    upsert_rows.append(row_data)
+
+                                # Upsert theo batch 500
+                                BATCH = 500
+                                for i in range(0, len(upsert_rows), BATCH):
+                                    sb.table('orders').upsert(
+                                        upsert_rows[i:i+BATCH],
+                                        on_conflict='id'
+                                    ).execute()
+
+                            print(f"[Supabase] Đã lưu {len(rows)} đơn hàng lên cloud.")
+                            self._json(200, {
+                                'success': True,
+                                'count': len(rows),
+                                'saved_at': now_str,
+                                'source': 'supabase'
+                            })
+                            return
+                    except Exception as e:
+                        print(f"[!] Supabase save lỗi, đã lưu local: {e}")
+                        self._json(200, {
+                            'success': True,
+                            'count': len(rows),
+                            'saved_at': now_str,
+                            'source': 'local',
+                            'warning': f'Supabase lỗi, lưu cục bộ: {str(e)[:60]}'
+                        })
+                        return
+
+                # ── Không có Supabase: chỉ lưu local ──
+                self._json(200, {
+                    'success': True,
                     'count': len(rows),
-                    'updated_at': now_str
-                }
-                with open(DRAFT_FILE, 'w', encoding='utf-8') as f:
-                    json.dump(data, f, ensure_ascii=False, indent=2)
-                
-                self._json(200, {'success': True, 'count': len(rows), 'saved_at': now_str})
+                    'saved_at': now_str,
+                    'source': 'local'
+                })
+
             except Exception as e:
-                self._json(500, {'error': f'Không thể lưu draft: {str(e)}'})
+                self._json(500, {'error': f'Không thể lưu dữ liệu: {str(e)}'})
+
+        elif self.path == '/api/proxy/save':
+            try:
+                body = self._read_body()
+                key = body.get('key', '').strip()
+                enabled = bool(body.get('enabled', False))
+                auto_rotate = bool(body.get('auto_rotate', True))
+                region = body.get('region', '').strip()
+                
+                if key:
+                    proxy_state['key'] = key
+                proxy_state['enabled'] = enabled
+                proxy_state['auto_rotate'] = auto_rotate
+                proxy_state['region'] = region
+                
+                kp_res = None
+                if proxy_state.get('key'):
+                    kp_res = kiotproxy_get_current()
+                
+                _save_proxy_config()
+                self._json(200, {
+                    'success': True,
+                    'enabled': proxy_state['enabled'],
+                    'auto_rotate': proxy_state['auto_rotate'],
+                    'region': proxy_state['region'],
+                    'current': proxy_state.get('current_proxy'),
+                    'kp_res': kp_res,
+                    'message': 'Đã lưu cấu hình Proxy thành công'
+                })
+            except Exception as e:
+                self._json(500, {'error': f'Lỗi lưu cấu hình: {str(e)}'})
+
+        elif self.path == '/api/proxy/toggle':
+            try:
+                body = self._read_body()
+                proxy_state['enabled'] = bool(body.get('enabled', False))
+                if proxy_state['enabled'] and not proxy_state.get('current_proxy') and proxy_state.get('key'):
+                    kiotproxy_get_current()
+                _save_proxy_config()
+                self._json(200, {
+                    'success': True,
+                    'enabled': proxy_state['enabled'],
+                    'current': proxy_state.get('current_proxy')
+                })
+            except Exception as e:
+                self._json(500, {'error': str(e)})
+
+        elif self.path == '/api/proxy/new-ip':
+            try:
+                body = self._read_body()
+                region = body.get('region')
+                res = kiotproxy_get_new(region=region)
+                self._json(200, res)
+            except Exception as e:
+                self._json(500, {'error': str(e)})
+
+        elif self.path == '/api/proxy/out':
+            try:
+                res = kiotproxy_out()
+                self._json(200, res)
+            except Exception as e:
+                self._json(500, {'error': str(e)})
+
+        elif self.path == '/api/proxy/test':
+            try:
+                if not proxy_state.get('proxy_url'):
+                    if proxy_state.get('key'):
+                        kiotproxy_get_current()
+                p_url = proxy_state.get('proxy_url')
+                if not p_url:
+                    return self._json(400, {'error': 'Chưa có thông tin Proxy hoạt động để kiểm tra. Hãy kiểm tra lại Key Proxy.'})
+                
+                t0 = time.time()
+                proxy_handler = urllib.request.ProxyHandler({'http': p_url, 'https': p_url})
+                https_handler = urllib.request.HTTPSHandler(context=ssl_ctx)
+                opener = urllib.request.build_opener(proxy_handler, https_handler)
+                
+                test_req = urllib.request.Request(
+                    'https://api.ipify.org?format=json',
+                    headers={'User-Agent': 'ShopeeTracker/4.2'}
+                )
+                with opener.open(test_req, timeout=10) as res:
+                    ip_data = json.loads(res.read().decode('utf-8'))
+                    latency_ms = round((time.time() - t0) * 1000)
+                    self._json(200, {
+                        'success': True,
+                        'ip': ip_data.get('ip'),
+                        'latency_ms': latency_ms,
+                        'proxy_url': p_url
+                    })
+            except Exception as e:
+                self._json(500, {'error': f'Kiểm tra kết nối Proxy thất bại: {str(e)}'})
+
+        elif self.path == '/api/vault/save':
+            try:
+                body = self._read_body()
+                item_id = body.get('id', '').strip()
+                name = body.get('name', '').strip() or 'Shop mới'
+                cookie = body.get('cookie', '').strip()
+                tags = body.get('tags', '').strip()
+                notes = body.get('notes', '').strip()
+                
+                if not cookie:
+                    return self._json(400, {'error': 'Cookie không được để trống'})
+                
+                token = clean_cookie_str(cookie)
+                vault = _load_vault()
+                now_str = datetime.datetime.now().strftime("%H:%M:%S %d/%m/%Y")
+                
+                # Kiểm tra sức khỏe cookie trước khi lưu
+                health = check_cookie_health(token)
+                
+                if item_id:
+                    found = False
+                    for it in vault:
+                        if it.get('id') == item_id:
+                            it['name'] = name
+                            it['cookie'] = token
+                            it['tags'] = tags
+                            it['notes'] = notes
+                            it['updated_at'] = now_str
+                            it['status'] = health.get('status', 'unknown')
+                            if health.get('username'):
+                                it['username'] = health.get('username')
+                            if health.get('error'):
+                                it['last_error'] = health.get('error')
+                            found = True
+                            break
+                    if not found:
+                        item_id = str(int(time.time() * 1000))
+                        vault.append({
+                            'id': item_id,
+                            'name': name,
+                            'cookie': token,
+                            'tags': tags,
+                            'notes': notes,
+                            'status': health.get('status', 'unknown'),
+                            'username': health.get('username', ''),
+                            'created_at': now_str,
+                            'updated_at': now_str
+                        })
+                else:
+                    item_id = str(int(time.time() * 1000))
+                    vault.append({
+                        'id': item_id,
+                        'name': name,
+                        'cookie': token,
+                        'tags': tags,
+                        'notes': notes,
+                        'status': health.get('status', 'unknown'),
+                        'username': health.get('username', ''),
+                        'created_at': now_str,
+                        'updated_at': now_str
+                    })
+                
+                _save_vault(vault)
+                self._json(200, {'success': True, 'item_id': item_id, 'health': health, 'items': vault})
+            except Exception as e:
+                self._json(500, {'error': f'Lỗi lưu shop: {str(e)}'})
+
+        elif self.path == '/api/vault/delete':
+            try:
+                body = self._read_body()
+                item_id = body.get('id', '').strip()
+                vault = _load_vault()
+                vault = [it for it in vault if it.get('id') != item_id]
+                _save_vault(vault)
+                self._json(200, {'success': True, 'items': vault})
+            except Exception as e:
+                self._json(500, {'error': f'Lỗi xóa shop: {str(e)}'})
+
+        elif self.path == '/api/vault/check':
+            try:
+                body = self._read_body()
+                item_id = body.get('id', '').strip()
+                check_all = body.get('all', False)
+                vault = _load_vault()
+                now_str = datetime.datetime.now().strftime("%H:%M:%S %d/%m/%Y")
+                
+                if check_all:
+                    for it in vault:
+                        ck = it.get('cookie', '')
+                        h = check_cookie_health(ck)
+                        it['status'] = h.get('status', 'unknown')
+                        it['last_checked'] = now_str
+                        if h.get('username'):
+                            it['username'] = h.get('username')
+                        if h.get('error'):
+                            it['last_error'] = h.get('error')
+                        else:
+                            it['last_error'] = None
+                    _save_vault(vault)
+                    self._json(200, {'success': True, 'items': vault})
+                else:
+                    target_item = None
+                    for it in vault:
+                        if it.get('id') == item_id:
+                            target_item = it
+                            break
+                    if not target_item:
+                        return self._json(404, {'error': 'Không tìm thấy shop này trong kho'})
+                    h = check_cookie_health(target_item.get('cookie', ''))
+                    target_item['status'] = h.get('status', 'unknown')
+                    target_item['last_checked'] = now_str
+                    if h.get('username'):
+                        target_item['username'] = h.get('username')
+                    if h.get('error'):
+                        target_item['last_error'] = h.get('error')
+                    else:
+                        target_item['last_error'] = None
+                    _save_vault(vault)
+                    self._json(200, {'success': True, 'item': target_item, 'health': h, 'items': vault})
+            except Exception as e:
+                self._json(500, {'error': f'Lỗi kiểm tra cookie: {str(e)}'})
+
+        elif self.path == '/api/templates/save':
+            try:
+                body = self._read_body()
+                items = body.get('items', [])
+                if not isinstance(items, list):
+                    return self._json(400, {'error': 'Dữ liệu templates không hợp lệ'})
+                _save_templates(items)
+                self._json(200, {'success': True, 'items': items})
+            except Exception as e:
+                self._json(500, {'error': f'Lỗi lưu mẫu tin nhắn: {str(e)}'})
+
+        elif self.path == '/api/telegram/save':
+            try:
+                body = self._read_body()
+                cfg = _load_telegram_config()
+                if 'bot_token' in body and body['bot_token'].strip():
+                    cfg['bot_token'] = body['bot_token'].strip()
+                if 'chat_id' in body:
+                    cfg['chat_id'] = body['chat_id'].strip()
+                if 'enabled' in body:
+                    cfg['enabled'] = bool(body['enabled'])
+                if 'notify_new_mvd' in body:
+                    cfg['notify_new_mvd'] = bool(body['notify_new_mvd'])
+                if 'notify_completed' in body:
+                    cfg['notify_completed'] = bool(body['notify_completed'])
+                if 'notify_cancelled' in body:
+                    cfg['notify_cancelled'] = bool(body['notify_cancelled'])
+                _save_telegram_config(cfg)
+                self._json(200, {'success': True, 'message': 'Đã lưu cấu hình Telegram'})
+            except Exception as e:
+                self._json(500, {'error': f'Lỗi lưu Telegram config: {str(e)}'})
+
+        elif self.path == '/api/telegram/test':
+            try:
+                body = self._read_body()
+                msg = body.get('message', '').strip() or '🤖 <b>Shopee Tracker Test:</b> Kết nối Telegram Bot thành công!'
+                ok, res_msg = send_telegram_alert(msg)
+                if ok:
+                    self._json(200, {'success': True, 'message': 'Đã gửi tin nhắn thử nghiệm tới Telegram!'})
+                else:
+                    self._json(400, {'error': f'Không thể gửi tin nhắn Telegram: {res_msg}'})
+            except Exception as e:
+                self._json(500, {'error': str(e)})
+
+        elif self.path == '/api/order/tracking-timeline':
+            try:
+                body = self._read_body()
+                order_id = str(body.get('order_id', '')).strip()
+                cookie_raw = body.get('cookie_raw', '').strip()
+                if not order_id:
+                    return self._json(400, {'error': 'Thiếu mã order_id'})
+                res = fetch_order_tracking_timeline(order_id, cookie_raw)
+                self._json(200, {'success': True, 'data': res})
+            except Exception as e:
+                self._json(500, {'error': f'Lỗi lấy hành trình đơn hàng: {str(e)}'})
 
         else:
             self._json(404, {'error': 'Endpoint không tồn tại'})
@@ -388,13 +1269,23 @@ def start_server():
     sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace')
     sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8', errors='replace')
     
+    # In thông báo trạng thái khởi động
+    print(f"[*] Shopee Tracking Sheet Server v4.2 - Supabase Edition")
+    if _is_supabase_configured():
+        print(f"[*] Supabase: ✅ Đã cấu hình — {SUPABASE_URL[:40]}...")
+        print(f"[*] Dữ liệu sẽ được lưu/tải từ Supabase PostgreSQL (cloud)")
+    else:
+        print(f"[!] Supabase: ⚠️  Chưa cấu hình — đang dùng file cục bộ (draft.json)")
+        print(f"[!] Để bật cloud storage: điền SUPABASE_URL và SUPABASE_KEY vào file .env")
+    print(f"[*] Server running on http://localhost:{PORT}")
+    print(f"-" * 60)
+    
     server_address = ('', PORT)
     with ThreadedHTTPServer(server_address, TrackingRequestHandler) as httpd:
-        print(f"[*] Shopee Tracking Sheet Server running on http://localhost:{PORT}")
         try:
             httpd.serve_forever()
         except KeyboardInterrupt:
-            print("\nServer stopped.")
+            print("\n[*] Server stopped.")
 
 if __name__ == '__main__':
     start_server()
