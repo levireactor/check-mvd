@@ -4173,6 +4173,19 @@
       if ($('chip-cnt-warning')) $('chip-cnt-warning').textContent = cntWarning;
     }
 
+    async function safeApiCall(url, options = {}) {
+      const res = await fetch(url, options);
+      const text = await res.text();
+      if (!text || !text.trim()) {
+        throw new Error(`Máy chủ không phản hồi dữ liệu (${url}). Nếu web chạy trên Render, hãy đảm bảo dịch vụ được tạo ở dạng 'Web Service' (chạy Python server.py) thay vì 'Static Site' web tĩnh!`);
+      }
+      try {
+        return JSON.parse(text);
+      } catch (err) {
+        throw new Error(`Dữ liệu trả về không phải JSON: ${text.substring(0, 120)}`);
+      }
+    }
+
     // ── KHO COOKIE & QUẢN LÝ SHOP (COOKIE VAULT) ──
     let vaultList = [];
     let selectedVaultIds = new Set();
@@ -4609,8 +4622,7 @@
     async function openTelegramModal() {
       $('modal-telegram').classList.add('show');
       try {
-        const res = await fetch('/api/telegram/info');
-        const d = await res.json();
+        const d = await safeApiCall('/api/telegram/info');
         $('chk-tele-enabled').checked = Boolean(d.enabled);
         $('input-tele-chatid').value = d.chat_id || '';
         if (d.has_token) {
@@ -4635,7 +4647,7 @@
       const notify_cancelled = $('chk-tele-cancelled').checked;
 
       try {
-        const res = await fetch('/api/telegram/save', {
+        const d = await safeApiCall('/api/telegram/save', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -4647,7 +4659,6 @@
             notify_cancelled
           })
         });
-        const d = await res.json();
         if (d.success) {
           showToast('Đã lưu cấu hình Telegram!', '🤖');
           closeTelegramModal();
@@ -4662,12 +4673,11 @@
     async function testSendTelegram() {
       showToast('Đang gửi tin thử nghiệm...', '⏳');
       try {
-        const res = await fetch('/api/telegram/test', {
+        const d = await safeApiCall('/api/telegram/test', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ message: '🤖 <b>[Shopee Tracker Test]</b> Kết nối Telegram Bot thành công 100%!' })
         });
-        const d = await res.json();
         if (d.success) {
           showToast('Đã gửi tin nhắn thành công qua Telegram!', '✅');
         } else {

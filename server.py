@@ -25,7 +25,7 @@ except ImportError:
     SUPABASE_AVAILABLE = False
     print("[!] supabase-py not installed. Run: pip install supabase")
 
-PORT = 8080
+PORT = int(os.environ.get("PORT", 8080))
 DIRECTORY = os.path.dirname(os.path.abspath(__file__))
 DRAFT_FILE = os.path.join(DIRECTORY, "draft.json")
 ENV_FILE = os.path.join(DIRECTORY, ".env")
