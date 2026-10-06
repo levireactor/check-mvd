@@ -4866,12 +4866,11 @@
         $('scan-status-text').textContent = `Đang quét tài khoản ${current}/${lines.length}...`;
 
         try {
-          const resp = await fetch('/api/process', {
+          const data = await safeApiCall('/api/process', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ spc_st: lines[i] })
           });
-          const data = await resp.json();
 
           if (data.error) {
             addLog(`Cookie #${current} lỗi: ${data.error}`);
@@ -5079,12 +5078,11 @@
 
       addLog(`[Renew] Đang kiểm tra lại đơn: ${row.order_sn || row.order_id}...`);
       try {
-        const res = await fetch('/api/process', {
+        const data = await safeApiCall('/api/process', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ spc_st: cookie, note_name: row.note_name || '' })
         });
-        const data = await res.json();
         if (data.error) {
           showToast(`Lỗi: ${data.error}`, '❌');
           addLog(`[Renew Lỗi] ${row.order_sn}: ${data.error}`);
@@ -5186,12 +5184,11 @@
         if (rowBtn) rowBtn.classList.add('spinning');
 
         try {
-          const res = await fetch('/api/process', {
+          const data = await safeApiCall('/api/process', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ spc_st: cookie, note_name: row.note_name || '' })
           });
-          const data = await res.json();
           if (data && data.orders && data.orders.length > 0) {
             let match = data.orders.find(o => String(o.order_id) === String(row.order_id) || (o.order_sn && o.order_sn === row.order_sn));
             if (!match) match = data.orders[0];
