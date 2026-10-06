@@ -1250,6 +1250,29 @@
       color: #c084fc;
     }
 
+    .autorenew-select {
+      background: rgba(255, 255, 255, 0.7);
+      border: 1px solid rgba(168, 85, 247, 0.35);
+      color: inherit;
+      border-radius: 6px;
+      padding: 2px 5px;
+      font-size: 0.74rem;
+      font-weight: 700;
+      outline: none;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    body.theme-dark .autorenew-select {
+      background: #1e1b2e;
+      border-color: #6b21a8;
+      color: #e2e8f0;
+    }
+
+    .autorenew-select:focus, .autorenew-select:hover {
+      border-color: #a855f7;
+    }
+
     .toggle-switch-pill {
       position: relative;
       width: 32px;
@@ -2701,12 +2724,22 @@
         <span class="proxy-dot" id="top-proxy-dot"></span>
       </button>
 
-      <!-- Auto-check switch -->
-      <label class="autocheck-toggle-wrap" id="autocheck-wrap" title="Tự động kiểm tra lại đơn sau mỗi 30 phút">
-        <input type="checkbox" id="chk-autocheck-30m" style="display:none" onchange="toggleAutoCheck30m(this.checked)">
-        <span class="toggle-switch-pill"><span class="toggle-switch-knob"></span></span>
-        <span>Auto-check 30p <small id="autocheck-countdown-text" style="color:#a855f7;font-weight:700"></small></span>
-      </label>
+      <!-- Auto Renew Widget -->
+      <div class="autocheck-toggle-wrap" id="autocheck-wrap" title="Tự động kiểm tra lại tất cả cookie theo chu kỳ">
+        <label style="display:inline-flex;align-items:center;gap:6px;cursor:pointer;margin:0" title="Bật/Tắt Auto Renew">
+          <input type="checkbox" id="chk-autocheck-30m" style="display:none" onchange="toggleAutoRenew(this.checked)">
+          <span class="toggle-switch-pill"><span class="toggle-switch-knob"></span></span>
+          <span style="font-weight:700">⏱️ Auto Renew</span>
+        </label>
+        <select id="sel-autorenew-interval" class="autorenew-select" onchange="changeAutoRenewInterval(this.value)" title="Chọn chu kỳ tự động quét">
+          <option value="5">5p</option>
+          <option value="10">10p</option>
+          <option value="15">15p</option>
+          <option value="30" selected>30p</option>
+          <option value="60">60p</option>
+        </select>
+        <small id="autocheck-countdown-text" style="color:#a855f7;font-weight:700;font-family:var(--mono)"></small>
+      </div>
 
       <!-- Badges -->
       <div class="autosave-badge" id="autosave-badge" title="Tự động ghi nhớ vào bộ nhớ trình duyệt & lưu lên máy chủ">
@@ -3562,6 +3595,8 @@
       renderTable();
       applyColumnVisibility();
       initProxyStatus();
+      loadVaultList();
+      initAutoRenewFromStorage();
 
       // Keyboard shortcut Ctrl + S
       window.addEventListener('keydown', e => {
@@ -5182,9 +5217,19 @@
         btn.title = 'Đang kiểm tra lại...';
       }
 
-      const cookie = (row.cookie_raw || '').trim();
-      if (!cookie) {
-        showToast('Đơn này không có cookie để kiểm tra lại!', '⚠️');
+      let cookie = (row.cookie_raw || '').trim();
+      // Nếu đơn này chưa có cookie, thử tìm lại từ các đơn khác có cùng username/note_name hoặc từ Kho Shop
+      if (!cookie && row.username) {
+        const found = sheetRows.find(r => r.username === row.username && r.cookie_raw);
+        if (found) cookie = found.cookie_raw;
+      }
+      if (!cookie && typeof vaultList !== 'undefined' && Array.isArray(vaultList)) {
+        const foundVault = vaultList.find(v => (v.username && v.username === row.username) || (v.name && v.name === row.note_name));
+        if (foundVault && foundVault.cookie) cookie = foundVault.cookie;
+      }
+
+      if (!cookie || cookie.length < 20) {
+        showToast('Đơn này không có cookie trong dữ liệu để kiểm tra lại!', '⚠️');
         if (btn) btn.classList.remove('spinning');
         return;
       }
@@ -5198,14 +5243,14 @@
         });
         if (data.error) {
           showToast(`Lỗi: ${data.error}`, '❌');
-          addLog(`[Renew Lỗi] ${row.order_sn}: ${data.error}`);
+          addLog(`[Renew Lỗi] ${row.order_sn || row.order_id}: ${data.error}`);
         } else if (data.orders && data.orders.length > 0) {
           let match = data.orders.find(o => String(o.order_id) === String(row.order_id) || (o.order_sn && o.order_sn === row.order_sn));
           if (!match) match = data.orders[0];
 
           const hadMvdBefore = Boolean(row.tracking_no);
 
-          // Update properties
+          // Cập nhật toàn bộ thông tin mới nhất
           if (match.tracking_no) row.tracking_no = match.tracking_no;
           row.has_tracking = Boolean(row.tracking_no);
           if (match.carrier) row.carrier = match.carrier;
@@ -5216,6 +5261,10 @@
           if (match.receiver_name) row.receiver_name = match.receiver_name;
           if (match.receiver_phone) row.receiver_phone = match.receiver_phone;
           if (match.receiver_address) row.receiver_address = match.receiver_address;
+          if (match.timeline && match.timeline.length) row.timeline = match.timeline;
+          if (match.cod_val !== undefined) row.cod_val = match.cod_val;
+          if (match.cod_amount) row.cod_amount = match.cod_amount;
+          row.cookie_raw = cookie;
 
           const nowStr = new Date().toLocaleTimeString('vi-VN') + ' ' + new Date().toLocaleDateString('vi-VN');
           row.last_check = nowStr;
@@ -5228,7 +5277,7 @@
           } else {
             showToast(`Đã làm mới đơn ${row.order_sn || row.order_id}!`, '✅');
           }
-          addLog(`[Renew Thành công] Đơn ${row.order_sn}. MVĐ: ${row.tracking_no || 'Chưa có'}`);
+          addLog(`[Renew Thành công] Đơn ${row.order_sn || row.order_id}. MVĐ: ${row.tracking_no || 'Chưa có'}`);
         } else {
           showToast('Tài khoản này hiện không tìm thấy đơn hàng trên Shopee', '⚠️');
         }
@@ -5240,7 +5289,53 @@
       }
     }
 
-    // 2. Chọn tất cả các đơn chưa có MVĐ
+    // 2. Thu thập toàn bộ cookie có sẵn trong data (sheetRows + vaultList)
+    function collectAllCookiesFromData(onlySelected = false) {
+      const cookieMap = new Map(); // token -> { token, note_name, rowCount, source }
+
+      // 1. Thu thập từ sheetRows
+      let rowsToScan = sheetRows;
+      if (onlySelected && selectedRowIds.size > 0) {
+        rowsToScan = sheetRows.filter(r => selectedRowIds.has(r.id));
+      }
+
+      rowsToScan.forEach(r => {
+        const c = (r.cookie_raw || '').trim();
+        if (c && c.length > 20) {
+          if (!cookieMap.has(c)) {
+            cookieMap.set(c, {
+              token: c,
+              note_name: r.note_name || '',
+              rowCount: 1,
+              source: 'sheet'
+            });
+          } else {
+            const entry = cookieMap.get(c);
+            entry.rowCount++;
+            if (!entry.note_name && r.note_name) entry.note_name = r.note_name;
+          }
+        }
+      });
+
+      // 2. Thu thập thêm từ Kho Shop (vaultList) nếu quét toàn bộ
+      if (!onlySelected && typeof vaultList !== 'undefined' && Array.isArray(vaultList)) {
+        vaultList.forEach(v => {
+          const c = (v.cookie || '').trim();
+          if (c && c.length > 20 && !cookieMap.has(c)) {
+            cookieMap.set(c, {
+              token: c,
+              note_name: v.name || v.tags || '',
+              rowCount: 0,
+              source: 'vault'
+            });
+          }
+        });
+      }
+
+      return Array.from(cookieMap.values());
+    }
+
+    // 3. Chọn tất cả các đơn chưa có MVĐ
     function selectNoMVDOrders() {
       const noMvdRows = sheetRows.filter(r => !r.tracking_no || !r.has_tracking);
       if (noMvdRows.length === 0) {
@@ -5253,22 +5348,11 @@
       showToast(`Đã chọn ${noMvdRows.length} đơn chưa có MVĐ!`, '🎯');
     }
 
-    // 3. Làm mới đơn hàng (hàng loạt: những đơn được chọn hoặc các đơn chưa có MVĐ)
-    async function renewSelectedOrAll() {
-      if (!sheetRows.length) return showToast('Bảng chưa có đơn hàng nào', '⚠️');
-
-      let targetRows = [];
-      if (selectedRowIds.size > 0) {
-        targetRows = sheetRows.filter(r => selectedRowIds.has(r.id));
-      } else {
-        // Nếu chưa chọn dòng nào, ưu tiên làm mới các đơn chưa có MVĐ
-        const noMvd = sheetRows.filter(r => !r.tracking_no || !r.has_tracking);
-        if (noMvd.length > 0) {
-          targetRows = noMvd;
-        } else {
-          if (!confirm(`Tất cả ${sheetRows.length} đơn đều đã có MVĐ. Bạn có muốn làm mới lại toàn bộ không?`)) return;
-          targetRows = sheetRows;
-        }
+    // 4. Làm mới đơn hàng (quét lại toàn bộ cookie có trong data, cập nhật thông tin mới nhất)
+    async function renewSelectedOrAll(isBackground = false) {
+      if (!sheetRows.length && (!vaultList || !vaultList.length)) {
+        if (!isBackground) showToast('Chưa có dữ liệu đơn hàng hoặc shop nào để làm mới!', '⚠️');
+        return;
       }
 
       const btn = $('btn-renew-batch');
@@ -5277,71 +5361,138 @@
         btn.innerHTML = '⏳ Đang làm mới...';
       }
 
-      showToast(`Bắt đầu làm mới ${targetRows.length} đơn hàng...`, '🔄');
-      addLog(`[Bắt đầu làm mới] ${targetRows.length} đơn hàng...`);
-      if (currentProxyData && currentProxyData.enabled && currentProxyData.current) {
-        const pIp = currentProxyData.current.realIpAddress || currentProxyData.current.host;
-        addLog(`[Proxy KiotProxy] Đang dùng IP: ${pIp} (${currentProxyData.current.location || ''})`);
+      // Thu thập toàn bộ cookie có sẵn trong data (sheetRows + vaultList)
+      const isSelectedOnly = selectedRowIds.size > 0;
+      const targetCookies = collectAllCookiesFromData(isSelectedOnly);
+
+      if (!targetCookies.length) {
+        if (btn) {
+          btn.classList.remove('spinning');
+          btn.innerHTML = '<span class="renew-icon">🔄</span> Làm mới đơn';
+        }
+        if (!isBackground) showToast('Không tìm thấy cookie nào hợp lệ trong dữ liệu để làm mới!', '⚠️');
+        return;
       }
 
-      let updatedCount = 0;
-      let newMvdCount = 0;
+      if (!isBackground) {
+        showToast(`Bắt đầu làm mới ${targetCookies.length} tài khoản cookie...`, '🔄');
+      }
+      addLog(`[Làm mới ${isBackground ? 'Tự động' : 'Thủ công'}] Đang kiểm tra lại ${targetCookies.length} tài khoản cookie có sẵn trong data...`);
 
-      for (let i = 0; i < targetRows.length; i++) {
-        const row = targetRows[i];
-        const cookie = (row.cookie_raw || '').trim();
-        if (!cookie) continue;
+      let totalUpdated = 0;
+      let totalNewMvd = 0;
+      let totalNewOrders = 0;
 
-        const hadMvdBefore = Boolean(row.tracking_no);
-        const rowBtn = $(`btn-renew-${row.id}`);
-        if (rowBtn) rowBtn.classList.add('spinning');
+      for (let i = 0; i < targetCookies.length; i++) {
+        const item = targetCookies[i];
+        if (btn) {
+          btn.innerHTML = `⏳ Làm mới (${i + 1}/${targetCookies.length})...`;
+        }
 
         try {
           const data = await safeApiCall('/api/process', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ spc_st: cookie, note_name: row.note_name || '' })
+            body: JSON.stringify({ spc_st: item.token, note_name: item.note_name || '' })
           });
+
           if (data && data.orders && data.orders.length > 0) {
-            let match = data.orders.find(o => String(o.order_id) === String(row.order_id) || (o.order_sn && o.order_sn === row.order_sn));
-            if (!match) match = data.orders[0];
-
-            if (match.tracking_no) row.tracking_no = match.tracking_no;
-            row.has_tracking = Boolean(row.tracking_no);
-            if (match.carrier) row.carrier = match.carrier;
-            if (match.status_desc) row.status_desc = match.status_desc;
-            if (match.status_badge_type) row.status_badge_type = match.status_badge_type;
-            if (match.status_badge_text) row.status_badge_text = match.status_badge_text;
-            if (match.driver_phone) row.driver_phone = match.driver_phone;
-
             const nowStr = new Date().toLocaleTimeString('vi-VN') + ' ' + new Date().toLocaleDateString('vi-VN');
-            row.last_check = nowStr;
 
-            updatedCount++;
-            if (!hadMvdBefore && row.tracking_no) newMvdCount++;
+            data.orders.forEach(freshOrd => {
+              // Tìm xem đơn này đã có trong sheetRows chưa
+              let existing = sheetRows.find(r => 
+                (freshOrd.order_id && String(r.order_id) === String(freshOrd.order_id)) ||
+                (freshOrd.order_sn && r.order_sn === freshOrd.order_sn)
+              );
+
+              if (existing) {
+                const hadMvdBefore = Boolean(existing.tracking_no);
+
+                // Cập nhật toàn bộ thông tin mới nhất
+                if (freshOrd.tracking_no) existing.tracking_no = freshOrd.tracking_no;
+                existing.has_tracking = Boolean(existing.tracking_no);
+                if (freshOrd.carrier) existing.carrier = freshOrd.carrier;
+                if (freshOrd.status_desc) existing.status_desc = freshOrd.status_desc;
+                if (freshOrd.status_badge_type) existing.status_badge_type = freshOrd.status_badge_type;
+                if (freshOrd.status_badge_text) existing.status_badge_text = freshOrd.status_badge_text;
+                if (freshOrd.driver_phone) existing.driver_phone = freshOrd.driver_phone;
+                if (freshOrd.receiver_name) existing.receiver_name = freshOrd.receiver_name;
+                if (freshOrd.receiver_phone) existing.receiver_phone = freshOrd.receiver_phone;
+                if (freshOrd.receiver_address) existing.receiver_address = freshOrd.receiver_address;
+                if (freshOrd.product_name) existing.product_name = freshOrd.product_name;
+                if (freshOrd.product_url) existing.product_url = freshOrd.product_url;
+                if (freshOrd.product_image) existing.product_image = freshOrd.product_image;
+                if (freshOrd.timeline && freshOrd.timeline.length) existing.timeline = freshOrd.timeline;
+                if (freshOrd.cod_val !== undefined) existing.cod_val = freshOrd.cod_val;
+                if (freshOrd.cod_amount) existing.cod_amount = freshOrd.cod_amount;
+                if (freshOrd.payment_status) existing.payment_status = freshOrd.payment_status;
+                existing.last_check = nowStr;
+                existing.cookie_raw = item.token;
+                if (!existing.note_name && item.note_name) existing.note_name = item.note_name;
+
+                totalUpdated++;
+                if (!hadMvdBefore && existing.tracking_no) {
+                  totalNewMvd++;
+                  addLog(`[🎉 MVĐ MỚI] Đơn ${existing.order_sn || existing.order_id}: ${existing.tracking_no} (${existing.carrier})`);
+                }
+              } else {
+                // ĐƠN HÀNG MỚI PHÁT SINH TRÊN SHOP NÀY
+                freshOrd.id = 'ord_' + Date.now() + '_' + Math.random().toString(36).substr(2, 6);
+                freshOrd.stt = sheetRows.length + 1;
+                freshOrd.cookie_raw = item.token;
+                if (!freshOrd.note_name && item.note_name) freshOrd.note_name = item.note_name;
+                sheetRows.push(freshOrd);
+                totalNewOrders++;
+                if (freshOrd.tracking_no) totalNewMvd++;
+                addLog(`[Đơn hàng mới] Phát hiện đơn mới: ${freshOrd.order_sn || freshOrd.order_id} (MVĐ: ${freshOrd.tracking_no || 'Chưa có'})`);
+              }
+            });
+
+            // Cập nhật trạng thái sống trong kho nếu có
+            if (typeof vaultList !== 'undefined' && Array.isArray(vaultList)) {
+              const vItem = vaultList.find(v => v.cookie === item.token);
+              if (vItem) {
+                vItem.status = 'alive';
+                vItem.last_checked = nowStr;
+                if (data.account?.username) vItem.username = data.account.username;
+              }
+            }
+          } else if (data && data.error) {
+            addLog(`[Lỗi cookie ${i + 1}] (${item.note_name || 'tài khoản'}): ${data.error}`);
+            if (typeof vaultList !== 'undefined' && Array.isArray(vaultList)) {
+              const vItem = vaultList.find(v => v.cookie === item.token);
+              if (vItem && String(data.error).includes('19')) {
+                vItem.status = 'expired';
+              }
+            }
           }
-        } catch (e) { }
+        } catch (err) {
+          addLog(`[Lỗi mạng] Cookie ${i + 1}: ${err.message}`);
+        }
 
-        if (rowBtn) rowBtn.classList.remove('spinning');
         renderTable();
-        if (i < targetRows.length - 1) await sleep(600);
+        if (i < targetCookies.length - 1) await sleep(600);
       }
 
       if (btn) {
         btn.classList.remove('spinning');
-        btn.innerHTML = '🔄 Làm mới đơn hàng';
+        btn.innerHTML = '<span class="renew-icon">🔄</span> Làm mới đơn';
       }
 
-      markUnsaved(); // Tự động lưu
-      const msg = newMvdCount > 0
-        ? `Hoàn tất làm mới! Phát hiện thêm ${newMvdCount} mã vận đơn mới.`
-        : `Đã làm mới xong ${updatedCount} đơn hàng.`;
-      showToast(msg, newMvdCount > 0 ? '🎉' : '✅');
-      addLog(`[Làm mới xong] Cập nhật ${updatedCount} đơn, ${newMvdCount} MVĐ mới.`);
+      markUnsaved(); // Tự động lưu lên server/Supabase/draft
+      renderTable();
+
+      let summaryMsg = `Đã làm mới ${targetCookies.length} tài khoản!`;
+      if (totalNewMvd > 0) summaryMsg += ` Phát hiện ${totalNewMvd} MVĐ mới 🚀`;
+      if (totalNewOrders > 0) summaryMsg += ` Thêm ${totalNewOrders} đơn mới.`;
+      
+      showToast(summaryMsg, totalNewMvd > 0 ? '🎉' : '✅');
+      addLog(`[Hoàn tất làm mới] Cập nhật ${totalUpdated} lượt, ${totalNewMvd} MVĐ mới, ${totalNewOrders} đơn mới.`);
     }
 
     function recheckSelectedOrders() {
-      renewSelectedOrAll();
+      renewSelectedOrAll(false);
     }
 
     function recheckCurrentDetail() {
@@ -5351,47 +5502,91 @@
       }
     }
 
-    // 4. Auto-check 30p
-    let autoCheckInterval = null;
-    let autoCheckTimeRemaining = 30 * 60;
-    let autoCheckCountdownTimer = null;
+    // 5. AUTO RENEW (TỰ ĐỘNG LÀM MỚI THEO CHU KỲ & LƯU BỘ NHỚ)
+    let autoRenewTimer = null;
+    let autoRenewCountdownTimer = null;
+    let autoRenewSecondsLeft = 30 * 60;
+    let autoRenewIntervalMinutes = 30;
 
-    function toggleAutoCheck30m(enable) {
+    function initAutoRenewFromStorage() {
+      const savedEnabled = localStorage.getItem('auto_renew_enabled') === 'true';
+      const savedInterval = parseInt(localStorage.getItem('auto_renew_interval') || '30', 10);
+      
+      const sel = $('sel-autorenew-interval');
+      if (sel && [5, 10, 15, 30, 60].includes(savedInterval)) {
+        sel.value = String(savedInterval);
+        autoRenewIntervalMinutes = savedInterval;
+      }
+
+      if (savedEnabled) {
+        toggleAutoRenew(true, false);
+      }
+    }
+
+    function changeAutoRenewInterval(val) {
+      const mins = parseInt(val, 10) || 30;
+      autoRenewIntervalMinutes = mins;
+      localStorage.setItem('auto_renew_interval', String(mins));
+      
+      const isRunning = $('chk-autocheck-30m') && $('chk-autocheck-30m').checked;
+      if (isRunning) {
+        startAutoRenewCountdown();
+        showToast(`Đã đổi chu kỳ Auto Renew: ${mins} phút`, '⏱️');
+      }
+    }
+
+    function toggleAutoRenew(enable, showToastMsg = true) {
       const wrap = $('autocheck-wrap');
       const chk = $('chk-autocheck-30m');
       const statusEl = $('autocheck-countdown-text');
+      
       if (chk) chk.checked = enable;
       if (wrap) wrap.classList.toggle('active', enable);
+      localStorage.setItem('auto_renew_enabled', enable ? 'true' : 'false');
 
-      if (autoCheckInterval) clearInterval(autoCheckInterval);
-      if (autoCheckCountdownTimer) clearInterval(autoCheckCountdownTimer);
+      if (autoRenewTimer) clearInterval(autoRenewTimer);
+      if (autoRenewCountdownTimer) clearInterval(autoRenewCountdownTimer);
 
       if (enable) {
-        autoCheckTimeRemaining = 30 * 60;
-        showToast('Đã BẬT Auto-check 30 phút!', '⏱️');
-        addLog('Đã kích hoạt chế độ Auto-check 30 phút.');
-        if (statusEl) statusEl.textContent = '(30:00)';
-
-        autoCheckCountdownTimer = setInterval(() => {
-          autoCheckTimeRemaining--;
-          if (autoCheckTimeRemaining <= 0) {
-            autoCheckTimeRemaining = 30 * 60;
-          }
-          const mins = Math.floor(autoCheckTimeRemaining / 60);
-          const secs = autoCheckTimeRemaining % 60;
-          const str = `(${mins}:${secs < 10 ? '0' : ''}${secs})`;
-          if (statusEl) statusEl.textContent = str;
-        }, 1000);
-
-        autoCheckInterval = setInterval(() => {
-          addLog('Đang tự động kiểm tra lại các đơn chưa có MVĐ (Auto-check 30p)...');
-          renewSelectedOrAll();
-        }, 30 * 60 * 1000);
+        if (showToastMsg) showToast(`Đã BẬT Auto Renew (${autoRenewIntervalMinutes} phút)!`, '⏱️');
+        addLog(`[Auto Renew] Kích hoạt tự động làm mới mỗi ${autoRenewIntervalMinutes} phút.`);
+        startAutoRenewCountdown();
       } else {
-        showToast('Đã TẮT Auto-check 30 phút', '⏱️');
-        addLog('Đã tắt Auto-check 30 phút.');
+        if (showToastMsg) showToast('Đã TẮT Auto Renew', '⏱️');
+        addLog('[Auto Renew] Đã tắt chế độ tự động làm mới.');
         if (statusEl) statusEl.textContent = '';
       }
+    }
+
+    function startAutoRenewCountdown() {
+      if (autoRenewTimer) clearInterval(autoRenewTimer);
+      if (autoRenewCountdownTimer) clearInterval(autoRenewCountdownTimer);
+
+      autoRenewSecondsLeft = autoRenewIntervalMinutes * 60;
+      updateCountdownDisplay();
+
+      autoRenewCountdownTimer = setInterval(() => {
+        autoRenewSecondsLeft--;
+        if (autoRenewSecondsLeft <= 0) {
+          autoRenewSecondsLeft = autoRenewIntervalMinutes * 60;
+          addLog(`[Auto Renew] Hết chu kỳ ${autoRenewIntervalMinutes}p, tự động quét lại toàn bộ cookie...`);
+          renewSelectedOrAll(true);
+        }
+        updateCountdownDisplay();
+      }, 1000);
+    }
+
+    function updateCountdownDisplay() {
+      const statusEl = $('autocheck-countdown-text');
+      if (!statusEl) return;
+      const mins = Math.floor(autoRenewSecondsLeft / 60);
+      const secs = autoRenewSecondsLeft % 60;
+      statusEl.textContent = `(${mins}:${secs < 10 ? '0' : ''}${secs})`;
+    }
+
+    // Alias cho các hàm cũ
+    function toggleAutoCheck30m(enable) {
+      toggleAutoRenew(enable);
     }
 
     // ── UTILITIES & EXPORTS ──

@@ -311,32 +311,49 @@ def kiotproxy_out(key=None):
         return {'success': False, 'message': 'Chưa nhập Key Proxy'}
     return kiotproxy_api_request('out', {'keyValue': k})
 
-def fetch_shopee_json(url, headers, timeout=10):
+def fetch_shopee_json(url, headers, timeout=10, retries=1):
     req = urllib.request.Request(url, headers=headers)
     
-    if proxy_state.get('enabled') and proxy_state.get('proxy_url'):
-        p_url = proxy_state['proxy_url']
+    if proxy_state.get('enabled'):
         provider = proxy_state.get('provider', 'proxyvn')
-        try:
-            proxy_handler = urllib.request.ProxyHandler({'http': p_url, 'https': p_url})
-            https_handler = urllib.request.HTTPSHandler(context=ssl_ctx)
-            opener = urllib.request.build_opener(proxy_handler, https_handler)
-            with opener.open(req, timeout=timeout) as res:
+        # Đảm bảo có proxy_url
+        if not proxy_state.get('proxy_url'):
+            try:
+                if provider == 'proxyvn':
+                    proxyvn_get_ip()
+                else:
+                    kiotproxy_get_current()
+            except Exception:
+                pass
+
+        p_url = proxy_state.get('proxy_url')
+        if p_url:
+            try:
+                proxy_handler = urllib.request.ProxyHandler({'http': p_url, 'https': p_url})
+                https_handler = urllib.request.HTTPSHandler(context=ssl_ctx)
+                opener = urllib.request.build_opener(proxy_handler, https_handler)
+                with opener.open(req, timeout=timeout) as res:
+                    return json.loads(res.read().decode('utf-8'))
+            except Exception as e:
+                is_http_err = isinstance(e, urllib.error.HTTPError)
+                is_block = is_http_err and e.code in (403, 429)
+                is_proxy_dead = not is_http_err or (is_http_err and e.code in (502, 503, 504))
+
+                if (is_block or is_proxy_dead) and proxy_state.get('auto_rotate') and retries > 0:
+                    print(f"[Proxy-{provider}] Gặp lỗi ({e}), tự động lấy IP mới và thử lại...")
+                    try:
+                        if provider == 'proxyvn':
+                            proxyvn_get_ip()
+                        else:
+                            kiotproxy_get_new()
+                        return fetch_shopee_json(url, headers, timeout=timeout, retries=retries - 1)
+                    except Exception as rot_err:
+                        print(f"[Proxy-{provider}] Đổi IP thất bại: {rot_err}")
+                print(f"[Proxy-{provider}] Lỗi kết nối ({p_url}): {e}")
+                raise
+        else:
+            with urllib.request.urlopen(req, context=ssl_ctx, timeout=timeout) as res:
                 return json.loads(res.read().decode('utf-8'))
-        except urllib.error.HTTPError as e:
-            if e.code in (403, 429) and proxy_state.get('auto_rotate'):
-                print(f"[Proxy-{provider}] Gặp HTTP {e.code} từ Shopee, đổi IP...")
-                try:
-                    if provider == 'proxyvn':
-                        proxyvn_get_ip()
-                    else:
-                        kiotproxy_get_new()
-                except Exception:
-                    pass
-            raise
-        except Exception as e:
-            print(f"[Proxy-{provider}] Lỗi kết nối ({p_url}): {e}")
-            raise
     else:
         with urllib.request.urlopen(req, context=ssl_ctx, timeout=timeout) as res:
             return json.loads(res.read().decode('utf-8'))
