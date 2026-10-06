@@ -109,9 +109,10 @@ SERVICES = {
 }
 
 try:
-    from telegram_auth import tg_auth_mgr
+    from telegram_auth import tg_auth_mgr, get_telethon_session
 except Exception as _tga_err:
     tg_auth_mgr = None
+    get_telethon_session = None
 
 def get_telegram_account_info(force_refresh=False):
     """Lấy thông tin tài khoản Telegram đang đăng nhập từ tg_auth_mgr"""
@@ -329,7 +330,8 @@ class AutoRegManager:
         return True, "SUCCESS", total_spent_cycle
 
     async def _async_run(self, server_id, count, delay, kiotproxy_key, use_proxy):
-        client = TelegramClient(SESSION_NAME, API_ID, API_HASH)
+        sess = get_telethon_session() if get_telethon_session else SESSION_NAME
+        client = TelegramClient(sess, API_ID, API_HASH)
         await client.connect()
         if not await client.is_user_authorized():
             self.log("Chưa đăng nhập Telegram! Vui lòng liên kết tài khoản Telegram trên giao diện trước.", "error")

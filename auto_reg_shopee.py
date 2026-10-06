@@ -48,7 +48,13 @@ try:
 except Exception:
     get_kiotproxy_ip = None
 
-client = TelegramClient(SESSION_NAME, API_ID, API_HASH)
+try:
+    from telegram_auth import get_telethon_session
+    _sess = get_telethon_session()
+except Exception:
+    _sess = SESSION_NAME
+
+client = TelegramClient(_sess, API_ID, API_HASH)
 
 # ========================================================
 # HÀM XỬ LÝ API CMSNPA

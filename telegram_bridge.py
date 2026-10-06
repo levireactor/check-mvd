@@ -19,8 +19,14 @@ SESSION_NAME = "session_master"
 BOT_A = "@simclonenpa_bot"   # Bot cho thuê SIM / lấy OTP
 BOT_B = "@sfast_main_bot"    # Bot reg tài khoản
 
-# Khởi tạo Telegram Client
-client = TelegramClient(SESSION_NAME, API_ID, API_HASH)
+try:
+    from telegram_auth import get_telethon_session
+    _sess = get_telethon_session()
+except Exception:
+    _sess = SESSION_NAME
+
+# Khởi tạo Telegram Client (Lock-free in-memory session)
+client = TelegramClient(_sess, API_ID, API_HASH)
 
 def extract_otp(text):
     """Hàm regex trích xuất mã OTP gồm 4 - 8 chữ số trong tin nhắn"""

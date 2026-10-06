@@ -1,7 +1,15 @@
 # -*- coding: utf-8 -*-
+"""
+Script đăng nhập Telegram an toàn và chống khóa phiên (Lock-Free).
+Sử dụng StringSession Telethon trong bộ nhớ (RAM), không gây xung đột khóa file SQLite
+kể cả khi server.py và các luồng autoreg đang chạy song song.
+"""
+
 import asyncio
+import os
 import sys
 from telethon import TelegramClient
+from telethon.sessions import StringSession
 from telethon.errors import (
     SessionPasswordNeededError,
     PhoneNumberInvalidError,
@@ -10,31 +18,66 @@ from telethon.errors import (
     PhoneCodeExpiredError
 )
 
+try:
+    from telegram_auth import (
+        get_telethon_session,
+        save_session_string,
+        get_string_session_str,
+        DEFAULT_TELEGRAM_SLOT,
+        STR_SESSION_FILE,
+        SESSION_FILE
+    )
+except ImportError:
+    get_telethon_session = None
+    save_session_string = None
+    get_string_session_str = None
+    DEFAULT_TELEGRAM_SLOT = {}
+    STR_SESSION_FILE = "session_master.string_session"
+    SESSION_FILE = "session_master.session"
+
 API_ID = 33946669
 API_HASH = "d88d388e5810305e722af0cc61a3a80a"
-SESSION_NAME = "session_master"
 
 async def login():
-    client = TelegramClient(SESSION_NAME, API_ID, API_HASH)
+    # 1. Kiểm tra session hiện có (dùng in-memory StringSession để không lock SQLite)
+    current_sess = get_telethon_session() if get_telethon_session else StringSession()
+    client = TelegramClient(current_sess, API_ID, API_HASH)
     await client.connect()
-    
+
     if await client.is_user_authorized():
         me = await client.get_me()
-        print("\n" + "="*50)
+        print("\n" + "="*55)
         print("🎉 BẠN ĐÃ ĐĂNG NHẬP SẴN RỒI!")
-        print(f"👤 Tài khoản: {me.first_name} (@{me.username or 'No Username'})")
+        print(f"👤 Tài khoản: {me.first_name} {me.last_name or ''} (@{me.username or 'No Username'})")
         print(f"📱 SĐT: +{me.phone}")
-        print("="*50)
-        await client.disconnect()
-        return
+        print("🔒 Trạng thái: Session In-Memory hoạt động ổn định (Không bị lock)")
+        print("="*55)
+        
+        # Đảm bảo file session_master.string_session được lưu đồng bộ
+        try:
+            saved_str = client.session.save()
+            if save_session_string:
+                save_session_string(saved_str)
+        except Exception:
+            pass
 
-    print("\n" + "="*50)
+        choice = input("\n👉 Bạn có muốn ĐĂNG NHẬP TÀI KHOẢN MỚI khác không? (y/N): ").strip().lower()
+        if choice not in ['y', 'yes']:
+            print("✅ Giữ nguyên phiên đăng nhập hiện tại. Đang thoát.")
+            await client.disconnect()
+            return
+        
+        # Nếu muốn đăng nhập lại tài khoản khác:
+        await client.disconnect()
+
+    print("\n" + "="*55)
     print("      HƯỚNG DẪN ĐĂNG NHẬP TELEGRAM AN TOÀN")
-    print("="*50)
+    print("="*55)
     print("⚠️ LƯU Ý QUAN TRỌNG:")
     print("1. Số điện thoại PHẢI có tiền tố +84 (Ví dụ: +84987654321)")
     print("2. Mã OTP sẽ được gửi vào APP TELEGRAM (Điện thoại hoặc PC), KHÔNG PHẢI QUA SMS SIM!")
-    print("="*50)
+    print("3. Cơ chế StringSession mới đảm bảo không bao giờ bị lỗi 'database is locked'.")
+    print("="*55)
 
     phone = input("\n👉 Nhập số điện thoại (Ví dụ +84912345678): ").strip()
     if not phone.startswith("+"):
@@ -44,16 +87,21 @@ async def login():
             phone = "+" + phone
         else:
             phone = "+84" + phone
-    
+
+    # Dùng StringSession() mới hoàn toàn trong RAM
+    new_sess = StringSession()
+    client = TelegramClient(new_sess, API_ID, API_HASH)
+    await client.connect()
+
     print(f"\n[*] Đang gửi yêu cầu mã OTP tới số: {phone} ...")
     try:
         sent_code = await client.send_code_request(phone)
-        print("\n" + "-"*50)
+        print("\n" + "-"*55)
         print("✅ YÊU CẦU ĐÃ GỬI THÀNH CÔNG!")
         print("📱 HÃY MỞ ỨNG DỤNG TELEGRAM TRÊN ĐIỆN THOẠI/PC:")
         print("👉 Tìm tin nhắn từ cuộc trò chuyện chính thức có tên 'Telegram'")
         print("👉 Lấy mã xác nhận 5 chữ số và nhập vào dưới đây:")
-        print("-"*50)
+        print("-"*55)
     except PhoneNumberInvalidError:
         print("\n❌ Số điện thoại không hợp lệ! Vui lòng kiểm tra lại.")
         await client.disconnect()
@@ -68,7 +116,6 @@ async def login():
         return
 
     code = input("\n👉 Nhập mã xác nhận (OTP) 5 số từ Telegram: ").strip()
-    # Loại bỏ khoảng trắng hoặc ký tự lạ nếu có
     code = code.replace(" ", "").replace("-", "")
 
     try:
@@ -92,12 +139,22 @@ async def login():
         return
 
     me = await client.get_me()
-    print("\n" + "="*50)
+    saved_key = client.session.save()
+    if save_session_string:
+        save_session_string(saved_key)
+    else:
+        try:
+            with open("session_master.string_session", "w", encoding="utf-8") as f:
+                f.write(saved_key)
+        except Exception:
+            pass
+
+    print("\n" + "="*55)
     print("🎉 ĐĂNG NHẬP THÀNH CÔNG RỰC RỠ!")
-    print(f"👤 Chào mừng: {me.first_name} (@{me.username or 'No Username'})")
+    print(f"👤 Chào mừng: {me.first_name} {me.last_name or ''} (@{me.username or 'No Username'})")
     print(f"📱 SĐT: +{me.phone}")
-    print("💾 Đã lưu phiên đăng nhập vào file 'session_master.session'.")
-    print("="*50)
+    print("💾 Đã lưu session vào 'session_master.string_session' (Chống khóa 100%)")
+    print("="*55)
     await client.disconnect()
 
 if __name__ == "__main__":

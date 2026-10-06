@@ -12,3 +12,4 @@ __pycache__/
 *.session
 accounts_reg.json
 accounts_reg.txt
+*.string_session
