@@ -430,8 +430,7 @@ class AutoRegManager:
                     elif reason == "PHONE_REJECTED":
                         self.log("ℹ️ SĐT cũ bị từ chối. Đang thử lại với SĐT mới...", "info")
                     elif reason == "PROXY_FAILED":
-                        self.log("❌ Lỗi Proxy: Không thể đổi IP mới để đảm bảo chống trùng. Dừng tiến trình!", "error")
-                        break
+                        self.log("⚠️ Lỗi đổi Proxy mới: Sẽ tự động thử lại lượt tiếp theo...", "warning")
                     elif reason == "STOPPED":
                         break
                     else:
@@ -668,6 +667,13 @@ class AutoRegManager:
                 for mb in msgs_b:
                     if mb.id > sent_msg_id and not mb.out:
                         txt_b = mb.text or ""
+                        
+                        # Kiểm tra nếu Bot B báo hủy/timeout 6 phút phiên hiện tại
+                        if "phiên đăng ký đã hủy" in txt_b or "hết 6 phút" in txt_b or "kết quả phiên reg" in txt_b.lower():
+                            self.log("⚠️ Bot B đã thông báo kết thúc phiên (hết 6 phút chờ OTP từ Shopee).", "warning")
+                            is_expired = True
+                            break
+
                         # PHẢI QUÉT KĨ SỐ ĐIỆN THOẠI ĐANG ĐƯỢC CHẠY TRONG PHIÊN
                         if (phone_clean not in txt_b) and (clean_num not in txt_b):
                             continue
