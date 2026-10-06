@@ -27,76 +27,122 @@ API_HASH = "d88d388e5810305e722af0cc61a3a80a"
 CMSNPA_KEY = "cmsnpa_Mud47JUcA1fYF8mTSmpABUoNqZvh_fUZjG96oVatiDw"
 CMSNPA_BASE = "https://otpapi.cmsnpa.com"
 
-def get_kiotproxy_ip(key, rotate=True):
+def kiotproxy_request(endpoint, key, payload_extra=None):
+    """Gửi request tới API KiotProxy và trả về tuple (response_json_dict, error_msg)"""
+    url = f"https://api.kiotproxy.com/api/public/proxies/{endpoint}"
+    data = {"keyValue": str(key).strip()}
+    if payload_extra and isinstance(payload_extra, dict):
+        data.update(payload_extra)
+    req = urllib.request.Request(
+        url,
+        data=json.dumps(data).encode("utf-8"),
+        headers={"Content-Type": "application/json", "User-Agent": "ShopeeTracker/4.2"}
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=12) as r:
+            return json.loads(r.read().decode("utf-8")), None
+    except urllib.error.HTTPError as e:
+        try:
+            body = json.loads(e.read().decode("utf-8"))
+            return body, body.get("message", f"HTTP {e.code}")
+        except Exception:
+            return None, f"HTTP {e.code}"
+    except Exception as e:
+        return None, str(e)
+
+def _parse_proxy_data(d):
+    """Trích xuất chuỗi IP dạng ip:port hoặc ip:port:user:pass từ data KiotProxy"""
+    if not d or not isinstance(d, dict):
+        return None
+    http_val = d.get("http")
+    if http_val:
+        return str(http_val).replace("http://", "").replace("https://", "").strip()
+    host = d.get("host")
+    port = d.get("httpPort")
+    user = d.get("proxyUser")
+    pwd = d.get("proxyPass")
+    if host and port:
+        if user and pwd:
+            return f"{host}:{port}:{user}:{pwd}"
+        return f"{host}:{port}"
+    return None
+
+def extract_kiotproxy_cooldown(res_or_msg):
+    """Đọc số giây cần chờ để xoay IP từ response KiotProxy"""
+    if isinstance(res_or_msg, dict):
+        d = res_or_msg.get("data")
+        if isinstance(d, dict) and "ttc" in d and d["ttc"] is not None:
+            try:
+                ttc = int(d["ttc"])
+                if ttc > 0:
+                    return ttc
+            except Exception:
+                pass
+        msg = res_or_msg.get("message", "")
+    else:
+        msg = str(res_or_msg or "")
+
+    m = re.search(r'sau\s*(\d+)\s*giây', msg, re.IGNORECASE)
+    if m:
+        try:
+            return int(m.group(1))
+        except Exception:
+            pass
+    m2 = re.search(r'(\d+)\s*(?:giây|giay|s)\b', msg, re.IGNORECASE)
+    if m2:
+        try:
+            return int(m2.group(1))
+        except Exception:
+            pass
+    return None
+
+def get_kiotproxy_ip(key, rotate=True, force_new=False):
     """
-    Gọi KiotProxy API để lấy IP xoay dạng ip:port hoặc ip:port:user:pass.
-    Trả về tuple: (proxy_str, note_str, err_str)
+    Gọi KiotProxy API để lấy IP.
+    - rotate=False: Lấy IP hiện tại (nếu chưa có thì tự kích hoạt IP mới).
+    - rotate=True: Xoay IP mới.
+    - force_new=True: Bắt buộc lấy IP mới, KHÔNG fallback về IP cũ nếu gặp cooldown.
+    Trả về tuple: (proxy_str, note_str, err_str, wait_seconds)
     """
     if not key or not str(key).strip():
-        return None, "", "Chưa nhập Key KiotProxy"
-    
-    k = str(key).strip()
-    url_base = "https://api.kiotproxy.com/api/public/proxies"
-    headers = {"Content-Type": "application/json", "User-Agent": "ShopeeTracker/4.2"}
+        return None, "", "Chưa nhập Key KiotProxy", 0
 
-    def _parse_proxy(d):
-        if not d or not isinstance(d, dict):
-            return None
-        http_val = d.get("http")
-        if http_val:
-            return str(http_val).replace("http://", "").replace("https://", "").strip()
-        host = d.get("host")
-        port = d.get("httpPort")
-        user = d.get("proxyUser")
-        pwd = d.get("proxyPass")
-        if host and port:
-            if user and pwd:
-                return f"{host}:{port}:{user}:{pwd}"
-            return f"{host}:{port}"
-        return None
+    k = str(key).strip()
 
     # 1. Thử xoay IP mới nếu rotate=True
     if rotate:
-        try:
-            req = urllib.request.Request(
-                f"{url_base}/get-new",
-                data=json.dumps({"keyValue": k}).encode("utf-8"),
-                headers=headers
-            )
-            with urllib.request.urlopen(req, timeout=12) as r:
-                res = json.loads(r.read().decode("utf-8"))
-                if res.get("success") and res.get("data"):
-                    p_str = _parse_proxy(res["data"])
-                    if p_str:
-                        return p_str, "IP mới vừa xoay", None
-        except urllib.error.HTTPError:
-            pass
-        except Exception:
-            pass
+        res, err = kiotproxy_request("get-new", k)
+        if res and res.get("success") and res.get("data"):
+            p_str = _parse_proxy_data(res["data"])
+            if p_str:
+                return p_str, "IP mới vừa xoay", None, 0
 
-    # 2. Lấy IP hiện tại nếu get-new chưa tới giờ xoay hoặc xoay thất bại
-    try:
-        req = urllib.request.Request(
-            f"{url_base}/get-current",
-            data=json.dumps({"keyValue": k}).encode("utf-8"),
-            headers=headers
-        )
-        with urllib.request.urlopen(req, timeout=12) as r:
-            res = json.loads(r.read().decode("utf-8"))
-            if res.get("success") and res.get("data"):
-                p_str = _parse_proxy(res["data"])
-                if p_str:
-                    return p_str, "IP hiện tại còn hạn", None
-                return None, "", "Không có định dạng IP hợp lệ"
-            return None, "", res.get("message", "Không lấy được IP")
-    except urllib.error.HTTPError as e:
-        try:
-            err_data = json.loads(e.read().decode("utf-8"))
-            return None, "", err_data.get("message", f"HTTP {e.code}")
-        except Exception:
-            return None, "", f"HTTP {e.code}"
-    except Exception as e:
-        return None, "", str(e)
+        # Nếu không lấy được IP mới
+        wait_s = extract_kiotproxy_cooldown(res or err)
+        if force_new:
+            # Bắt buộc mới -> Không fallback về IP cũ
+            return None, "", err or "Proxy đang trong thời gian chờ đổi", wait_s or 15
+
+    # 2. Lấy IP hiện tại (dành cho rotate=False hoặc kiểm tra)
+    res_curr, err_curr = kiotproxy_request("get-current", k)
+    if res_curr and res_curr.get("success") and res_curr.get("data"):
+        p_str = _parse_proxy_data(res_curr["data"])
+        if p_str:
+            return p_str, "IP hiện tại còn hạn", None, 0
+
+    # Nếu get-current báo chưa có proxy nào gán cho key này (ví dụ sau /out hoặc key mới)
+    # Tự động kích hoạt bằng get-new
+    if res_curr and (res_curr.get("error") == "PROXY_NOT_FOUND_BY_KEY" or res_curr.get("code") == 40001050):
+        res_new, err_new = kiotproxy_request("get-new", k)
+        if res_new and res_new.get("success") and res_new.get("data"):
+            p_str = _parse_proxy_data(res_new["data"])
+            if p_str:
+                return p_str, "Đã kích hoạt IP mới", None, 0
+        wait_s = extract_kiotproxy_cooldown(res_new or err_new)
+        return None, "", err_new or "Proxy chưa được kích hoạt", wait_s or 15
+
+    wait_s = extract_kiotproxy_cooldown(res_curr or err_curr)
+    return None, "", err_curr or "Không lấy được IP từ KiotProxy", wait_s or 0
 
 BOT_A = "@simclonenpa_bot"
 BOT_B = "@sfast_main_bot"
@@ -133,6 +179,7 @@ class AutoRegManager:
         self.kiotproxy_key = ""
         self.use_proxy = False
         self.last_proxy = None
+        self.used_proxies = set()  # Lưu các IP proxy đã sử dụng trong đợt reg để chống trùng 100%
         self.stats = {
             "total_requested": 0,
             "success": 0,
@@ -166,6 +213,7 @@ class AutoRegManager:
                 "kiotproxy_key": self.kiotproxy_key,
                 "use_proxy": self.use_proxy,
                 "last_proxy": self.last_proxy,
+                "used_proxies_count": len(self.used_proxies),
                 "stats": dict(self.stats),
                 "logs": list(self.logs[-50:])
             }
@@ -215,6 +263,7 @@ class AutoRegManager:
         self.kiotproxy_key = str(kiotproxy_key).strip()
         self.use_proxy = bool(use_proxy and self.kiotproxy_key)
         self.last_proxy = None
+        self.used_proxies.clear()
         self.stats = {
             "total_requested": count,
             "success": 0,
@@ -380,6 +429,11 @@ class AutoRegManager:
                         break
                     elif reason == "PHONE_REJECTED":
                         self.log("ℹ️ SĐT cũ bị từ chối. Đang thử lại với SĐT mới...", "info")
+                    elif reason == "PROXY_FAILED":
+                        self.log("❌ Lỗi Proxy: Không thể đổi IP mới để đảm bảo chống trùng. Dừng tiến trình!", "error")
+                        break
+                    elif reason == "STOPPED":
+                        break
                     else:
                         self.log("⚠️ Phiên thử thất bại. Tự động thử lại lượt tiếp theo...", "warning")
 
@@ -391,6 +445,48 @@ class AutoRegManager:
                     await asyncio.sleep(3)
 
         await client.disconnect()
+
+    async def _acquire_unique_proxy(self, kiotproxy_key):
+        """
+        Chủ động xoay IP và đảm bảo 100% không trùng proxy với bất kỳ tài khoản nào đã tạo trước đó.
+        Nếu KiotProxy chưa hết thời gian cooldown, tự động chờ đếm ngược và xoay sang IP mới.
+        """
+        max_attempts = 15
+        for attempt in range(1, max_attempts + 1):
+            if self.should_stop:
+                return None, "STOPPED"
+
+            self.current_step = "ROTATING_PROXY"
+            must_force_new = len(self.used_proxies) > 0
+
+            if must_force_new:
+                self.log(f"🌐 Đang chủ động xoay IP mới (Đã dùng {len(self.used_proxies)} IP riêng biệt)...", "info")
+            else:
+                self.log("🌐 Đang kết nối KiotProxy lấy IP cho tài khoản đầu tiên...", "info")
+
+            p_str, p_note, p_err, wait_s = get_kiotproxy_ip(kiotproxy_key, rotate=True, force_new=must_force_new)
+
+            if p_str:
+                # Kiểm tra chắc chắn IP này chưa từng được dùng trong phiên
+                if p_str not in self.used_proxies:
+                    self.used_proxies.add(p_str)
+                    self.last_proxy = p_str
+                    self.log(f"✅ KiotProxy đã cấp IP MỚI: {p_str} ({p_note}) — Đảm bảo KHÔNG TRÙNG bất kỳ acc nào!", "success")
+                    return p_str, None
+                else:
+                    self.log(f"⚠️ KiotProxy vừa trả về IP trùng với acc trước ({p_str}). Bắt buộc xoay tiếp sang IP khác...", "warning")
+
+            # Nếu gặp cooldown (chưa đến hạn đổi)
+            wait_time = max(int(wait_s or 15), 5) + 2  # Thêm 2s đệm an toàn
+            self.log(f"⏳ KiotProxy cần {wait_time}s để sẵn sàng cấp IP mới (Chống trùng IP acc trước). Đang chờ...", "info")
+            
+            for remaining in range(wait_time, 0, -1):
+                if self.should_stop:
+                    return None, "STOPPED"
+                self.current_step = f"WAIT_PROXY ({remaining}s)"
+                await asyncio.sleep(1)
+
+        return None, "TIMEOUT"
 
     async def _run_single_reg_cycle(self, client, http, server_id, kiotproxy_key="", use_proxy=False):
         headers = {"Authorization": f"Bearer {CMSNPA_KEY}", "Content-Type": "application/json"}
@@ -414,7 +510,21 @@ class AutoRegManager:
         except Exception:
             pass
 
-        # 1. Thuê SĐT từ CMSNPA
+        # 1. BƯỚC 1: XỬ LÝ VÀ CHỦ ĐỘNG XOAY PROXY TRƯỚC (Đảm bảo mỗi Acc 1 IP riêng biệt, không trùng nhau)
+        proxy_assigned = None
+        bot_fee = 700  # Mặc định dùng /regsdt (700đ)
+
+        if use_proxy and kiotproxy_key:
+            proxy_assigned, proxy_err = await self._acquire_unique_proxy(kiotproxy_key)
+            if self.should_stop:
+                return False, "STOPPED", 0
+            if proxy_assigned:
+                bot_fee = 500  # Gói /regfull (500đ)
+            else:
+                self.log(f"❌ Không thể xoay được Proxy mới ({proxy_err}). Dừng chu kỳ để bảo vệ tài khoản khỏi trùng IP!", "error")
+                return False, "PROXY_FAILED", 0
+
+        # 2. BƯỚC 2: THUÊ SĐT TỪ CMSNPA (Sau khi đã có sẵn Proxy mới, tránh SIM bị hết hạn khi chờ xoay IP)
         self.current_step = "RENTING_PHONE"
         self.log("Đang gọi API CMSNPA để thuê số điện thoại...", "info")
         rental_id, phone = None, None
@@ -448,22 +558,6 @@ class AutoRegManager:
             phone_clean = digits
 
         self.log(f"Thuê số thành công từ CMSNPA: {phone_clean} (ReqID: {rental_id})", "success")
-
-        # 2. Xử lý Proxy (Tự động xoay IP phiên nếu bật KiotProxy)
-        proxy_assigned = None
-        bot_fee = 700  # Mặc định dùng /regsdt (700đ)
-
-        if use_proxy and kiotproxy_key:
-            self.current_step = "ROTATING_PROXY"
-            self.log("🌐 Đang kết nối KiotProxy xoay IP phiên mới...", "info")
-            p_str, p_note, p_err = get_kiotproxy_ip(kiotproxy_key, rotate=True)
-            if p_str:
-                proxy_assigned = p_str
-                self.last_proxy = p_str
-                bot_fee = 500  # Gói /regfull (500đ)
-                self.log(f"✅ KiotProxy đã cấp IP: {p_str} ({p_note}) — Phí bot: 500đ", "success")
-            else:
-                self.log(f"⚠️ KiotProxy không khả dụng ({p_err}). Tự động dùng IP của Bot B (/regsdt - 700đ)...", "warning")
 
         # 3. Gửi lệnh Reg sang @sfast_main_bot
         self.current_step = "SENDING_REG"

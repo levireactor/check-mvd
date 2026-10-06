@@ -298,6 +298,10 @@ def kiotproxy_get_current(key=None):
         proxy_state['proxy_url'] = _format_proxy_url(res['data'])
         proxy_state['last_check'] = datetime.datetime.now().strftime("%H:%M:%S %d/%m/%Y")
         proxy_state['last_error'] = None
+        return res
+    elif res.get('error') == 'PROXY_NOT_FOUND_BY_KEY' or res.get('code') == 40001050:
+        # Tự động cấp proxy đầu tiên nếu key chưa có proxy nào đang dùng
+        return kiotproxy_get_new(key=k)
     else:
         proxy_state['last_error'] = res.get('message', 'Không lấy được proxy hiện tại')
     return res
@@ -1526,7 +1530,10 @@ class TrackingRequestHandler(http.server.SimpleHTTPRequestHandler):
                 key = body.get('key', '').strip() or proxy_state.get('key', '').strip()
                 if not key:
                     return self._json(400, {'success': False, 'error': 'Vui lòng nhập Key KiotProxy'})
-                p_str, p_note, p_err = get_kiotproxy_ip(key, rotate=False)
+                res_tuple = get_kiotproxy_ip(key, rotate=False)
+                p_str = res_tuple[0]
+                p_note = res_tuple[1]
+                p_err = res_tuple[2]
                 if p_str:
                     proxy_state['key'] = key
                     _save_proxy_config()

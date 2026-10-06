@@ -226,8 +226,8 @@ async def run_single_reg(server_id, kiotproxy_key=""):
         # Bước 3: Xử lý Proxy xoay KiotProxy (nếu có cấu hình)
         proxy_assigned = None
         if kiotproxy_key and get_kiotproxy_ip:
-            print("[*] 🌐 Đang gọi KiotProxy xoay IP phiên mới...")
-            p_str, p_note, p_err = get_kiotproxy_ip(kiotproxy_key, rotate=True)
+            res_kp = get_kiotproxy_ip(kiotproxy_key, rotate=True)
+            p_str, p_note, p_err = res_kp[0], res_kp[1], res_kp[2]
             if p_str:
                 proxy_assigned = p_str
                 print(f"[✅] KiotProxy đã cấp IP: {p_str} ({p_note}) => Gói /regfull (500đ/acc)")
