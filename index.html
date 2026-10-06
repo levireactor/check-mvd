@@ -2656,6 +2656,9 @@
         <div class="top-menu-item" onclick="$('json-file-input').click(); closeMenuDropdowns()">
           <span>📥</span> <span>Nhập file JSON</span>
         </div>
+        <div class="top-menu-item" onclick="deduplicateSheetRows(); closeMenuDropdowns()" title="Lọc và giản lược các đơn bị trùng trên sheet">
+          <span>🧹</span> <span>Lọc trùng đơn (Cookie đã có sẵn)</span>
+        </div>
         <div class="top-menu-divider"></div>
         <div class="top-menu-item danger-item" onclick="clearAllRows(); closeMenuDropdowns()">
           <span>🗑️</span> <span>Xóa trắng toàn bộ bảng</span>
@@ -4986,15 +4989,74 @@
       $('modal-add').classList.remove('show');
     }
 
+    function cleanCookieStr(raw) {
+      if (!raw) return '';
+      let s = String(raw).trim();
+      if (s.startsWith('Cookie:')) s = s.substring(7).trim();
+      if (s.includes('|')) s = s.split('|')[0].trim();
+      if (s.includes('SPC_ST=')) {
+        const parts = s.split(';');
+        for (let p of parts) {
+          p = p.trim();
+          if (p.startsWith('SPC_ST=')) return p.substring(7).trim();
+        }
+      }
+      return s.replace(/;.*$/, '').trim();
+    }
+
+    function parseCookieLine(line) {
+      let str = String(line || '').trim();
+      let noteName = '';
+      if (str.includes('|Ten=') || str.includes('|ten=')) {
+        const parts = str.split(/\|[Tt]en=/);
+        str = parts[0].trim();
+        noteName = parts[1].trim();
+      } else if (str.includes('|')) {
+        const parts = str.split('|');
+        str = parts[0].trim();
+        noteName = parts.slice(1).join('|').trim();
+      }
+      const cleanToken = cleanCookieStr(str);
+      return { raw: str, noteName, cleanToken };
+    }
+
     async function startScanBatch() {
       const raw = $('modal-cookie-input').value.trim();
       if (!raw) return showToast('Vui lòng dán cookie vào ô', '⚠️');
 
-      const lines = raw.split('\n')
+      const rawLines = raw.split('\n')
         .map(l => l.trim())
         .filter(l => l.length > 20);
 
-      if (!lines.length) return showToast('Không tìm thấy cookie hợp lệ', '⚠️');
+      if (!rawLines.length) return showToast('Không tìm thấy cookie hợp lệ', '⚠️');
+
+      // ── BƯỚC 1: Giản lược các cookie trùng lặp trong danh sách vừa dán vào ──
+      const uniqueCookieMap = new Map();
+      rawLines.forEach(l => {
+        const parsed = parseCookieLine(l);
+        if (parsed.cleanToken && parsed.cleanToken.length >= 20) {
+          if (!uniqueCookieMap.has(parsed.cleanToken)) {
+            uniqueCookieMap.set(parsed.cleanToken, parsed);
+          } else {
+            // Giữ lại tên shop/ghi chú nếu dòng sau có
+            const cur = uniqueCookieMap.get(parsed.cleanToken);
+            if (!cur.noteName && parsed.noteName) cur.noteName = parsed.noteName;
+          }
+        }
+      });
+
+      const uniqueCookies = Array.from(uniqueCookieMap.values());
+      const dupCountInInput = rawLines.length - uniqueCookies.length;
+      if (dupCountInInput > 0) {
+        addLog(`[Giản lược] Phát hiện ${dupCountInInput} cookie bị trùng trong danh sách nhập vào, đã gộp về duy nhất.`);
+      }
+
+      // ── BƯỚC 2: Kiểm tra các cookie đã có sẵn trong sheet ──
+      const existingTokensInSheet = new Set();
+      sheetRows.forEach(r => {
+        const c = cleanCookieStr(r.cookie_raw);
+        if (c) existingTokensInSheet.add(c);
+      });
 
       const delayMs = parseInt($('scan-delay-select').value) || 300;
       $('btn-run-scan').disabled = true;
@@ -5002,34 +5064,84 @@
       $('scan-status-text').style.display = 'block';
 
       let addedCount = 0;
-      addLog(`Bắt đầu quét danh sách ${lines.length} cookie...`);
+      let updatedCount = 0;
+      let alreadyInSheetCookiesCount = 0;
+
+      addLog(`Bắt đầu quét ${uniqueCookies.length} cookie (sau khi giản lược trùng)...`);
       if (currentProxyData && currentProxyData.enabled && currentProxyData.current) {
         const pIp = currentProxyData.current.realIpAddress || currentProxyData.current.host;
-        addLog(`[Proxy KiotProxy] Đang dùng IP: ${pIp} (${currentProxyData.current.location || ''})`);
+        addLog(`[Proxy] Đang dùng IP: ${pIp} (${currentProxyData.current.location || ''})`);
       }
 
-      for (let i = 0; i < lines.length; i++) {
+      for (let i = 0; i < uniqueCookies.length; i++) {
         const current = i + 1;
-        $('scan-progress-fill').style.width = Math.round((current / lines.length) * 100) + '%';
-        $('scan-status-text').textContent = `Đang quét tài khoản ${current}/${lines.length}...`;
+        const item = uniqueCookies[i];
+        const isCookieAlreadyInSheet = existingTokensInSheet.has(item.cleanToken);
+
+        $('scan-progress-fill').style.width = Math.round((current / uniqueCookies.length) * 100) + '%';
+        
+        if (isCookieAlreadyInSheet) {
+          alreadyInSheetCookiesCount++;
+          $('scan-status-text').textContent = `[${current}/${uniqueCookies.length}] Cookie đã có sẵn trong sheet — Đang cập nhật lại...`;
+          showToast('Cookie đã có sẵn trong sheet', 'ℹ️');
+          addLog(`[Cookie đã có sẵn trong sheet] Cookie #${current} (${item.noteName || 'Tài khoản'}): Đã có sẵn trên bảng, cập nhật lại đơn.`);
+        } else {
+          $('scan-status-text').textContent = `Đang quét tài khoản ${current}/${uniqueCookies.length}...`;
+        }
 
         try {
           const data = await safeApiCall('/api/process', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ spc_st: lines[i] })
+            body: JSON.stringify({ spc_st: item.cleanToken, note_name: item.noteName || '' })
           });
 
           if (data.error) {
             addLog(`Cookie #${current} lỗi: ${data.error}`);
           } else if (data.orders && data.orders.length > 0) {
+            const nowStr = new Date().toLocaleTimeString('vi-VN') + ' ' + new Date().toLocaleDateString('vi-VN');
+
             data.orders.forEach(order => {
-              order.id = 'ord_' + Date.now() + '_' + Math.random().toString(36).substr(2, 6);
-              order.stt = sheetRows.length + 1;
-              sheetRows.push(order);
-              addedCount++;
+              // ── BƯỚC 3: Giản lược các đơn trùng nhau về 1 cookie/đơn trên sheet ──
+              const existingRow = sheetRows.find(r => 
+                (order.order_id && String(r.order_id) === String(order.order_id)) ||
+                (order.order_sn && r.order_sn === order.order_sn)
+              );
+
+              if (existingRow) {
+                // Đơn đã có trên sheet: cập nhật thông tin mới nhất, không tạo dòng mới trùng lặp
+                if (order.tracking_no) existingRow.tracking_no = order.tracking_no;
+                existingRow.has_tracking = Boolean(existingRow.tracking_no);
+                if (order.carrier) existingRow.carrier = order.carrier;
+                if (order.status_desc) existingRow.status_desc = order.status_desc;
+                if (order.status_badge_type) existingRow.status_badge_type = order.status_badge_type;
+                if (order.status_badge_text) existingRow.status_badge_text = order.status_badge_text;
+                if (order.driver_phone) existingRow.driver_phone = order.driver_phone;
+                if (order.receiver_name) existingRow.receiver_name = order.receiver_name;
+                if (order.receiver_phone) existingRow.receiver_phone = order.receiver_phone;
+                if (order.receiver_address) existingRow.receiver_address = order.receiver_address;
+                if (order.timeline && order.timeline.length) existingRow.timeline = order.timeline;
+                if (order.cod_val !== undefined) existingRow.cod_val = order.cod_val;
+                if (order.cod_amount) existingRow.cod_amount = order.cod_amount;
+                if (order.payment_status) existingRow.payment_status = order.payment_status;
+                existingRow.last_check = nowStr;
+                existingRow.cookie_raw = item.cleanToken;
+                if (!existingRow.note_name && item.noteName) existingRow.note_name = item.noteName;
+
+                updatedCount++;
+                addLog(`[Đơn trùng - Giản lược] Đơn ${order.order_sn || order.order_id}: Cookie đã có sẵn trong sheet, đã cập nhật mới.`);
+              } else {
+                // Đơn chưa có: thêm mới vào sheet
+                order.id = 'ord_' + Date.now() + '_' + Math.random().toString(36).substr(2, 6);
+                order.stt = sheetRows.length + 1;
+                order.cookie_raw = item.cleanToken;
+                if (item.noteName) order.note_name = item.noteName;
+                sheetRows.push(order);
+                addedCount++;
+              }
             });
-            addLog(`Cookie #${current} (${data.account?.username || 'user'}): Tìm thấy ${data.orders.length} đơn hàng.`);
+
+            addLog(`Cookie #${current} (${data.account?.username || item.noteName || 'user'}): Có ${data.orders.length} đơn hàng.`);
           } else {
             addLog(`Cookie #${current} (${data.account?.username || 'user'}): 0 đơn hàng.`);
           }
@@ -5038,18 +5150,86 @@
         }
 
         renderTable();
-        if (i < lines.length - 1) await sleep(delayMs);
+        if (i < uniqueCookies.length - 1) await sleep(delayMs);
       }
 
       $('btn-run-scan').disabled = false;
-      $('scan-status-text').textContent = `Hoàn tất! Đã thêm ${addedCount} đơn hàng vào bảng.`;
-      showToast(`Quét hoàn tất! Thêm được ${addedCount} đơn hàng.`, '✅');
+      let summaryText = `Hoàn tất! Thêm mới ${addedCount} đơn hàng.`;
+      if (alreadyInSheetCookiesCount > 0) {
+        summaryText += ` (Giản lược ${alreadyInSheetCookiesCount} cookie đã có sẵn trong sheet, cập nhật ${updatedCount} đơn).`;
+      }
+      $('scan-status-text').textContent = summaryText;
+
+      const toastIcon = alreadyInSheetCookiesCount > 0 ? 'ℹ️' : '✅';
+      const toastMsg = alreadyInSheetCookiesCount > 0
+        ? `Quét xong! Cookie đã có sẵn trong sheet: ${alreadyInSheetCookiesCount} (Cập nhật: ${updatedCount}, Thêm mới: ${addedCount})`
+        : `Quét hoàn tất! Thêm được ${addedCount} đơn hàng.`;
+      showToast(toastMsg, toastIcon);
+
       markUnsaved();
       setTimeout(() => {
         closeAddModal();
         $('scan-progress-bar').style.display = 'none';
         $('scan-status-text').style.display = 'none';
-      }, 1200);
+      }, 1500);
+    }
+
+    // ── LỌC VÀ GIẢN LƯỢC CÁC ĐƠN TRÙNG LẶP TRÊN SHEET ──
+    function deduplicateSheetRows(showUserFeedback = true) {
+      if (!sheetRows || sheetRows.length <= 1) {
+        if (showUserFeedback) showToast('Không có đơn nào bị trùng lặp trên sheet.', '✅');
+        return 0;
+      }
+
+      const initialCount = sheetRows.length;
+      const seenOrderMap = new Map();
+      const uniqueList = [];
+      let duplicateRowsCount = 0;
+
+      sheetRows.forEach(row => {
+        // Khóa định danh đơn hàng
+        const key = (row.order_sn || row.order_id || '').trim() || `${cleanCookieStr(row.cookie_raw)}_${row.product_name}_${row.receiver_phone}`;
+        
+        if (seenOrderMap.has(key)) {
+          // Trùng đơn: giản lược về 1 dòng duy nhất, cập nhật dữ liệu tốt hơn
+          const target = seenOrderMap.get(key);
+          if (!target.tracking_no && row.tracking_no) {
+            target.tracking_no = row.tracking_no;
+            target.has_tracking = true;
+            target.carrier = row.carrier;
+          }
+          if (row.status_desc && (!target.status_desc || target.status_desc === '➖')) {
+            target.status_desc = row.status_desc;
+            target.status_badge_type = row.status_badge_type;
+            target.status_badge_text = row.status_badge_text;
+          }
+          if (!target.cookie_raw && row.cookie_raw) {
+            target.cookie_raw = row.cookie_raw;
+          }
+          duplicateRowsCount++;
+        } else {
+          seenOrderMap.set(key, row);
+          uniqueList.push(row);
+        }
+      });
+
+      const removedCount = initialCount - uniqueList.length;
+      if (removedCount > 0) {
+        uniqueList.forEach((r, idx) => {
+          r.stt = idx + 1;
+        });
+        sheetRows = uniqueList;
+        renderTable();
+        markUnsaved();
+
+        const msg = `Đã giản lược ${removedCount} đơn trùng về 1 cookie! (Cookie đã có sẵn trong sheet)`;
+        if (showUserFeedback) showToast(msg, '🧹');
+        addLog(`[Lọc trùng] ${msg}`);
+      } else {
+        if (showUserFeedback) showToast('Tất cả các đơn trên sheet đều là duy nhất, không có trùng lặp.', '✅');
+      }
+
+      return removedCount;
     }
 
     // ── DETAIL MODAL (🔍) ──

@@ -105,6 +105,8 @@ def clean_cookie_str(raw):
     raw = (raw or '').strip()
     if raw.startswith('Cookie:'):
         raw = raw[7:].strip()
+    if '|' in raw:
+        raw = raw.split('|')[0].strip()
     if 'SPC_ST=' in raw:
         parts = raw.split(';')
         for p in parts:
