@@ -1072,6 +1072,15 @@ class TrackingRequestHandler(http.server.SimpleHTTPRequestHandler):
             except Exception as e:
                 self._json(500, {'error': str(e)})
 
+        elif self.path == '/api/telegram/slots':
+            try:
+                if not tg_auth_mgr:
+                    return self._json(500, {'error': 'Telegram auth manager chưa sẵn sàng'})
+                slots = tg_auth_mgr.get_preset_slots()
+                self._json(200, {'success': True, 'slots': slots})
+            except Exception as e:
+                self._json(500, {'error': str(e)})
+
         else:
             super().do_GET()
 
@@ -1625,6 +1634,15 @@ class TrackingRequestHandler(http.server.SimpleHTTPRequestHandler):
                 if not tg_auth_mgr:
                     return self._json(500, {'success': False, 'error': 'Telegram auth manager chưa sẵn sàng'})
                 res = tg_auth_mgr.logout()
+                self._json(200, res)
+            except Exception as e:
+                self._json(500, {'success': False, 'error': str(e)})
+
+        elif self.path == '/api/telegram/load-default-slot':
+            try:
+                if not tg_auth_mgr:
+                    return self._json(500, {'success': False, 'error': 'Telegram auth manager chưa sẵn sàng'})
+                res = tg_auth_mgr.load_default_slot()
                 self._json(200, res)
             except Exception as e:
                 self._json(500, {'success': False, 'error': str(e)})

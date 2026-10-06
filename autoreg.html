@@ -1005,6 +1005,39 @@
                 </div>
             </div>
 
+            <!-- Preset Slot Card (Tài khoản mặc định sẵn của hệ thống) -->
+            <div id="tgPresetSlotBox" style="background: linear-gradient(135deg, rgba(99, 102, 241, 0.12), rgba(59, 130, 246, 0.08)); border: 1px solid rgba(99, 102, 241, 0.35); border-radius: 10px; padding: 14px; margin-bottom: 16px;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                    <div style="font-size: 12px; font-weight: 700; color: #A5B4FC; display: flex; align-items: center; gap: 6px;">
+                        <i class="fa-solid fa-crown" style="color: #FBBF24;"></i>
+                        <span>SLOT TELEGRAM MẶC ĐỊNH SẴN</span>
+                    </div>
+                    <span id="badgeSlotActive" style="font-size: 11px; padding: 3px 9px; border-radius: 999px; background: rgba(99, 102, 241, 0.25); color: #C7D2FE; font-weight: 600;">
+                        Slot 1 (Chính)
+                    </span>
+                </div>
+                
+                <div style="display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap;">
+                    <div style="display: flex; gap: 10px; align-items: center;">
+                        <div style="width: 38px; height: 38px; border-radius: 50%; background: linear-gradient(135deg, #6366F1, #3B82F6); display: flex; align-items: center; justify-content: center; color: #FFF; font-size: 14px; font-weight: 700; box-shadow: 0 2px 10px rgba(99, 102, 241, 0.4);">
+                            CB
+                        </div>
+                        <div>
+                            <div style="font-size: 13px; font-weight: 700; color: #FFF;">chubin đặng</div>
+                            <div style="font-size: 11px; color: #93C5FD; font-family: var(--font-mono);">+84967193558 <span style="color: var(--text-sub); font-family: var(--font-body);">( @senykaroa )</span></div>
+                        </div>
+                    </div>
+                    <div style="display: flex; gap: 6px;">
+                        <button type="button" class="btn-sm-action" onclick="loadDefaultTelegramSlot()" id="btnLoadDefaultSlot" style="background: rgba(99, 102, 241, 0.35); border-color: rgba(99, 102, 241, 0.6); color: #FFF; font-weight: 600;" title="Kích hoạt ngay Slot này">
+                            <i class="fa-solid fa-bolt" style="color: #FBBF24;"></i> <span id="txtBtnLoadDefault">Kích hoạt Slot</span>
+                        </button>
+                        <button type="button" class="btn-sm-action" onclick="copyDefaultSlotSession()" title="Sao chép StringSession của Slot này">
+                            <i class="fa-solid fa-copy"></i> Copy Session
+                        </button>
+                    </div>
+                </div>
+            </div>
+
             <!-- Header / Subtitle for Login Form -->
             <div id="tgFormHeader" style="margin-bottom: 12px;">
                 <div style="font-size: 13px; font-weight: 600; color: #93C5FD; display: flex; align-items: center; gap: 6px;">
@@ -1078,6 +1111,11 @@
 
             <!-- TAB 2: STRING SESSION -->
             <div id="tabContentSession" class="tg-tab-content" style="display: none;">
+                <div style="display: flex; justify-content: flex-end; margin-bottom: 8px;">
+                    <button type="button" class="btn-sm-action" onclick="fillDefaultSessionToInput()" style="color: #93C5FD; border-color: rgba(99, 102, 241, 0.4); font-size: 11px;">
+                        <i class="fa-solid fa-crown" style="color: #FBBF24;"></i> Điền Session của Slot mặc định
+                    </button>
+                </div>
                 <div class="form-group" style="margin-bottom: 12px;">
                     <label class="form-label">Chuỗi StringSession của Telethon</label>
                     <textarea id="inputTgSessionString" class="custom-input" rows="3" placeholder="Dán chuỗi StringSession tại đây (dạng 1BVts...)" style="font-family: var(--font-mono); font-size: 11px; resize: vertical;"></textarea>
@@ -1251,9 +1289,35 @@
         document.getElementById('modalTelegram').style.display = 'none';
     }
 
+    const DEFAULT_TELEGRAM_SESSION_STR = "1BVtsOG4Bu38H6CC0ejYTb2vsIn0Lstvy_TQceV4970quNkL-wrcoaaIwkBcYx9N-9aHsqQmjKadPsm6PE0m3PcvJiIjIpJlMRVvZm_RJvojNT3-vtQeflr7IAoojIACOto5xL7xy75iM99WPDvGLCSo4OuMLDxgFpG3IzuDOe4e0fcdt0YkAhivyuCmpyzxEMXOrSzeDRrb-_Co5-3W6zw8D0kULxwB0C5AIfu13E_CrKeBrV05-dEdgobetD-q1fIQ0hGQ1vMJiDwyP87zgxeLiUYp2Zs17VL8yl-57xV4grlHtpZgrEJ8-EA7l9uMrPnH5xmRBFVqN6st8hZ9-951TP1xeW_o=";
+
     function renderTelegramModalUI() {
         const card = document.getElementById('tgAccountCard');
         const formTitle = document.getElementById('tgFormTitle');
+        const badgeSlot = document.getElementById('badgeSlotActive');
+        const btnLoadDefault = document.getElementById('btnLoadDefaultSlot');
+        const txtBtnLoad = document.getElementById('txtBtnLoadDefault');
+
+        const isDefaultActive = currentTgAccount && currentTgAccount.connected && 
+            (currentTgAccount.phone === '+84967193558' || (currentTgAccount.username && currentTgAccount.username.toLowerCase() === 'senykaroa'));
+
+        if (badgeSlot && btnLoadDefault) {
+            if (isDefaultActive) {
+                badgeSlot.innerHTML = '<span style="color: #10B981;"><i class="fa-solid fa-circle-check"></i> Đang hoạt động</span>';
+                badgeSlot.style.background = 'rgba(16, 185, 129, 0.2)';
+                badgeSlot.style.color = '#34D399';
+                btnLoadDefault.disabled = true;
+                if (txtBtnLoad) txtBtnLoad.textContent = 'Đang sử dụng';
+                btnLoadDefault.style.opacity = '0.7';
+            } else {
+                badgeSlot.innerHTML = 'Slot 1 (Chính)';
+                badgeSlot.style.background = 'rgba(99, 102, 241, 0.25)';
+                badgeSlot.style.color = '#C7D2FE';
+                btnLoadDefault.disabled = false;
+                if (txtBtnLoad) txtBtnLoad.textContent = 'Kích hoạt Slot';
+                btnLoadDefault.style.opacity = '1';
+            }
+        }
 
         if (currentTgAccount && currentTgAccount.connected) {
             card.style.display = 'block';
@@ -1268,6 +1332,46 @@
         } else {
             card.style.display = 'none';
             if (formTitle) formTitle.textContent = 'Đăng nhập tài khoản điều phối:';
+        }
+    }
+
+    async function loadDefaultTelegramSlot() {
+        const btn = document.getElementById('btnLoadDefaultSlot');
+        if (btn) {
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Đang nạp...';
+        }
+        try {
+            const res = await fetch('/api/telegram/load-default-slot', { method: 'POST' });
+            const j = await res.json();
+            if (j.success) {
+                showToast(j.message || 'Đã kích hoạt Slot mặc định!', 'fa-circle-check', '#10B981');
+                currentTgAccount = j.account;
+                renderTelegramModalUI();
+                updateHeaderChips({ telegram: j.account });
+            } else {
+                showToast(j.error || 'Lỗi kích hoạt Slot mặc định!', 'fa-circle-exclamation', '#EF4444');
+            }
+        } catch (e) {
+            showToast('Lỗi: ' + e.message, 'fa-triangle-exclamation', '#EF4444');
+        } finally {
+            if (btn) {
+                btn.disabled = false;
+                btn.innerHTML = '<i class="fa-solid fa-bolt" style="color: #FBBF24;"></i> <span id="txtBtnLoadDefault">Kích hoạt Slot</span>';
+                renderTelegramModalUI();
+            }
+        }
+    }
+
+    function copyDefaultSlotSession() {
+        copyText(DEFAULT_TELEGRAM_SESSION_STR, 'StringSession Slot mặc định (chubin đặng)');
+    }
+
+    function fillDefaultSessionToInput() {
+        const inp = document.getElementById('inputTgSessionString');
+        if (inp) {
+            inp.value = DEFAULT_TELEGRAM_SESSION_STR;
+            showToast('Đã tự điền StringSession của Slot mặc định!', 'fa-circle-check', '#10B981');
         }
     }
 

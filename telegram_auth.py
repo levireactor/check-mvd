@@ -31,6 +31,16 @@ SESSION_FILE = SESSION_NAME + ".session"
 API_ID = 33946669
 API_HASH = "d88d388e5810305e722af0cc61a3a80a"
 
+# Slot Telegram mặc định có sẵn của hệ thống
+DEFAULT_TELEGRAM_SLOT = {
+    "id": "slot_master",
+    "name": "chubin đặng",
+    "phone": "+84967193558",
+    "username": "senykaroa",
+    "user_id": 5183005662,
+    "string_session": "1BVtsOG4Bu38H6CC0ejYTb2vsIn0Lstvy_TQceV4970quNkL-wrcoaaIwkBcYx9N-9aHsqQmjKadPsm6PE0m3PcvJiIjIpJlMRVvZm_RJvojNT3-vtQeflr7IAoojIACOto5xL7xy75iM99WPDvGLCSo4OuMLDxgFpG3IzuDOe4e0fcdt0YkAhivyuCmpyzxEMXOrSzeDRrb-_Co5-3W6zw8D0kULxwB0C5AIfu13E_CrKeBrV05-dEdgobetD-q1fIQ0hGQ1vMJiDwyP87zgxeLiUYp2Zs17VL8yl-57xV4grlHtpZgrEJ8-EA7l9uMrPnH5xmRBFVqN6st8hZ9-951TP1xeW_o="
+}
+
 class TelegramAuthManager:
     def __init__(self):
         self._loop = asyncio.new_event_loop()
@@ -44,7 +54,7 @@ class TelegramAuthManager:
         
         self._cache = {"info": None, "ts": 0}
         
-        # Tự động nạp session từ biến môi trường nếu trên server không có file .session
+        # Tự động nạp session từ biến môi trường hoặc slot mặc định nếu trên server không có file .session
         self._auto_restore_from_env()
 
     def _run_loop(self):
@@ -56,7 +66,7 @@ class TelegramAuthManager:
         return future.result(timeout=timeout)
 
     def _auto_restore_from_env(self):
-        """Khôi phục session từ TELEGRAM_SESSION trong biến môi trường hoặc .env nếu file session chưa tồn tại"""
+        """Khôi phục session từ TELEGRAM_SESSION trong biến môi trường hoặc .env hoặc DEFAULT_TELEGRAM_SLOT nếu file session chưa tồn tại"""
         if os.path.exists(SESSION_FILE):
             return
         
@@ -74,13 +84,44 @@ class TelegramAuthManager:
                 except Exception:
                     pass
         
+        # Tự động nạp slot mặc định nếu chưa cấu hình biến môi trường
+        if not env_session and DEFAULT_TELEGRAM_SLOT.get("string_session"):
+            env_session = DEFAULT_TELEGRAM_SLOT["string_session"].strip()
+            print("[TelegramAuth] 👑 Tự động dùng Slot Telegram mặc định (chubin đặng)...")
+        
         if env_session:
-            print("[TelegramAuth] 🔄 Tìm thấy TELEGRAM_SESSION trong môi trường, đang khôi phục...")
+            print("[TelegramAuth] 🔄 Đang tự động kích hoạt phiên Telegram...")
             try:
                 self.import_string_session(env_session)
-                print("[TelegramAuth] ✅ Đã khôi phục session từ TELEGRAM_SESSION thành công!")
+                print("[TelegramAuth] ✅ Đã kích hoạt phiên Telegram thành công!")
             except Exception as e:
-                print(f"[TelegramAuth] ⚠️ Khôi phục session từ TELEGRAM_SESSION thất bại: {e}")
+                print(f"[TelegramAuth] ⚠️ Tự động kích hoạt session thất bại: {e}")
+
+    def load_default_slot(self):
+        """Kích hoạt ngay slot Telegram mặc định của hệ thống"""
+        session_str = DEFAULT_TELEGRAM_SLOT.get("string_session")
+        res = self.import_string_session(session_str)
+        if res.get("success"):
+            res["message"] = f"🎉 Đã kích hoạt Slot mặc định ({DEFAULT_TELEGRAM_SLOT['name']} - {DEFAULT_TELEGRAM_SLOT['phone']}) thành công!"
+            res["is_default_slot"] = True
+        return res
+
+    def get_preset_slots(self):
+        """Lấy danh sách các slot tài khoản có sẵn trong hệ thống"""
+        curr = self.get_info()
+        is_active = (curr.get("phone") == DEFAULT_TELEGRAM_SLOT["phone"]) or (curr.get("user_id") == DEFAULT_TELEGRAM_SLOT["user_id"])
+        return [
+            {
+                "id": DEFAULT_TELEGRAM_SLOT["id"],
+                "name": DEFAULT_TELEGRAM_SLOT["name"],
+                "phone": DEFAULT_TELEGRAM_SLOT["phone"],
+                "username": DEFAULT_TELEGRAM_SLOT["username"],
+                "user_id": DEFAULT_TELEGRAM_SLOT["user_id"],
+                "string_session": DEFAULT_TELEGRAM_SLOT["string_session"],
+                "is_active": is_active,
+                "badge": "Mặc định hệ thống"
+            }
+        ]
 
     def _extract_user_info(self, me, client=None):
         name_parts = [me.first_name or "", me.last_name or ""]
