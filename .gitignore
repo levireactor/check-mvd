@@ -9,5 +9,6 @@ __pycache__/
 *.pyd
 .Python
 .DS_Store
-
-
+*.session
+accounts_reg.json
+accounts_reg.txt

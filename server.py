@@ -25,6 +25,14 @@ except ImportError:
     SUPABASE_AVAILABLE = False
     print("[!] supabase-py not installed. Run: pip install supabase")
 
+try:
+    from autoreg_manager import auto_reg_mgr, SERVICES as AUTOREG_SERVICES, CMSNPA_KEY, CMSNPA_BASE, get_kiotproxy_ip, get_telegram_account_info
+    AUTOREG_AVAILABLE = True
+except Exception as _ar_ex:
+    auto_reg_mgr = None
+    AUTOREG_AVAILABLE = False
+    print(f"[!] Autoreg manager not loaded: {_ar_ex}")
+
 PORT = int(os.environ.get("PORT", 8080))
 DIRECTORY = os.path.dirname(os.path.abspath(__file__))
 DRAFT_FILE = os.path.join(DIRECTORY, "draft.json")
@@ -1008,6 +1016,46 @@ class TrackingRequestHandler(http.server.SimpleHTTPRequestHandler):
                 })
             except Exception as e:
                 self._json(500, {'error': f'Lỗi đọc Telegram config: {str(e)}'})
+
+        elif self.path == '/api/autoreg/status' or self.path.startswith('/api/autoreg/status?'):
+            try:
+                if not auto_reg_mgr:
+                    return self._json(500, {'error': 'Autoreg manager chưa sẵn sàng'})
+                st = auto_reg_mgr.get_status()
+                # Kiểm tra số dư CMSNPA (Gửi kèm User-Agent để tránh Cloudflare 403)
+                credits = None
+                try:
+                    headers = {
+                        "Authorization": f"Bearer {CMSNPA_KEY}",
+                        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+                        "Accept": "application/json"
+                    }
+                    req = urllib.request.Request(f"{CMSNPA_BASE}/api/v1/balance", headers=headers)
+                    with urllib.request.urlopen(req, timeout=5) as resp:
+                        b_data = json.loads(resp.read().decode('utf-8'))
+                        if b_data.get('ok'):
+                            credits = b_data.get('credits')
+                except Exception as _bal_err:
+                    print(f"[!] Lỗi đọc số dư CMSNPA: {_bal_err}")
+
+                st['credits'] = credits
+                st['services'] = AUTOREG_SERVICES
+                st['telegram'] = get_telegram_account_info('refresh' in self.path)
+                if not st.get('kiotproxy_key') and proxy_state.get('key'):
+                    st['kiotproxy_key'] = proxy_state.get('key')
+                self._json(200, {'success': True, 'data': st})
+            except Exception as e:
+                self._json(500, {'error': str(e)})
+
+        elif self.path == '/api/autoreg/accounts':
+            try:
+                if not auto_reg_mgr:
+                    return self._json(500, {'error': 'Autoreg manager chưa sẵn sàng'})
+                accs = auto_reg_mgr.get_accounts()
+                self._json(200, {'success': True, 'accounts': accs})
+            except Exception as e:
+                self._json(500, {'error': str(e)})
+
         else:
             super().do_GET()
 
@@ -1424,6 +1472,89 @@ class TrackingRequestHandler(http.server.SimpleHTTPRequestHandler):
                 self._json(200, {'success': True, 'data': res})
             except Exception as e:
                 self._json(500, {'error': f'Lỗi lấy hành trình đơn hàng: {str(e)}'})
+
+        elif self.path == '/api/autoreg/start':
+            try:
+                if not auto_reg_mgr:
+                    return self._json(500, {'error': 'Autoreg manager chưa sẵn sàng'})
+                body = self._read_body()
+                server_id = body.get('server_id', 'dyn_ab1eb87836')
+                count = int(body.get('count', 1))
+                delay = int(body.get('delay', 10))
+                kiotproxy_key = body.get('kiotproxy_key', '').strip()
+                use_proxy = bool(body.get('use_proxy', False))
+                # Tự động lưu key nếu có nhập
+                if kiotproxy_key:
+                    proxy_state['key'] = kiotproxy_key
+                    _save_proxy_config()
+                ok, msg = auto_reg_mgr.start(server_id, count, delay, kiotproxy_key, use_proxy)
+                if ok:
+                    self._json(200, {'success': True, 'message': msg})
+                else:
+                    self._json(400, {'error': msg})
+            except Exception as e:
+                self._json(500, {'error': str(e)})
+
+        elif self.path == '/api/autoreg/test-kiotproxy':
+            try:
+                body = self._read_body()
+                key = body.get('key', '').strip() or proxy_state.get('key', '').strip()
+                if not key:
+                    return self._json(400, {'success': False, 'error': 'Vui lòng nhập Key KiotProxy'})
+                p_str, p_note, p_err = get_kiotproxy_ip(key, rotate=False)
+                if p_str:
+                    proxy_state['key'] = key
+                    _save_proxy_config()
+                    self._json(200, {'success': True, 'proxy': p_str, 'note': p_note})
+                else:
+                    self._json(200, {'success': False, 'error': p_err or 'Không thể kết nối proxy với Key này'})
+            except Exception as e:
+                self._json(500, {'error': str(e)})
+
+        elif self.path == '/api/autoreg/stop':
+            try:
+                if not auto_reg_mgr:
+                    return self._json(500, {'error': 'Autoreg manager chưa sẵn sàng'})
+                ok, msg = auto_reg_mgr.stop()
+                self._json(200, {'success': True, 'message': msg})
+            except Exception as e:
+                self._json(500, {'error': str(e)})
+
+        elif self.path == '/api/autoreg/clear':
+            try:
+                if not auto_reg_mgr:
+                    return self._json(500, {'error': 'Autoreg manager chưa sẵn sàng'})
+                auto_reg_mgr.clear_accounts()
+                self._json(200, {'success': True, 'message': 'Đã xóa lịch sử tài khoản'})
+            except Exception as e:
+                self._json(500, {'error': str(e)})
+
+        elif self.path == '/api/autoreg/import-to-vault':
+            try:
+                body = self._read_body()
+                cookie = body.get('cookie', '').strip()
+                name = body.get('name', '').strip() or 'Acc Shopee Mới'
+                if not cookie:
+                    return self._json(400, {'error': 'Thiếu cookie'})
+                
+                vault = _load_vault()
+                now_str = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                item_id = str(int(time.time() * 1000))
+                vault.insert(0, {
+                    'id': item_id,
+                    'name': name,
+                    'cookie': cookie,
+                    'tags': 'AutoReg, Shopee',
+                    'notes': f'Tạo tự động lúc {now_str}',
+                    'status': 'unknown',
+                    'username': name,
+                    'created_at': now_str,
+                    'updated_at': now_str
+                })
+                _save_vault(vault)
+                self._json(200, {'success': True, 'message': 'Đã đưa vào Kho Cookie thành công!'})
+            except Exception as e:
+                self._json(500, {'error': str(e)})
 
         else:
             self._json(404, {'error': 'Endpoint không tồn tại'})
