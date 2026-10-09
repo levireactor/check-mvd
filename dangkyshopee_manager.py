@@ -99,12 +99,111 @@ def parse_vietnamese_address(raw_str):
     result["street"] = text
     return result
 
-def generate_random_vn_phone():
-    """Tạo số điện thoại Việt Nam ngẫu nhiên 10 số"""
-    prefixes = ["098", "097", "096", "086", "083", "084", "085", "081", "082", "070", "079", "077", "076", "078", "032", "033", "034", "035", "036", "037", "038", "039"]
-    prefix = random.choice(prefixes)
-    suffix = "".join([str(random.randint(0, 9)) for _ in range(7)])
-    return f"{prefix}{suffix}"
+AFF_CONFIG_FILE = os.path.join(DIRECTORY, "affiliate_config.json")
+
+def load_affiliate_config():
+    if os.path.exists(AFF_CONFIG_FILE):
+        try:
+            with open(AFF_CONFIG_FILE, "r", encoding="utf-8") as f:
+                return json.load(f)
+        except Exception:
+            pass
+    return {"enabled": False, "app_id": "", "secret": "", "sub_id": ""}
+
+def save_affiliate_config(data):
+    try:
+        with open(AFF_CONFIG_FILE, "w", encoding="utf-8") as f:
+            json.dump(data, f, ensure_ascii=False, indent=2)
+        return True
+    except Exception:
+        return False
+
+def expand_shopee_short_url(url):
+    """Mở rộng link rút gọn s.shopee.vn / vn.shp.ee thành link gốc canonical"""
+    url = url.strip()
+    if any(d in url.lower() for d in ["s.shopee.vn", "vn.shp.ee", "shp.ee", "shope.ee"]):
+        try:
+            import urllib.request
+            req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"})
+            opener = urllib.request.build_opener(urllib.request.HTTPRedirectHandler)
+            with opener.open(req, timeout=8) as resp:
+                return resp.geturl()
+        except Exception:
+            pass
+    return url
+
+def convert_shopee_affiliate_link(raw_url, app_id=None, secret=None, sub_id=None):
+    """
+    Gọi Shopee Affiliate GraphQL Open API để sinh shortLink có mã hoa hồng tiếp thị
+    Endpoint: https://open-api.affiliate.shopee.vn/graphql
+    """
+    import hashlib
+    import urllib.request
+    import urllib.error
+
+    cfg = load_affiliate_config()
+    app_id = str(app_id if app_id is not None else cfg.get("app_id", "")).strip()
+    secret = str(secret if secret is not None else cfg.get("secret", "")).strip()
+    sub_id = str(sub_id if sub_id is not None else cfg.get("sub_id", "")).strip()
+
+    if not app_id or not secret:
+        return False, "Chưa cấu hình App ID hoặc Secret Key của Shopee Affiliate"
+
+    # 1. Mở rộng link nếu là dạng rút gọn
+    canonical_url = expand_shopee_short_url(raw_url)
+
+    # 2. Xây dựng mutation GraphQL
+    if sub_id:
+        sub_ids_str = json.dumps([sub_id])
+        input_args = f'originUrl: "{canonical_url}", subIds: {sub_ids_str}'
+    else:
+        input_args = f'originUrl: "{canonical_url}"'
+
+    gql_query = f"mutation {{ generateShortLink(input: {{ {input_args} }}) {{ shortLink }} }}"
+    payload = {"query": gql_query}
+    payload_str = json.dumps(payload, separators=(',', ':'))
+
+    timestamp = int(time.time())
+    factor = f"{app_id}{timestamp}{payload_str}{secret}"
+    signature = hashlib.sha256(factor.encode("utf-8")).hexdigest()
+
+    headers = {
+        "Content-Type": "application/json",
+        "Authorization": f"SHA256 Credential={app_id}, Timestamp={timestamp}, Signature={signature}",
+        "User-Agent": "ShopeeAffiliateClient/1.0"
+    }
+
+    req = urllib.request.Request(
+        "https://open-api.affiliate.shopee.vn/graphql",
+        data=payload_str.encode("utf-8"),
+        headers=headers,
+        method="POST"
+    )
+
+    try:
+        with urllib.request.urlopen(req, timeout=12) as response:
+            res_data = json.loads(response.read().decode("utf-8"))
+            if "errors" in res_data and res_data["errors"]:
+                err_msg = res_data["errors"][0].get("message", "Lỗi GraphQL Shopee")
+                return False, f"Shopee API báo lỗi: {err_msg}"
+
+            data = res_data.get("data", {})
+            gen_res = data.get("generateShortLink", {})
+            short_link = gen_res.get("shortLink")
+            if short_link:
+                return True, short_link
+            else:
+                return False, "Không nhận được shortLink từ Shopee"
+    except urllib.error.HTTPError as e:
+        try:
+            err_body = e.read().decode("utf-8")
+            err_json = json.loads(err_body)
+            msg = err_json.get("message") or err_json.get("errors", [{}])[0].get("message", f"HTTP {e.code}")
+            return False, f"Lỗi HTTP {e.code}: {msg}"
+        except Exception:
+            return False, f"Lỗi kết nối Shopee API (HTTP {e.code})"
+    except Exception as e:
+        return False, f"Lỗi kết nối: {str(e)}"
 
 class DangKyShopeeManager:
     def __init__(self):
@@ -379,6 +478,18 @@ class DangKyShopeeManager:
         item["status"] = "addtocart"
         item["step_detail"] = "Đang gửi lệnh /addtocart..."
         prod_link = self.config.get("product_link", "").strip()
+
+        # Kiểm tra tự động chuyển đổi sang link Affiliate của người dùng
+        aff_cfg = load_affiliate_config()
+        if aff_cfg.get("enabled") and aff_cfg.get("app_id") and aff_cfg.get("secret"):
+            self.log("🔗 Đang chuyển đổi link sản phẩm sang link Affiliate của bạn...", "info")
+            aff_ok, aff_res = convert_shopee_affiliate_link(prod_link)
+            if aff_ok:
+                prod_link = aff_res
+                self.log(f"✅ Đã chuyển đổi thành công link Affiliate: {prod_link}", "success")
+            else:
+                self.log(f"⚠️ Chuyển đổi link Affiliate chưa được: {aff_res}. Tiếp tục dùng link gốc.", "warning")
+
         self.log(f"📤 Gửi {step_cart_num}: /addtocart {prod_link}|<nick>...", "info")
 
         cart_cmd = f"/addtocart {prod_link}|{raw_nick}"

@@ -41,11 +41,20 @@ except Exception as _tg_err:
     print(f"[!] Telegram auth manager not loaded: {_tg_err}")
 
 try:
-    from dangkyshopee_manager import dks_mgr, parse_vietnamese_address
+    from dangkyshopee_manager import (
+        dks_mgr,
+        parse_vietnamese_address,
+        load_affiliate_config,
+        save_affiliate_config,
+        convert_shopee_affiliate_link
+    )
     DKS_AVAILABLE = True
 except Exception as _dks_err:
     dks_mgr = None
     parse_vietnamese_address = None
+    load_affiliate_config = None
+    save_affiliate_config = None
+    convert_shopee_affiliate_link = None
     DKS_AVAILABLE = False
     print(f"[!] DangKyShopee manager not loaded: {_dks_err}")
 
@@ -1351,6 +1360,24 @@ class TrackingRequestHandler(http.server.SimpleHTTPRequestHandler):
             except Exception as e:
                 self._json(500, {'error': str(e)})
 
+        elif self.path == '/api/bot-dks/aff-config':
+            try:
+                cfg = load_affiliate_config() if load_affiliate_config else {}
+                sec = cfg.get('secret', '')
+                masked_sec = sec[:4] + '*' * (len(sec) - 8) + sec[-4:] if len(sec) > 8 else ('*' * len(sec) if sec else '')
+                self._json(200, {
+                    'success': True,
+                    'data': {
+                        'enabled': bool(cfg.get('enabled', False)),
+                        'app_id': cfg.get('app_id', ''),
+                        'has_secret': bool(sec),
+                        'secret_masked': masked_sec,
+                        'sub_id': cfg.get('sub_id', '')
+                    }
+                })
+            except Exception as e:
+                self._json(500, {'error': str(e)})
+
         else:
             super().do_GET()
 
@@ -2086,6 +2113,53 @@ class TrackingRequestHandler(http.server.SimpleHTTPRequestHandler):
                     self._json(400, {'error': msg})
             except Exception as e:
                 self._json(500, {'error': str(e)})
+
+        elif self.path == '/api/bot-dks/aff-config':
+            try:
+                body = self._read_body()
+                cur = load_affiliate_config() if load_affiliate_config else {}
+                new_sec = body.get('secret', '').strip()
+                # Nếu người dùng không nhập lại secret hoặc gửi masked, giữ nguyên secret cũ
+                if not new_sec or '*' in new_sec:
+                    final_sec = cur.get('secret', '')
+                else:
+                    final_sec = new_sec
+
+                new_cfg = {
+                    'enabled': bool(body.get('enabled', False)),
+                    'app_id': body.get('app_id', '').strip(),
+                    'secret': final_sec,
+                    'sub_id': body.get('sub_id', '').strip()
+                }
+                if save_affiliate_config:
+                    save_affiliate_config(new_cfg)
+                self._json(200, {'success': True, 'message': 'Đã lưu cấu hình Shopee Affiliate thành công'})
+            except Exception as e:
+                self._json(500, {'error': str(e)})
+
+        elif self.path == '/api/bot-dks/test-aff':
+            try:
+                body = self._read_body()
+                test_url = body.get('url', '').strip()
+                app_id = body.get('app_id', '').strip() or None
+                secret = body.get('secret', '').strip() or None
+                sub_id = body.get('sub_id', '').strip() or None
+                if secret and '*' in secret:
+                    secret = None
+
+                if not test_url:
+                    return self._json(400, {'success': False, 'error': 'Vui lòng nhập Link sản phẩm để test'})
+
+                if convert_shopee_affiliate_link:
+                    ok, res = convert_shopee_affiliate_link(test_url, app_id=app_id, secret=secret, sub_id=sub_id)
+                    if ok:
+                        self._json(200, {'success': True, 'short_link': res})
+                    else:
+                        self._json(200, {'success': False, 'error': res})
+                else:
+                    self._json(500, {'success': False, 'error': 'Module affiliate chưa sẵn sàng'})
+            except Exception as e:
+                self._json(500, {'success': False, 'error': str(e)})
 
         elif self.path == '/api/bot-dks/parse-address':
             try:

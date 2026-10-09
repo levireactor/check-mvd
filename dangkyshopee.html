@@ -604,6 +604,51 @@
                     </div>
                 </div>
 
+                <!-- KHU VỰC CẤU HÌNH SHOPEE AFFILIATE -->
+                <div style="background: rgba(99, 102, 241, 0.08); border: 1px solid rgba(99, 102, 241, 0.25); border-radius: var(--radius-sm); padding: 12px; margin-top: 4px;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; cursor: pointer;" onclick="toggleAffiliatePanel()">
+                        <div style="display: flex; align-items: center; gap: 8px;">
+                            <i class="fa-solid fa-link" style="color: #06B6D4;"></i>
+                            <span style="font-size: 13px; font-weight: 700; color: #fff;">Chuyển Đổi Sang Link Affiliate Của Tôi</span>
+                            <span id="badgeAffStatus" class="status-badge status-pending" style="font-size: 10px; padding: 1px 6px;">Tắt</span>
+                        </div>
+                        <i class="fa-solid fa-chevron-down" id="iconAffChevron" style="color: var(--text-muted); font-size: 12px; transition: 0.2s;"></i>
+                    </div>
+
+                    <div id="panelAffiliate" style="display: none; margin-top: 12px; flex-direction: column; gap: 10px;">
+                        <label style="cursor: pointer; font-size: 12px; color: var(--text-main); display: inline-flex; align-items: center; gap: 8px;">
+                            <input type="checkbox" id="affEnabled" style="width: 15px; height: 15px; cursor: pointer;" onchange="updateAffBadge()">
+                            <span><b>Bật tự động chuyển đổi</b> link sản phẩm sang link Affiliate của tôi khi chạy</span>
+                        </label>
+
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                            <div class="form-group">
+                                <label style="font-size: 11px;">App ID (Shopee Open API):</label>
+                                <input type="text" id="affAppId" placeholder="Ví dụ: 17300000000" style="padding: 7px 10px; font-size: 12px;">
+                            </div>
+                            <div class="form-group">
+                                <label style="font-size: 11px;">Sub ID (Tùy chọn):</label>
+                                <input type="text" id="affSubId" placeholder="Ví dụ: bot_cart" style="padding: 7px 10px; font-size: 12px;">
+                            </div>
+                        </div>
+
+                        <div class="form-group">
+                            <label style="font-size: 11px;">API Secret Key:</label>
+                            <input type="password" id="affSecret" placeholder="Dán API Secret Key vào đây" style="padding: 7px 10px; font-size: 12px;">
+                        </div>
+
+                        <div style="display: flex; gap: 8px; justify-content: flex-end; margin-top: 4px;">
+                            <button type="button" class="btn btn-secondary" onclick="testAffiliateConvert()" style="padding: 6px 12px; font-size: 11px;">
+                                <i class="fa-solid fa-vial"></i> Test Chuyển Link Thử
+                            </button>
+                            <button type="button" class="btn btn-primary" onclick="saveAffiliateConfig()" style="padding: 6px 14px; font-size: 11px; flex: unset;">
+                                <i class="fa-solid fa-floppy-disk"></i> Lưu Cấu Hình
+                            </button>
+                        </div>
+                        <div id="affTestResult" style="display: none; font-size: 11px; padding: 8px; border-radius: 6px; background: rgba(0, 0, 0, 0.4); word-break: break-all;"></div>
+                    </div>
+                </div>
+
                 <!-- Lệnh 2: Chọn loại lệnh địa chỉ -->
                 <div class="form-group">
                     <label for="addressCommand">
@@ -1080,10 +1125,120 @@
         }
     }
 
+    // ==========================================
+    // SHOPEE AFFILIATE FUNCTIONS
+    // ==========================================
+    function toggleAffiliatePanel() {
+        const panel = document.getElementById('panelAffiliate');
+        const icon = document.getElementById('iconAffChevron');
+        const isHidden = panel.style.display === 'none';
+        panel.style.display = isHidden ? 'flex' : 'none';
+        icon.style.transform = isHidden ? 'rotate(180deg)' : 'rotate(0deg)';
+    }
+
+    function updateAffBadge() {
+        const chk = document.getElementById('affEnabled');
+        const badge = document.getElementById('badgeAffStatus');
+        if (chk.checked) {
+            badge.innerText = 'Đang bật';
+            badge.className = 'status-badge status-success';
+        } else {
+            badge.innerText = 'Tắt';
+            badge.className = 'status-badge status-pending';
+        }
+    }
+
+    async function loadAffiliateConfig() {
+        try {
+            const res = await fetch('/api/bot-dks/aff-config');
+            const data = await res.json();
+            if (data.success && data.data) {
+                const cfg = data.data;
+                document.getElementById('affEnabled').checked = Boolean(cfg.enabled);
+                document.getElementById('affAppId').value = cfg.app_id || '';
+                document.getElementById('affSubId').value = cfg.sub_id || '';
+                if (cfg.has_secret) {
+                    document.getElementById('affSecret').placeholder = 'Đã lưu: ' + cfg.secret_masked;
+                }
+                updateAffBadge();
+            }
+        } catch (e) {
+            console.error('Lỗi load affiliate config:', e);
+        }
+    }
+
+    async function saveAffiliateConfig() {
+        const payload = {
+            enabled: document.getElementById('affEnabled').checked,
+            app_id: document.getElementById('affAppId').value.trim(),
+            secret: document.getElementById('affSecret').value.trim(),
+            sub_id: document.getElementById('affSubId').value.trim()
+        };
+
+        try {
+            const res = await fetch('/api/bot-dks/aff-config', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+            const data = await res.json();
+            if (data.success) {
+                alert('💾 Đã lưu cấu hình Shopee Affiliate thành công!');
+                loadAffiliateConfig();
+            } else {
+                alert('❌ Lỗi: ' + data.error);
+            }
+        } catch (e) {
+            alert('Lỗi lưu cấu hình: ' + e);
+        }
+    }
+
+    async function testAffiliateConvert() {
+        const url = document.getElementById('productLink').value.trim();
+        const box = document.getElementById('affTestResult');
+        box.style.display = 'block';
+
+        if (!url) {
+            box.style.color = '#F87171';
+            box.innerHTML = '⚠️ Vui lòng nhập link sản phẩm vào ô "Link Sản Phẩm (Bước 1)" ở trên trước khi test!';
+            return;
+        }
+
+        const payload = {
+            url: url,
+            app_id: document.getElementById('affAppId').value.trim(),
+            secret: document.getElementById('affSecret').value.trim(),
+            sub_id: document.getElementById('affSubId').value.trim()
+        };
+
+        box.style.color = '#60A5FA';
+        box.innerHTML = '⏳ Đang gọi Shopee Open API để tạo shortLink...';
+
+        try {
+            const res = await fetch('/api/bot-dks/test-aff', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+            const data = await res.json();
+            if (data.success) {
+                box.style.color = '#34D399';
+                box.innerHTML = `🎉 <b>Chuyển đổi thành công!</b><br>Link Affiliate: <a href="${data.short_link}" target="_blank" style="color: #22D3EE; text-decoration: underline;">${data.short_link}</a>`;
+            } else {
+                box.style.color = '#F87171';
+                box.innerHTML = `❌ Thất bại: ${data.error || 'Không tạo được link'}`;
+            }
+        } catch (e) {
+            box.style.color = '#F87171';
+            box.innerHTML = '❌ Lỗi kết nối: ' + e;
+        }
+    }
+
     // Khởi tạo
     window.addEventListener('DOMContentLoaded', () => {
         updateLineCount();
         checkTelegramAuth();
+        loadAffiliateConfig();
         fetchStatus();
         pollInterval = setInterval(fetchStatus, 1500);
     });
