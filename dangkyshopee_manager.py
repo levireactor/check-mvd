@@ -120,6 +120,8 @@ class DangKyShopeeManager:
 
         self.config = {
             "product_link": "",
+            "product_variant": "",  # Phân loại/mẫu sản phẩm mong muốn (nếu có)
+            "max_cart_retries": 3,
             "use_mailfree": False,  # Mặc định bỏ lệnh mailfree
             "address_command": "/diachi",  # /diachi hoặc /addressnew
             "address_area": "",
@@ -445,12 +447,93 @@ class DangKyShopeeManager:
         return False, f"Hết thời gian chờ phản hồi ({timeout}s)"
 
     # -------------------------------------------------------------------------
-    # BỘ XỬ LÝ LỆNH 2: /addtocart
+    # BỘ XỬ LÝ LỆNH 2: /addtocart (NÂNG CẤP: QUÉT PHÂN LOẠI & RETRY 8S)
     # -------------------------------------------------------------------------
+    def _find_best_variant_button(self, buttons, target_variant=""):
+        """
+        Quét danh sách các nút phân loại của sản phẩm:
+        - Bỏ qua tuyệt đối các nút mang ý nghĩa Hủy/Cancel/Quay lại/Đóng.
+        - Tìm nút trùng hoặc gần giống nhất với tên phân loại đã nhập.
+        - Nếu không quét thấy hoặc không nhập phân loại: Tự động chọn RANDOM một nút sản phẩm hợp lệ!
+        """
+        valid_btns = []
+        cancel_keywords = ["hủy", "huy", "cancel", "quay lại", "thoát", "close", "đóng", "back", "dừng", "stop"]
+
+        for row in buttons:
+            for btn in row:
+                b_txt = (btn.text or "").strip()
+                if not b_txt:
+                    continue
+                # Bỏ qua hoàn toàn các nút Hủy / Cancel
+                if any(ck in b_txt.lower() for ck in cancel_keywords):
+                    continue
+                valid_btns.append(btn)
+
+        if not valid_btns:
+            return None, "NO_VALID_BUTTONS"
+
+        target = (target_variant or "").strip().lower()
+        if target:
+            # 1. So khớp chính xác hoặc chứa toàn bộ chuỗi
+            for btn in valid_btns:
+                b_txt = btn.text.strip().lower()
+                if target == b_txt or target in b_txt or b_txt in target:
+                    return btn, "MATCH_EXACT"
+
+            # 2. So khớp theo các từ khóa tương đồng (word overlap)
+            target_words = set(re.findall(r'\w+', target))
+            best_btn = None
+            best_score = 0
+            for btn in valid_btns:
+                b_words = set(re.findall(r'\w+', btn.text.strip().lower()))
+                common = target_words.intersection(b_words)
+                score = len(common)
+                if score > best_score:
+                    best_score = score
+                    best_btn = btn
+
+            if best_btn and best_score > 0:
+                return best_btn, "MATCH_SIMILAR"
+
+        # 3. Không trùng khớp hoặc không nhập => Chọn RANDOM ô sản phẩm hợp lệ (Không bấm Hủy)
+        chosen = random.choice(valid_btns)
+        return chosen, "RANDOM_CHOICE"
+
     async def _execute_addtocart(self, client, bot_entity, cmd_text):
+        """Thực thi thêm giỏ hàng kèm cơ chế thử lại nếu lỗi: đợi 8s để chạy lại"""
+        max_retries = int(self.config.get("max_cart_retries", 3))
+
+        for attempt in range(1, max_retries + 1):
+            if self.should_stop:
+                return False, "Tiến trình bị dừng"
+
+            if attempt > 1:
+                self.log(f"🔄 Đang thử lại Lệnh Thêm Giỏ Hàng (Lần {attempt}/{max_retries})...", "warning")
+
+            success, res_or_err = await self._run_single_addtocart(client, bot_entity, cmd_text)
+            if success:
+                return True, res_or_err
+
+            # Nếu phiên bị lỗi: đợi 8s để chạy lại theo yêu cầu
+            if attempt < max_retries and not self.should_stop:
+                self.log(f"⚠️ Phiên thêm giỏ bị lỗi: '{res_or_err}'. Đang đợi 8 giây để chạy lại...", "warning")
+                # Gửi /stop để dọn dẹp nếu bot đang kẹt phiên dở
+                try:
+                    await client.send_message(bot_entity, "/stop")
+                except Exception:
+                    pass
+                await asyncio.sleep(8)
+
+        return False, f"Thêm giỏ thất bại sau {max_retries} lần thử"
+
+    async def _run_single_addtocart(self, client, bot_entity, cmd_text):
+        """Chạy một chu trình thêm giỏ hàng và xử lý quét nút phân loại"""
         timeout = int(self.config.get("timeout_step", 50))
+        target_variant = self.config.get("product_variant", "").strip()
+
         last_sent = await client.send_message(bot_entity, cmd_text)
         start_time = time.time()
+        handled_btn_ids = set()
 
         while time.time() - start_time < timeout:
             if self.should_stop:
@@ -458,29 +541,53 @@ class DangKyShopeeManager:
 
             messages = await client.get_messages(bot_entity, limit=4)
             for m in messages:
-                if not m.out and m.id > last_sent.id:
-                    txt = m.text or ""
-                    if "KẾT QUẢ THÊM GIỎ" in txt:
-                        # Kiểm tra xem có Thành công: X với X > 0 không
-                        success_match = re.search(r'Thành công:\s*\*?(\d+)\*?', txt, re.IGNORECASE)
-                        fail_match = re.search(r'Lỗi:\s*\*?(\d+)\*?', txt, re.IGNORECASE)
-                        s_count = int(success_match.group(1)) if success_match else 0
-                        f_count = int(fail_match.group(1)) if fail_match else 0
+                if m.out:
+                    continue
 
-                        if s_count > 0:
-                            # Trích xuất tên sản phẩm
-                            lines = [ln.strip() for ln in txt.split("\n") if "x1" in ln or "x2" in ln or "x3" in ln]
-                            item_name = lines[0] if lines else f"Thành công {s_count} món"
-                            return True, item_name
+                txt = m.text or ""
+
+                # 1. Kiểm tra nếu đã có kết quả thêm giỏ
+                if "KẾT QUẢ THÊM GIỎ" in txt:
+                    success_match = re.search(r'Thành công:\s*\*?(\d+)\*?', txt, re.IGNORECASE)
+                    fail_match = re.search(r'Lỗi:\s*\*?(\d+)\*?', txt, re.IGNORECASE)
+                    s_count = int(success_match.group(1)) if success_match else 0
+                    f_count = int(fail_match.group(1)) if fail_match else 0
+
+                    if s_count > 0:
+                        lines = [ln.strip() for ln in txt.split("\n") if "x1" in ln or "x2" in ln or "x3" in ln]
+                        item_name = lines[0] if lines else f"Thành công {s_count} món"
+                        return True, item_name
+                    else:
+                        return False, f"Thêm giỏ báo lỗi (Thành công: {s_count}, Lỗi: {f_count})"
+
+                # 2. Kiểm tra nếu bot báo lỗi
+                if "❌ Lỗi:" in txt or "Không đăng nhập được" in txt or "Cookie đăng nhập đã hết hạn" in txt:
+                    return False, txt.split("\n")[0]
+
+                if "Bạn đang có phiên chạy dở" in txt:
+                    return False, "Kẹt phiên chạy dở"
+
+                # 3. Quét các nút phân loại sản phẩm nếu có
+                if m.buttons and m.id not in handled_btn_ids and "KẾT QUẢ THÊM GIỎ" not in txt:
+                    btn, match_type = self._find_best_variant_button(m.buttons, target_variant)
+                    if btn:
+                        handled_btn_ids.add(m.id)
+                        if match_type in ["MATCH_EXACT", "MATCH_SIMILAR"]:
+                            self.log(f"🛒 Quét thấy phân loại khớp '{target_variant}': Bấm chọn '{btn.text}'...", "info")
                         else:
-                            return False, f"Thêm giỏ thất bại (Thành công: {s_count}, Lỗi: {f_count})"
+                            self.log(f"🎲 Không thấy phân loại trùng khớp, tự động chọn ngẫu nhiên ô: '{btn.text}' (Không chọn Hủy)...", "info")
 
-                    if "❌ Lỗi:" in txt or "Không đăng nhập được" in txt:
-                        return False, txt.split("\n")[0]
+                        try:
+                            await btn.click()
+                        except Exception as _b_err:
+                            self.log(f"⚠️ Lỗi bấm nút phân loại: {_b_err}", "warning")
 
-            await asyncio.sleep(2)
+                        await asyncio.sleep(2)
+                        break
 
-        return False, f"Hết thời gian chờ phản hồi ({timeout}s)"
+            await asyncio.sleep(1.5)
+
+        return False, f"Hết thời gian chờ phản hồi thêm giỏ ({timeout}s)"
 
     # -------------------------------------------------------------------------
     # BỘ XỬ LÝ LỆNH 3: /diachi hoặc /addressnew (WIZARD TOÀN DIỆN)

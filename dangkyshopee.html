@@ -592,6 +592,18 @@
                     <input type="text" id="productLink" placeholder="Ví dụ: https://s.shopee.vn/2VsIx1Npqi hoặc vn.shp.ee/...">
                 </div>
 
+                <!-- Phân loại / Mẫu mong muốn -->
+                <div class="form-group">
+                    <label for="productVariant">
+                        <i class="fa-solid fa-shapes" style="color: #06B6D4;"></i> Phân Loại / Mẫu Mong Muốn (Tùy chọn)
+                    </label>
+                    <input type="text" id="productVariant" placeholder="Ví dụ: Trắng, Size L, 500g (Để trống sẽ tự động Random)">
+                    <div style="font-size: 11px; color: var(--text-muted); display: flex; align-items: center; gap: 5px;">
+                        <i class="fa-solid fa-wand-magic-sparkles" style="color: var(--cyan);"></i>
+                        <span>Quét chọn ô trùng/gần nhất. Không thấy sẽ <b>Random ô sản phẩm</b> (không bấm Hủy). Lỗi tự đợi 8s thử lại.</span>
+                    </div>
+                </div>
+
                 <!-- Lệnh 2: Chọn loại lệnh địa chỉ -->
                 <div class="form-group">
                     <label for="addressCommand">
@@ -942,6 +954,7 @@
 
         const config = {
             product_link: productLink,
+            product_variant: document.getElementById('productVariant') ? document.getElementById('productVariant').value.trim() : '',
             use_mailfree: document.getElementById('useMailfree') ? document.getElementById('useMailfree').checked : false,
             address_command: document.getElementById('addressCommand').value,
             address_area: document.getElementById('addressArea').value.trim(),
