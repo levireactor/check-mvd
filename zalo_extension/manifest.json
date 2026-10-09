@@ -1,0 +1,35 @@
+{
+  "manifest_version": 3,
+  "name": "Zalo Order Filter Bot - Lọc Đơn Hàng & Tag Khách Hàng",
+  "version": "1.0.0",
+  "description": "Tự động lọc và bóc tách thông tin đơn hàng từ tin nhắn Zalo Web theo Thẻ Tag khách hàng (Tên, SĐT thật, Link SP, Voucher, Địa chỉ cũ/mới).",
+  "permissions": [
+    "storage",
+    "activeTab",
+    "scripting",
+    "tabs"
+  ],
+  "host_permissions": [
+    "https://chat.zalo.me/*",
+    "https://generativelanguage.googleapis.com/*",
+    "https://shopee-tracker-pro-b1v8.onrender.com/*",
+    "https://*.onrender.com/*",
+    "http://localhost:8080/*",
+    "http://127.0.0.1:8080/*"
+  ],
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "Zalo Order Filter Bot"
+  },
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": ["https://chat.zalo.me/*"],
+      "js": ["parser.js", "content.js"],
+      "css": ["floating_ui.css"],
+      "run_at": "document_end"
+    }
+  ]
+}

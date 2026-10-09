@@ -1,0 +1,249 @@
+/* Floating UI Style cho Bot Zalo trên chat.zalo.me */
+#zalo-bot-float-container {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  z-index: 999999;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+#zalo-bot-float-btn {
+  background: linear-gradient(135deg, #0068ff 0%, #004ecc 100%);
+  color: #ffffff;
+  border: none;
+  border-radius: 50px;
+  padding: 10px 18px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: 0 4px 16px rgba(0, 104, 255, 0.4);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  transition: all 0.2s ease;
+}
+
+#zalo-bot-float-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(0, 104, 255, 0.55);
+}
+
+#zalo-bot-mvd-btn {
+  background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+  color: #ffffff;
+  border: none;
+  border-radius: 50px;
+  padding: 10px 18px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: 0 4px 16px rgba(217, 119, 6, 0.4);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  transition: all 0.2s ease;
+}
+
+#zalo-bot-mvd-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(217, 119, 6, 0.55);
+}
+
+#zalo-bot-modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background: rgba(0, 0, 0, 0.45);
+  backdrop-filter: blur(4px);
+  z-index: 1000000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.zalo-bot-modal {
+  background: #ffffff;
+  width: 90%;
+  max-width: 650px;
+  border-radius: 16px;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.2);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  animation: zaloBotFadeIn 0.25s ease-out;
+}
+
+@keyframes zaloBotFadeIn {
+  from { opacity: 0; transform: scale(0.95); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+.zalo-bot-modal-header {
+  background: #0068ff;
+  color: white;
+  padding: 16px 20px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.zalo-bot-modal-header h3 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.zalo-bot-close-btn {
+  background: none;
+  border: none;
+  color: white;
+  font-size: 20px;
+  cursor: pointer;
+  line-height: 1;
+}
+
+.zalo-bot-modal-body {
+  padding: 20px;
+  max-height: 70vh;
+  overflow-y: auto;
+}
+
+.zalo-bot-field-group {
+  margin-bottom: 14px;
+}
+
+.zalo-bot-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: #64748b;
+  text-transform: uppercase;
+  margin-bottom: 4px;
+  display: block;
+}
+
+.zalo-bot-value {
+  font-size: 14px;
+  color: #1e293b;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 10px 12px;
+  word-break: break-all;
+}
+
+.zalo-bot-value.highlight {
+  background: #ecfdf5;
+  border-color: #a7f3d0;
+  color: #065f46;
+  font-weight: 600;
+}
+
+.zalo-bot-modal-footer {
+  padding: 14px 20px;
+  background: #f8fafc;
+  border-top: 1px solid #e2e8f0;
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.zalo-bot-btn {
+  padding: 9px 16px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  border: none;
+  transition: all 0.15s;
+}
+
+.zalo-bot-btn-copy {
+  background: #0068ff;
+  color: white;
+}
+
+.zalo-bot-btn-copy:hover {
+  background: #0056d6;
+}
+
+.zalo-bot-btn-close {
+  background: #e2e8f0;
+  color: #475569;
+}
+
+/* Toast Notification trên Zalo Web */
+#zalo-bot-toast-container {
+  position: fixed;
+  top: 20px;
+  right: 24px;
+  z-index: 1000001;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  pointer-events: none;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+}
+
+.zalo-bot-toast {
+  pointer-events: auto;
+  background: #ffffff;
+  border-left: 4px solid #10b981;
+  border-radius: 8px;
+  padding: 12px 16px;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.15);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 13px;
+  color: #0f172a;
+  min-width: 280px;
+  max-width: 400px;
+  animation: zaloBotSlideIn 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  transition: all 0.25s ease;
+}
+
+.zalo-bot-toast.info {
+  border-left-color: #0068ff;
+}
+
+.zalo-bot-toast.warning {
+  border-left-color: #f59e0b;
+}
+
+.zalo-bot-toast-icon {
+  font-size: 18px;
+  flex-shrink: 0;
+}
+
+.zalo-bot-toast-content {
+  flex: 1;
+}
+
+.zalo-bot-toast-title {
+  font-weight: 700;
+  font-size: 12px;
+  color: #1e293b;
+  margin-bottom: 2px;
+}
+
+.zalo-bot-toast-msg {
+  font-size: 12px;
+  color: #475569;
+}
+
+@keyframes zaloBotSlideIn {
+  from {
+    opacity: 0;
+    transform: translateX(40px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+

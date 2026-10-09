@@ -1,0 +1,1071 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Điều Phối @dangkyshopee_bot — 3 Lệnh Tự Động Tuần Tự</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&family=Outfit:wght@500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        :root {
+            --bg-base: #0B0F19;
+            --bg-surface: #111827;
+            --bg-card: rgba(17, 24, 39, 0.78);
+            --bg-card-hover: rgba(31, 41, 55, 0.9);
+            --border-color: rgba(255, 255, 255, 0.08);
+            --border-glow: rgba(99, 102, 241, 0.35);
+            --primary: #6366F1;
+            --primary-hover: #4F46E5;
+            --primary-glow: rgba(99, 102, 241, 0.4);
+            --success: #10B981;
+            --success-glow: rgba(16, 185, 129, 0.3);
+            --warning: #F59E0B;
+            --danger: #EF4444;
+            --cyan: #06B6D4;
+            --text-main: #F3F4F6;
+            --text-muted: #9CA3AF;
+            --text-sub: #6B7280;
+            --font-heading: 'Outfit', sans-serif;
+            --font-body: 'Inter', sans-serif;
+            --font-mono: 'JetBrains Mono', monospace;
+            --radius-sm: 8px;
+            --radius-md: 14px;
+            --radius-lg: 20px;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            background-color: var(--bg-base);
+            background-image: 
+                radial-gradient(at 0% 0%, rgba(99, 102, 241, 0.14) 0px, transparent 50%),
+                radial-gradient(at 100% 100%, rgba(6, 182, 212, 0.12) 0px, transparent 50%),
+                radial-gradient(at 50% 50%, rgba(16, 185, 129, 0.06) 0px, transparent 50%);
+            background-attachment: fixed;
+            color: var(--text-main);
+            font-family: var(--font-body);
+            line-height: 1.5;
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .app-container {
+            max-width: 1440px;
+            margin: 0 auto;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        /* Top Header */
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 16px 24px;
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius-lg);
+            backdrop-filter: blur(16px);
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+        }
+
+        .brand-box {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+        }
+
+        .brand-icon {
+            width: 48px;
+            height: 48px;
+            border-radius: 12px;
+            background: linear-gradient(135deg, #6366F1, #06B6D4);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 22px;
+            color: #fff;
+            box-shadow: 0 4px 16px rgba(99, 102, 241, 0.4);
+        }
+
+        .brand-text h1 {
+            font-family: var(--font-heading);
+            font-size: 20px;
+            font-weight: 700;
+            background: linear-gradient(90deg, #FFFFFF, #C7D2FE);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .brand-text p {
+            font-size: 13px;
+            color: var(--text-muted);
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .nav-links {
+            display: flex;
+            gap: 10px;
+        }
+
+        .nav-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 14px;
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius-sm);
+            color: var(--text-main);
+            text-decoration: none;
+            font-size: 13px;
+            font-weight: 500;
+            transition: all 0.2s;
+        }
+
+        .nav-btn:hover {
+            background: rgba(255, 255, 255, 0.1);
+            border-color: rgba(255, 255, 255, 0.2);
+            transform: translateY(-1px);
+        }
+
+        /* KPI Cards Grid */
+        .kpi-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 16px;
+        }
+
+        .kpi-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius-md);
+            padding: 16px 20px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            backdrop-filter: blur(12px);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .kpi-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 4px;
+            height: 100%;
+        }
+
+        .kpi-card.blue::before { background: var(--primary); }
+        .kpi-card.green::before { background: var(--success); }
+        .kpi-card.red::before { background: var(--danger); }
+        .kpi-card.cyan::before { background: var(--cyan); }
+
+        .kpi-info h3 {
+            font-size: 12px;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            font-weight: 600;
+            letter-spacing: 0.5px;
+            margin-bottom: 4px;
+        }
+
+        .kpi-val {
+            font-family: var(--font-heading);
+            font-size: 26px;
+            font-weight: 700;
+            color: #fff;
+        }
+
+        .kpi-icon {
+            font-size: 26px;
+            opacity: 0.8;
+        }
+
+        /* Main Workspace Grid */
+        .workspace-grid {
+            display: grid;
+            grid-template-columns: 480px 1fr;
+            gap: 20px;
+        }
+
+        .card {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius-lg);
+            padding: 20px;
+            backdrop-filter: blur(14px);
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+
+        .card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding-bottom: 12px;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .card-title {
+            font-family: var(--font-heading);
+            font-size: 16px;
+            font-weight: 700;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            color: #fff;
+        }
+
+        .card-title i {
+            color: var(--primary);
+        }
+
+        /* Form elements */
+        .form-group {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        label {
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--text-muted);
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .badge-step {
+            display: inline-block;
+            padding: 2px 7px;
+            font-size: 10px;
+            font-weight: 700;
+            border-radius: 4px;
+            background: rgba(99, 102, 241, 0.2);
+            color: #A5B4FC;
+            border: 1px solid rgba(99, 102, 241, 0.4);
+        }
+
+        input[type="text"], input[type="number"], select, textarea {
+            width: 100%;
+            background: rgba(0, 0, 0, 0.35);
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius-sm);
+            padding: 10px 14px;
+            color: var(--text-main);
+            font-family: var(--font-body);
+            font-size: 13px;
+            transition: all 0.2s;
+        }
+
+        input:focus, select:focus, textarea:focus {
+            outline: none;
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.25);
+            background: rgba(0, 0, 0, 0.5);
+        }
+
+        textarea {
+            resize: vertical;
+            font-family: var(--font-mono);
+            font-size: 12px;
+            line-height: 1.4;
+        }
+
+        /* Tabs */
+        .tab-bar {
+            display: flex;
+            gap: 8px;
+            background: rgba(0, 0, 0, 0.25);
+            padding: 4px;
+            border-radius: var(--radius-sm);
+            border: 1px solid var(--border-color);
+        }
+
+        .tab-btn {
+            flex: 1;
+            padding: 6px 12px;
+            border-radius: 6px;
+            border: none;
+            background: transparent;
+            color: var(--text-muted);
+            font-size: 12px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+        }
+
+        .tab-btn.active {
+            background: var(--primary);
+            color: #fff;
+            box-shadow: 0 2px 8px rgba(99, 102, 241, 0.4);
+        }
+
+        .tab-pane {
+            display: none;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .tab-pane.active {
+            display: flex;
+        }
+
+        /* Buttons */
+        .btn-row {
+            display: flex;
+            gap: 10px;
+        }
+
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            padding: 11px 18px;
+            border-radius: var(--radius-sm);
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            border: none;
+            transition: all 0.2s;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #6366F1, #4F46E5);
+            color: #fff;
+            box-shadow: 0 4px 14px rgba(99, 102, 241, 0.4);
+            flex: 2;
+        }
+
+        .btn-primary:hover:not(:disabled) {
+            background: linear-gradient(135deg, #4F46E5, #4338CA);
+            transform: translateY(-1px);
+        }
+
+        .btn-danger {
+            background: linear-gradient(135deg, #EF4444, #DC2626);
+            color: #fff;
+            box-shadow: 0 4px 14px rgba(239, 68, 68, 0.3);
+            flex: 1;
+        }
+
+        .btn-danger:hover:not(:disabled) {
+            background: #DC2626;
+            transform: translateY(-1px);
+        }
+
+        .btn-secondary {
+            background: rgba(255, 255, 255, 0.08);
+            color: var(--text-main);
+            border: 1px solid var(--border-color);
+        }
+
+        .btn-secondary:hover {
+            background: rgba(255, 255, 255, 0.15);
+        }
+
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none !important;
+            box-shadow: none !important;
+        }
+
+        /* Table & Queue */
+        .table-wrap {
+            max-height: 290px;
+            overflow-y: auto;
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius-sm);
+            background: rgba(0, 0, 0, 0.25);
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 12px;
+            text-align: left;
+        }
+
+        thead {
+            background: rgba(17, 24, 39, 0.95);
+            position: sticky;
+            top: 0;
+            z-index: 5;
+        }
+
+        th, td {
+            padding: 10px 12px;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        th {
+            font-weight: 600;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            font-size: 11px;
+            letter-spacing: 0.5px;
+        }
+
+        tbody tr:hover {
+            background: rgba(255, 255, 255, 0.03);
+        }
+
+        .status-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            padding: 3px 8px;
+            border-radius: 999px;
+            font-size: 11px;
+            font-weight: 600;
+        }
+
+        .status-pending { background: rgba(156, 163, 175, 0.15); color: #9CA3AF; }
+        .status-running { background: rgba(6, 182, 212, 0.2); color: #22D3EE; animation: pulse 1.5s infinite; }
+        .status-mailfree { background: rgba(168, 85, 247, 0.2); color: #C084FC; }
+        .status-addtocart { background: rgba(245, 158, 11, 0.2); color: #FBBF24; }
+        .status-diachi { background: rgba(59, 130, 246, 0.2); color: #60A5FA; }
+        .status-success { background: rgba(16, 185, 129, 0.2); color: #34D399; }
+        .status-failed { background: rgba(239, 68, 68, 0.2); color: #F87171; }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.6; }
+        }
+
+        /* Live Terminal */
+        .terminal-box {
+            background: #05070E;
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius-sm);
+            padding: 14px;
+            height: 290px;
+            overflow-y: auto;
+            font-family: var(--font-mono);
+            font-size: 12px;
+            line-height: 1.55;
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        .log-entry {
+            display: flex;
+            gap: 8px;
+            word-break: break-word;
+        }
+
+        .log-time {
+            color: #6B7280;
+            flex-shrink: 0;
+        }
+
+        .log-type-info { color: #E5E7EB; }
+        .log-type-success { color: #34D399; font-weight: 600; }
+        .log-type-warning { color: #FBBF24; }
+        .log-type-error { color: #F87171; font-weight: 600; }
+
+        /* Helpers & tooltips */
+        .tip-box {
+            background: rgba(99, 102, 241, 0.08);
+            border: 1px solid rgba(99, 102, 241, 0.2);
+            border-radius: var(--radius-sm);
+            padding: 10px 12px;
+            font-size: 12px;
+            color: #C7D2FE;
+            display: flex;
+            align-items: flex-start;
+            gap: 8px;
+        }
+
+        .tip-box i {
+            margin-top: 2px;
+            color: var(--primary);
+        }
+
+        /* Responsive */
+        @media (max-width: 1080px) {
+            .workspace-grid {
+                grid-template-columns: 1fr;
+            }
+            .kpi-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
+    </style>
+</head>
+<body>
+
+<div class="app-container">
+    <!-- Header -->
+    <header>
+        <div class="brand-box">
+            <div class="brand-icon">
+                <i class="fa-solid fa-robot"></i>
+            </div>
+            <div class="brand-text">
+                <h1>Auto Workflow @dangkyshopee_bot</h1>
+                <p><i class="fa-solid fa-shield-halved" style="color: #10B981;"></i> Tự động tuần tự 3 lệnh: /mailfree ➔ /addtocart ➔ /diachi</p>
+            </div>
+        </div>
+        <div class="nav-links">
+            <a href="index.html" class="nav-btn"><i class="fa-solid fa-table-list"></i> Bảng Đơn Hàng</a>
+            <a href="autoreg.html" class="nav-btn"><i class="fa-solid fa-user-plus"></i> Auto Reg Shopee</a>
+            <span id="tgAccountStatus" class="nav-btn" style="border-color: rgba(16, 185, 129, 0.4); background: rgba(16, 185, 129, 0.1); color: #34D399;">
+                <i class="fa-brands fa-telegram"></i> Telegram: Đang kiểm tra...
+            </span>
+        </div>
+    </header>
+
+    <!-- KPI Summary Cards -->
+    <div class="kpi-grid">
+        <div class="kpi-card blue">
+            <div class="kpi-info">
+                <h3>Tổng Nick Hàng Đợi</h3>
+                <div class="kpi-val" id="kpiTotal">0</div>
+            </div>
+            <div class="kpi-icon" style="color: var(--primary);"><i class="fa-solid fa-layer-group"></i></div>
+        </div>
+
+        <div class="kpi-card green">
+            <div class="kpi-info">
+                <h3>Thành Công (Xong 3 Bước)</h3>
+                <div class="kpi-val" id="kpiSuccess">0</div>
+            </div>
+            <div class="kpi-icon" style="color: var(--success);"><i class="fa-solid fa-circle-check"></i></div>
+        </div>
+
+        <div class="kpi-card red">
+            <div class="kpi-info">
+                <h3>Thất Bại / Lỗi</h3>
+                <div class="kpi-val" id="kpiFailed">0</div>
+            </div>
+            <div class="kpi-icon" style="color: var(--danger);"><i class="fa-solid fa-circle-xmark"></i></div>
+        </div>
+
+        <div class="kpi-card cyan">
+            <div class="kpi-info">
+                <h3>Tiến Trình Đang Chạy</h3>
+                <div class="kpi-val" id="kpiCurrent" style="font-size: 18px; word-break: break-all;">IDLE</div>
+            </div>
+            <div class="kpi-icon" style="color: var(--cyan);"><i class="fa-solid fa-spinner fa-spin-pulse" id="spinnerIcon" style="display: none;"></i></div>
+        </div>
+    </div>
+
+    <!-- Main Workspace -->
+    <div class="workspace-grid">
+        <!-- LEFT COLUMN: CONFIG & QUEUE -->
+        <div style="display: flex; flex-direction: column; gap: 20px;">
+            <!-- CARD 1: CẤU HÌNH LỆNH & SẢN PHẨM -->
+            <div class="card">
+                <div class="card-header">
+                    <div class="card-title"><i class="fa-solid fa-sliders"></i> Cấu Hình Lệnh Bot</div>
+                    <span class="badge-step">3 Bước Tuần Tự</span>
+                </div>
+
+                <!-- Lệnh 2: Link sản phẩm -->
+                <div class="form-group">
+                    <label for="productLink">
+                        <span class="badge-step">Bước 2</span> Link Sản Phẩm (/addtocart)
+                    </label>
+                    <input type="text" id="productLink" placeholder="Ví dụ: https://s.shopee.vn/2VsIx1Npqi hoặc vn.shp.ee/...">
+                </div>
+
+                <!-- Lệnh 3: Chọn loại lệnh địa chỉ -->
+                <div class="form-group">
+                    <label for="addressCommand">
+                        <span class="badge-step">Bước 3</span> Lệnh Thêm Địa Chỉ
+                    </label>
+                    <select id="addressCommand">
+                        <option value="/diachi" selected>/diachi (Mặc định)</option>
+                        <option value="/addressnew">/addressnew (Tạo mới nâng cao)</option>
+                    </select>
+                </div>
+            </div>
+
+            <!-- CARD 2: CẤU HÌNH ĐỊA CHỈ (LỰA CHỌN 2 & 3) -->
+            <div class="card">
+                <div class="card-header">
+                    <div class="card-title"><i class="fa-solid fa-location-dot"></i> Dữ Liệu Địa Chỉ Cho Bot</div>
+                </div>
+
+                <!-- Tab bar -->
+                <div class="tab-bar">
+                    <button class="tab-btn active" id="tabBtnSmart" onclick="switchTab('smart')">
+                        <i class="fa-solid fa-wand-magic-sparkles"></i> Dán Tự Tách (Lựa chọn 2)
+                    </button>
+                    <button class="tab-btn" id="tabBtnManual" onclick="switchTab('manual')">
+                        <i class="fa-solid fa-pen-to-square"></i> Ô Nhập Riêng (Lựa chọn 3)
+                    </button>
+                </div>
+
+                <!-- TAB PANE SMART PARSER -->
+                <div class="tab-pane active" id="paneSmart">
+                    <div class="form-group">
+                        <label>Dán chuỗi địa chỉ bất kỳ để tự động bóc tách:</label>
+                        <textarea id="smartAddressInput" rows="2" placeholder="Ví dụ: Lê Anh Phương, 222 Tôn Đức Thắng, Phường Ô Chợ Dừa, Quận Đống Đa, Hà Nội"></textarea>
+                    </div>
+                    <button type="button" class="btn btn-secondary" onclick="doSmartParse()" style="padding: 6px 12px; font-size: 12px; align-self: flex-start;">
+                        <i class="fa-solid fa-bolt"></i> Bóc tách & Áp dụng ngay
+                    </button>
+                </div>
+
+                <!-- TAB PANE MANUAL -->
+                <div class="tab-pane" id="paneManual">
+                    <div class="tip-box">
+                        <i class="fa-solid fa-circle-info"></i>
+                        <span>Các giá trị này sẽ được gửi tự động vào từng bước hỏi của bot.</span>
+                    </div>
+                </div>
+
+                <!-- Các trường chi tiết hiển thị chung -->
+                <div class="form-group">
+                    <label>B1. Khu Vực (Phường/Xã/Quận/Tỉnh):</label>
+                    <input type="text" id="addressArea" placeholder="Ví dụ: Phường Tràng Tiền, Quận Hoàn Kiếm, Hà Nội" value="Phường Tràng Tiền, Quận Hoàn Kiếm, Hà Nội">
+                </div>
+
+                <div class="form-group">
+                    <label>B2. Tên Người Nhận:</label>
+                    <input type="text" id="addressName" placeholder="Ví dụ: Nguyễn Văn Trung" value="Nguyễn Văn Trung">
+                </div>
+
+                <div class="form-group">
+                    <label>B3. Chế Độ Số Điện Thoại:</label>
+                    <select id="phoneMode" onchange="toggleCustomPhone()">
+                        <option value="auto" selected>Tự động: Lấy SĐT Acc nếu có, không có thì Random [Khuyên dùng]</option>
+                        <option value="random">Luôn Random 1 SĐT hợp lệ (Đầu 09/08/03/07)</option>
+                        <option value="custom">Sử dụng Số Điện Thoại cố định dưới đây</option>
+                    </select>
+                </div>
+
+                <div class="form-group" id="customPhoneGroup" style="display: none;">
+                    <label>Số Điện Thoại Cố Định:</label>
+                    <input type="text" id="customPhone" placeholder="Ví dụ: 0987654321">
+                </div>
+
+                <div class="form-group">
+                    <label>B4. Địa Chỉ Chi Tiết (Số nhà, tên đường):</label>
+                    <input type="text" id="addressStreet" placeholder="Ví dụ: 12 Tràng Tiền" value="12 Tràng Tiền">
+                </div>
+            </div>
+
+            <!-- CARD 3: DANH SÁCH NICK -->
+            <div class="card">
+                <div class="card-header">
+                    <div class="card-title"><i class="fa-solid fa-users"></i> Danh Sách Nick Cần Xử Lý</div>
+                    <span id="lineCountBadge" class="badge-step">0 dòng</span>
+                </div>
+
+                <div class="form-group">
+                    <label for="nicksInput">Dán danh sách nick (Mỗi dòng 1 nick: SPC_ST=... hoặc user|pass):</label>
+                    <textarea id="nicksInput" rows="7" placeholder="SPC_ST=u6rZEuyDylF2XLJWtmHzBIBV4XthJjnoq4BCrlFl2uIFhRY0hwpbI5riHgAuNQQq...&#10;user2|pass2&#10;user3|pass3|spcf3" oninput="updateLineCount()"></textarea>
+                </div>
+
+                <div style="display: flex; gap: 10px; align-items: center;">
+                    <div class="form-group" style="flex: 1;">
+                        <label>Delay giữa các nick (giây):</label>
+                        <input type="number" id="delayBetween" value="6" min="2" max="60">
+                    </div>
+                    <div class="form-group" style="flex: 1;">
+                        <label>Timeout mỗi bước (giây):</label>
+                        <input type="number" id="timeoutStep" value="50" min="20" max="180">
+                    </div>
+                </div>
+
+                <div class="btn-row">
+                    <button id="btnStart" class="btn btn-primary" onclick="startWorkflow()">
+                        <i class="fa-solid fa-play"></i> Bắt Đầu Chạy
+                    </button>
+                    <button id="btnStop" class="btn btn-danger" onclick="stopWorkflow()" disabled>
+                        <i class="fa-solid fa-stop"></i> Dừng
+                    </button>
+                    <button class="btn btn-secondary" onclick="clearQueue()" title="Xóa danh sách hàng đợi">
+                        <i class="fa-solid fa-trash-can"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- RIGHT COLUMN: LIVE PROGRESS & REALTIME TERMINAL -->
+        <div style="display: flex; flex-direction: column; gap: 20px;">
+            <!-- CARD 4: BẢNG TIẾN ĐỘ TỪNG NICK -->
+            <div class="card">
+                <div class="card-header">
+                    <div class="card-title"><i class="fa-solid fa-list-check"></i> Hàng Đợi & Tiến Độ Chi Tiết</div>
+                    <div style="display: flex; gap: 8px;">
+                        <button class="nav-btn" onclick="exportQueueCsv()"><i class="fa-solid fa-file-csv"></i> Xuất CSV</button>
+                    </div>
+                </div>
+
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th style="width: 50px;">STT</th>
+                                <th>Tài Khoản / Cookie</th>
+                                <th style="width: 140px;">Trạng Thái</th>
+                                <th>Chi Tiết Hoàn Thành</th>
+                                <th style="width: 80px;">Thời Gian</th>
+                            </tr>
+                        </thead>
+                        <tbody id="queueTableBody">
+                            <tr>
+                                <td colspan="5" style="text-align: center; color: var(--text-muted); padding: 30px;">
+                                    Chưa có nick trong hàng đợi. Vui lòng dán danh sách nick và bấm [Bắt Đầu Chạy].
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- CARD 5: LIVE TERMINAL LOG -->
+            <div class="card">
+                <div class="card-header">
+                    <div class="card-title">
+                        <i class="fa-solid fa-terminal"></i> Nhật Ký Tương Tác Bot Telegram (Real-time)
+                    </div>
+                    <div style="display: flex; gap: 8px;">
+                        <button class="nav-btn" onclick="clearLogs()"><i class="fa-solid fa-eraser"></i> Xóa Log</button>
+                    </div>
+                </div>
+
+                <div class="terminal-box" id="terminalBox">
+                    <div class="log-entry log-type-info">
+                        <span class="log-time">[Sẵn sàng]</span>
+                        <span>Hệ thống điều phối @dangkyshopee_bot đã khởi tạo. Chờ lệnh bắt đầu...</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    let isRunning = false;
+    let pollInterval = null;
+
+    // Chuyển tab cấu hình địa chỉ
+    function switchTab(type) {
+        document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+        document.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('active'));
+
+        if (type === 'smart') {
+            document.getElementById('tabBtnSmart').classList.add('active');
+            document.getElementById('paneSmart').classList.add('active');
+        } else {
+            document.getElementById('tabBtnManual').classList.add('active');
+            document.getElementById('paneManual').classList.add('active');
+        }
+    }
+
+    function toggleCustomPhone() {
+        const mode = document.getElementById('phoneMode').value;
+        const group = document.getElementById('customPhoneGroup');
+        group.style.display = (mode === 'custom') ? 'flex' : 'none';
+    }
+
+    function updateLineCount() {
+        const text = document.getElementById('nicksInput').value;
+        const lines = text.split('\n').filter(l => l.trim().length > 0);
+        document.getElementById('lineCountBadge').innerText = `${lines.length} dòng`;
+    }
+
+    // Bóc tách thông minh chuỗi địa chỉ
+    async function doSmartParse() {
+        const raw = document.getElementById('smartAddressInput').value.trim();
+        if (!raw) {
+            alert('Vui lòng nhập chuỗi địa chỉ cần bóc tách!');
+            return;
+        }
+
+        try {
+            const res = await fetch('/api/bot-dks/parse-address', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ text: raw })
+            });
+            const data = await res.json();
+            if (data.success && data.data) {
+                const p = data.data;
+                if (p.name) document.getElementById('addressName').value = p.name;
+                if (p.area) document.getElementById('addressArea').value = p.area;
+                if (p.street) document.getElementById('addressStreet').value = p.street;
+                if (p.phone) {
+                    document.getElementById('phoneMode').value = 'custom';
+                    document.getElementById('customPhone').value = p.phone;
+                    toggleCustomPhone();
+                }
+                alert(`✅ Đã bóc tách thành công!\n• Tên: ${p.name || '(trống)'}\n• Khu vực: ${p.area || '(trống)'}\n• Chi tiết: ${p.street || '(trống)'}`);
+            }
+        } catch (e) {
+            alert('Lỗi khi bóc tách địa chỉ: ' + e);
+        }
+    }
+
+    // Cập nhật trạng thái và nhật ký từ server
+    async function fetchStatus() {
+        try {
+            const res = await fetch('/api/bot-dks/status');
+            const data = await res.json();
+            if (!data.success) return;
+
+            const st = data.data;
+            isRunning = st.is_running;
+
+            // Nút bấm
+            document.getElementById('btnStart').disabled = isRunning;
+            document.getElementById('btnStop').disabled = !isRunning;
+            document.getElementById('spinnerIcon').style.display = isRunning ? 'inline-block' : 'none';
+
+            // KPI
+            document.getElementById('kpiTotal').innerText = st.stats.total || 0;
+            document.getElementById('kpiSuccess').innerText = st.stats.success || 0;
+            document.getElementById('kpiFailed').innerText = st.stats.failed || 0;
+            document.getElementById('kpiCurrent').innerText = isRunning ? `${st.current_step}` : 'IDLE';
+
+            // Render Queue Table
+            renderQueue(st.queue || []);
+
+            // Render Logs
+            renderLogs(st.logs || []);
+        } catch (e) {
+            console.error('Lỗi fetchStatus:', e);
+        }
+    }
+
+    function renderQueue(queue) {
+        const tbody = document.getElementById('queueTableBody');
+        if (!queue || queue.length === 0) {
+            tbody.innerHTML = `<tr><td colspan="5" style="text-align: center; color: var(--text-muted); padding: 30px;">Hàng đợi trống.</td></tr>`;
+            return;
+        }
+
+        let html = '';
+        queue.forEach((item, idx) => {
+            let statusClass = `status-${item.status}`;
+            let statusLabel = item.status.toUpperCase();
+
+            if (item.status === 'mailfree') statusLabel = 'Mailfree ⏳';
+            else if (item.status === 'addtocart') statusLabel = 'Cart ⏳';
+            else if (item.status === 'diachi') statusLabel = 'Địa chỉ ⏳';
+            else if (item.status === 'success') statusLabel = 'Thành công ✅';
+            else if (item.status === 'failed') statusLabel = 'Lỗi ❌';
+
+            let details = [];
+            if (item.mail_info) details.push(`📧 ${item.mail_info}`);
+            if (item.cart_info) details.push(`🛒 ${item.cart_info}`);
+            if (item.address_info) details.push(`🏠 ${item.address_info}`);
+            if (item.error) details.push(`<span style="color: #F87171;">⚠️ ${item.error}</span>`);
+
+            html += `
+                <tr>
+                    <td>${idx + 1}</td>
+                    <td style="font-family: var(--font-mono); font-weight: 600;" title="${item.raw}">${item.display}</td>
+                    <td><span class="status-badge ${statusClass}">${statusLabel}</span></td>
+                    <td style="font-size: 11px;">${details.join(' | ') || item.step_detail}</td>
+                    <td style="color: var(--text-muted); font-size: 11px;">${item.updated_at || ''}</td>
+                </tr>
+            `;
+        });
+        tbody.innerHTML = html;
+    }
+
+    let lastLogCount = 0;
+    function renderLogs(logs) {
+        if (!logs) return;
+        const box = document.getElementById('terminalBox');
+        if (logs.length === lastLogCount) return;
+
+        lastLogCount = logs.length;
+        box.innerHTML = logs.map(l => `
+            <div class="log-entry log-type-${l.type}">
+                <span class="log-time">[${l.time}]</span>
+                <span>${escapeHtml(l.msg)}</span>
+            </div>
+        `).join('');
+
+        box.scrollTop = box.scrollHeight;
+    }
+
+    function escapeHtml(text) {
+        return text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+    }
+
+    // Bắt đầu chiến dịch
+    async function startWorkflow() {
+        const productLink = document.getElementById('productLink').value.trim();
+        if (!productLink) {
+            alert('Vui lòng nhập Link Sản Phẩm để bot thêm vào giỏ hàng!');
+            document.getElementById('productLink').focus();
+            return;
+        }
+
+        const nicksRaw = document.getElementById('nicksInput').value.split('\n')
+            .map(l => l.trim())
+            .filter(l => l.length > 0);
+
+        if (nicksRaw.length === 0) {
+            alert('Vui lòng dán danh sách nick vào ô nhập liệu!');
+            document.getElementById('nicksInput').focus();
+            return;
+        }
+
+        const config = {
+            product_link: productLink,
+            address_command: document.getElementById('addressCommand').value,
+            address_area: document.getElementById('addressArea').value.trim(),
+            address_name: document.getElementById('addressName').value.trim(),
+            address_street: document.getElementById('addressStreet').value.trim(),
+            phone_mode: document.getElementById('phoneMode').value,
+            custom_phone: document.getElementById('customPhone').value.trim(),
+            delay_between_nicks: parseInt(document.getElementById('delayBetween').value) || 6,
+            timeout_step: parseInt(document.getElementById('timeoutStep').value) || 50
+        };
+
+        try {
+            document.getElementById('btnStart').disabled = true;
+            const res = await fetch('/api/bot-dks/start', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ config, nicks: nicksRaw })
+            });
+            const data = await res.json();
+            if (data.success) {
+                alert('🚀 Đã khởi động chiến dịch thành công!');
+                fetchStatus();
+            } else {
+                alert('❌ Lỗi: ' + (data.error || 'Không thể khởi động'));
+                document.getElementById('btnStart').disabled = false;
+            }
+        } catch (e) {
+            alert('Lỗi kết nối máy chủ: ' + e);
+            document.getElementById('btnStart').disabled = false;
+        }
+    }
+
+    // Dừng tiến trình
+    async function stopWorkflow() {
+        if (!confirm('Bạn có chắc chắn muốn dừng tiến trình đang chạy?')) return;
+        try {
+            const res = await fetch('/api/bot-dks/stop', { method: 'POST' });
+            const data = await res.json();
+            if (data.success) {
+                alert('🛑 ' + data.message);
+                fetchStatus();
+            }
+        } catch (e) {
+            alert('Lỗi: ' + e);
+        }
+    }
+
+    // Xóa hàng đợi
+    async function clearQueue() {
+        if (!confirm('Bạn muốn xóa toàn bộ lịch sử hàng đợi này?')) return;
+        try {
+            const res = await fetch('/api/bot-dks/clear-queue', { method: 'POST' });
+            const data = await res.json();
+            if (data.success) {
+                fetchStatus();
+            } else {
+                alert(data.error);
+            }
+        } catch (e) {
+            alert('Lỗi: ' + e);
+        }
+    }
+
+    // Xóa nhật ký
+    async function clearLogs() {
+        try {
+            await fetch('/api/bot-dks/clear-logs', { method: 'POST' });
+            document.getElementById('terminalBox').innerHTML = '';
+            lastLogCount = 0;
+        } catch (e) {
+            console.error(e);
+        }
+    }
+
+    // Xuất CSV
+    async function exportQueueCsv() {
+        try {
+            const res = await fetch('/api/bot-dks/status');
+            const data = await res.json();
+            const queue = data.data.queue || [];
+            if (queue.length === 0) {
+                alert('Hàng đợi trống!');
+                return;
+            }
+
+            let csv = "STT,Nick,TrangThai,Mail,Cart,DiaChi,Loi,ThoiGian\n";
+            queue.forEach((it, i) => {
+                csv += `"${i+1}","${(it.raw||'').replace(/"/g, '""')}","${it.status}","${(it.mail_info||'').replace(/"/g, '""')}","${(it.cart_info||'').replace(/"/g, '""')}","${(it.address_info||'').replace(/"/g, '""')}","${(it.error||'').replace(/"/g, '""')}","${it.updated_at||''}"\n`;
+            });
+
+            const blob = new Blob(["\uFEFF" + csv], { type: 'text/csv;charset=utf-8;' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `dangkyshopee_export_${new Date().toISOString().slice(0, 10)}.csv`;
+            a.click();
+        } catch (e) {
+            alert('Lỗi xuất CSV: ' + e);
+        }
+    }
+
+    // Kiểm tra Telegram Auth
+    async function checkTelegramAuth() {
+        try {
+            const res = await fetch('/api/telegram/status');
+            const data = await res.json();
+            const badge = document.getElementById('tgAccountStatus');
+            if (data.success && data.data && data.data.connected) {
+                const info = data.data;
+                const name = info.first_name || info.username || 'Đã kết nối';
+                badge.innerHTML = `<i class="fa-brands fa-telegram"></i> Telegram: ${name} (${info.phone || 'Sẵn sàng'})`;
+                badge.style.borderColor = 'rgba(16, 185, 129, 0.4)';
+                badge.style.background = 'rgba(16, 185, 129, 0.1)';
+                badge.style.color = '#34D399';
+            } else {
+                badge.innerHTML = `<i class="fa-brands fa-telegram"></i> Telegram: Chưa đăng nhập!`;
+                badge.style.borderColor = 'rgba(239, 68, 68, 0.4)';
+                badge.style.background = 'rgba(239, 68, 68, 0.1)';
+                badge.style.color = '#F87171';
+            }
+        } catch (e) {
+            console.error('Lỗi check Telegram:', e);
+        }
+    }
+
+    // Khởi tạo
+    window.addEventListener('DOMContentLoaded', () => {
+        updateLineCount();
+        checkTelegramAuth();
+        fetchStatus();
+        pollInterval = setInterval(fetchStatus, 1500);
+    });
+</script>
+
+</body>
+</html>

@@ -2681,7 +2681,7 @@
         <div class="top-menu-item" onclick="openTelegramModal(); closeMenuDropdowns()">
           <span>🤖</span> <span>Cấu hình Telegram Bot</span>
         </div>
-        <div class="top-menu-item" onclick="openProxyModal(); closeMenuDropdowns()">
+        <div class="top-menu-item" onclick="openProxyModal('kiotproxy'); closeMenuDropdowns()">
           <span>🌐</span> <span>Cài đặt Proxy KiotProxy</span>
         </div>
         <div class="top-menu-divider"></div>
@@ -2698,6 +2698,9 @@
     </div>
 
     <!-- Nút Thao Tác Trọng Tâm -->
+    <a href="dangkyshopee.html" target="_blank" class="top-btn" style="background: linear-gradient(135deg, #06b6d4, #3b82f6); color: #fff; font-weight: 700; border: none; text-decoration: none; display: inline-flex; align-items: center; gap: 5px; box-shadow: 0 2px 8px rgba(6, 182, 212, 0.35);" title="Điều phối 3 lệnh tự động (@dangkyshopee_bot)">
+      <span>🤖</span> <span>Bot ĐK Shopee</span>
+    </a>
     <a href="autoreg.html" target="_blank" class="top-btn" style="background: linear-gradient(135deg, #6366f1, #8b5cf6); color: #fff; font-weight: 700; border: none; text-decoration: none; display: inline-flex; align-items: center; gap: 5px; box-shadow: 0 2px 8px rgba(99, 102, 241, 0.35);" title="Mở hệ thống tạo tài khoản Shopee tự động (CMSNPA + SFAST)">
       <span>⚡</span> <span>Auto Reg Shopee</span>
     </a>
@@ -3112,15 +3115,20 @@
             <div class="proxy-card">
               <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:7px">
                 <label style="font-weight:700;font-size:0.83rem">🔑 Key KiotProxy</label>
+                <span id="kp-badge-verified" style="display:none;font-size:0.72rem;padding:2px 8px;border-radius:10px;background:#d1fae5;color:#065f46;font-weight:700">Đã kết nối</span>
               </div>
               <div style="display:flex;gap:6px">
                 <div style="position:relative;flex:1">
                   <input type="password" id="input-proxy-key" class="proxy-input"
-                    placeholder="Dán mã key KiotProxy của bạn tại đây...">
+                    placeholder="Dán mã key KiotProxy của bạn tại đây..."
+                    oninput="handleKiotKeyInput(this.value)">
                   <button type="button" class="btn-eye-toggle" onclick="toggleProxyKeyVisibility()" title="Ẩn/Hiện key">👁️</button>
                 </div>
                 <button class="top-btn" onclick="pasteProxyKeyFromClipboard()" title="Dán từ Clipboard">📋 Dán</button>
+                <button class="top-btn" id="btn-check-kp-key" onclick="testKiotProxyKeyDirectly()"
+                  style="background:#059669;color:#fff;border-color:#047857;font-weight:600" title="Kiểm tra kết nối và nhận diện IP ngay">⚡ Kiểm tra Key</button>
               </div>
+              <div id="kp-key-status" style="display:none;font-size:0.75rem;margin-top:7px;padding:6px 10px;border-radius:6px;background:rgba(5,150,105,0.08);border:1px solid rgba(5,150,105,0.2)"></div>
             </div>
 
             <div class="proxy-card">
@@ -5975,15 +5983,89 @@
       if (inp) inp.type = inp.type === 'password' ? 'text' : 'password';
     }
 
+    function handleKiotKeyInput(val) {
+      const trimmed = (val || '').trim();
+      if (trimmed.length >= 8) {
+        const chk = $('chk-kp-enabled');
+        if (chk && !chk.checked) chk.checked = true;
+      }
+      const st = $('kp-key-status');
+      if (st) st.style.display = 'none';
+      const badge = $('kp-badge-verified');
+      if (badge) badge.style.display = 'none';
+    }
+
     async function pasteProxyKeyFromClipboard() {
       try {
         const text = await navigator.clipboard.readText();
         if (text) {
           $('input-proxy-key').value = text.trim();
+          handleKiotKeyInput(text.trim());
           showToast('Đã dán Key KiotProxy từ Clipboard!', '📋');
+          await testKiotProxyKeyDirectly();
         }
       } catch (e) {
         showToast('Không thể đọc Clipboard: ' + e.message, '⚠️');
+      }
+    }
+
+    async function testKiotProxyKeyDirectly() {
+      const key = ($('input-proxy-key').value || '').trim();
+      const statusEl = $('kp-key-status');
+      const badge = $('kp-badge-verified');
+      const btn = $('btn-check-kp-key');
+
+      if (!key) {
+        showToast('Vui lòng nhập mã Key KiotProxy trước!', '⚠️');
+        if (statusEl) {
+          statusEl.style.display = 'block';
+          statusEl.style.color = '#ef4444';
+          statusEl.innerHTML = '⚠️ Vui lòng dán mã Key KiotProxy vào ô trên.';
+        }
+        return;
+      }
+
+      if (btn) { btn.disabled = true; btn.textContent = '⏳ Đang kiểm tra...'; }
+      if (statusEl) {
+        statusEl.style.display = 'block';
+        statusEl.style.color = 'var(--text-muted)';
+        statusEl.innerHTML = '⏳ Đang kết nối xác thực Key với máy chủ KiotProxy...';
+      }
+
+      try {
+        const res = await fetch('/api/proxy/test-key', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ provider: 'kiotproxy', key: key })
+        });
+        const data = await res.json();
+
+        if (data.success) {
+          $('chk-kp-enabled').checked = true;
+          if (badge) badge.style.display = 'inline-block';
+          if (statusEl) {
+            statusEl.style.color = '#059669';
+            const pingTxt = data.latency_ms ? ` | Ping: <b>${data.latency_ms}ms</b>` : '';
+            statusEl.innerHTML = `✅ <b>Key hợp lệ!</b> IP: <b>${data.ip}</b> (${data.location || 'Việt Nam'})${pingTxt}`;
+          }
+          showToast(`Nhận diện KiotProxy thành công: ${data.ip}`, '✅');
+          await refreshProxyInfo('kiotproxy');
+        } else {
+          if (badge) badge.style.display = 'none';
+          if (statusEl) {
+            statusEl.style.color = '#ef4444';
+            statusEl.innerHTML = `❌ <b>Không nhận Key:</b> ${data.error || 'Key không hợp lệ hoặc đã hết hạn'}`;
+          }
+          showToast(`KiotProxy lỗi: ${data.error || 'Key không hợp lệ'}`, '❌');
+        }
+      } catch (e) {
+        if (statusEl) {
+          statusEl.style.color = '#ef4444';
+          statusEl.innerHTML = `❌ <b>Lỗi kết nối kiểm tra:</b> ${e.message}`;
+        }
+        showToast('Lỗi kiểm tra key: ' + e.message, '❌');
+      } finally {
+        if (btn) { btn.disabled = false; btn.textContent = '⚡ Kiểm tra Key'; }
       }
     }
 
@@ -5998,7 +6080,7 @@
         const prov = (info.provider === 'kiotproxy') ? 'KP' : 'VN';
         if (ip) {
           txt.textContent = `🛡️ ${prov}: ${ip}`;
-          btn.title = `Proxy Đang BẬT (${info.provider || 'ProxyVN'}) - IP: ${ip} (${info.current?.location || ''})`;
+          btn.title = `Proxy Đang BẬT (${info.provider || 'KiotProxy'}) - IP: ${ip} (${info.current?.location || ''})`;
         } else {
           txt.textContent = `🛡️ Proxy: BẬT`;
           btn.title = 'Proxy đang bật nhưng chưa có kết nối IP';
@@ -6010,9 +6092,9 @@
       }
     }
 
-    async function openProxyModal() {
+    async function openProxyModal(preferredTab) {
       $('modal-proxy').classList.add('show');
-      await refreshProxyInfo();
+      await refreshProxyInfo(preferredTab);
     }
 
     function closeProxyModal() {
@@ -6020,14 +6102,14 @@
       if (ttcCountdownTimer) clearInterval(ttcCountdownTimer);
     }
 
-    async function refreshProxyInfo() {
+    async function refreshProxyInfo(preferredTab) {
       try {
         const res = await fetch('/api/proxy/info');
         const info = await res.json();
         currentProxyData = info;
 
-        // Cập nhật tab phù hợp theo provider đang lưu
-        const prov = info.provider || 'proxyvn';
+        // Cập nhật tab phù hợp theo tham số hoặc provider đang lưu
+        const prov = preferredTab || info.provider || 'kiotproxy';
         switchProxyTab(prov);
 
         // Fill ProxyVN fields
@@ -6040,14 +6122,16 @@
         if (info.proxyvn_tinhthanh !== undefined) {
           $('pvn-tinhthanh').value = String(info.proxyvn_tinhthanh);
         }
-        $('chk-proxy-enabled').checked = Boolean(info.enabled && prov === 'proxyvn');
+        $('chk-proxy-enabled').checked = Boolean(info.enabled && (info.provider || 'kiotproxy') === 'proxyvn');
         $('chk-proxy-autorotate').checked = info.auto_rotate !== false;
 
         // Fill KiotProxy fields
         if (info.key_raw) {
           $('input-proxy-key').value = info.key_raw;
+          const badge = $('kp-badge-verified');
+          if (badge && info.has_key) badge.style.display = 'inline-block';
         }
-        $('chk-kp-enabled').checked = Boolean(info.enabled && prov === 'kiotproxy');
+        $('chk-kp-enabled').checked = Boolean(info.enabled && (info.provider || 'kiotproxy') === 'kiotproxy');
         $('chk-proxy-autorotate-kp').checked = info.auto_rotate !== false;
         if (info.region !== undefined) {
           $('select-proxy-region').value = info.region || '';
@@ -6069,26 +6153,54 @@
       const ttlEl = $('pi-ttl');
       const expEl = $('pi-expiration');
 
-      const isPvn = (info.provider || 'proxyvn') === 'proxyvn';
+      const isPvn = (info.provider || 'kiotproxy') === 'proxyvn';
       const p = info.current;
 
       if (p) {
-        pill.textContent = info.enabled ? '🟢 Đang hoạt động' : '⚪ Đã tắt';
+        pill.textContent = info.enabled ? '🟢 Đang hoạt động' : '⚪ Đã tắt (Sẵn sàng)';
         pill.className = 'proxy-status-pill ' + (info.enabled ? 'active' : '');
 
         const curIp = p.ip || p.realIpAddress || p.host || '--';
         ipEl.textContent = curIp;
-        if (nmEl) nmEl.textContent = p.nhamang || p.telecom || (isPvn ? info.proxyvn_nhamang : '--');
+        
+        let providerName = isPvn ? (p.nhamang || p.telecom || info.proxyvn_nhamang || 'ProxyVN') : 'KiotProxy';
+        if (nmEl) nmEl.textContent = providerName;
+        
         if (portEl) portEl.textContent = p.port ? `${p.port} (HTTP)` : (p.httpPort ? `${p.httpPort} (HTTP)` : '--');
-        if (locEl) locEl.textContent = p.location || p.region || (info.proxyvn_location || 'Việt Nam');
-        if (ttlEl) ttlEl.textContent = p.expire_at || (info.proxyvn_expire_s ? `${info.proxyvn_expire_s}s` : (p.ttl ? `${p.ttl}s` : '--'));
-        if (expEl) expEl.textContent = info.proxyvn_expire_at || p.expirationAt || '--';
+        if (locEl) locEl.textContent = p.location || p.region || (isPvn ? (info.proxyvn_location || 'Việt Nam') : 'Việt Nam');
+        
+        // Format TTL
+        let ttlStr = '--';
+        if (p.expire_at) {
+          ttlStr = p.expire_at;
+        } else if (info.proxyvn_expire_s) {
+          ttlStr = `${info.proxyvn_expire_s}s`;
+        } else if (p.ttl) {
+          ttlStr = `${p.ttl}s (${Math.round(p.ttl / 60)} phút)`;
+        } else if (p.ttc !== undefined) {
+          ttlStr = `${p.ttc}s (Đổi sau)`;
+        }
+        if (ttlEl) ttlEl.textContent = ttlStr;
+        
+        // Format expiration date
+        let expStr = '--';
+        if (info.proxyvn_expire_at) {
+          expStr = info.proxyvn_expire_at;
+        } else if (p.expirationAt) {
+          if (typeof p.expirationAt === 'number') {
+            const d = new Date(p.expirationAt);
+            expStr = `${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')} ${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}/${d.getFullYear()}`;
+          } else {
+            expStr = p.expirationAt;
+          }
+        }
+        if (expEl) expEl.textContent = expStr;
       } else {
         const hasKey = isPvn ? info.has_proxyvn_key : info.has_key;
         pill.textContent = hasKey ? '⚠️ Chưa nạp IP' : 'Chưa có Key';
         pill.className = 'proxy-status-pill ' + (hasKey ? 'error' : '');
         if (ipEl) ipEl.textContent = '--';
-        if (nmEl) nmEl.textContent = '--';
+        if (nmEl) nmEl.textContent = isPvn ? 'ProxyVN' : 'KiotProxy';
         if (portEl) portEl.textContent = '--';
         if (locEl) locEl.textContent = '--';
         if (ttlEl) ttlEl.textContent = '--';
@@ -6104,6 +6216,15 @@
       }
 
       const isPvn = currentProxyTab === 'proxyvn';
+      
+      // Tự động bật enabled nếu người dùng đã nhập key ở tab hiện tại
+      if (!isPvn && $('input-proxy-key').value.trim()) {
+        $('chk-kp-enabled').checked = true;
+      }
+      if (isPvn && $('input-proxyvn-key').value.trim()) {
+        $('chk-proxy-enabled').checked = true;
+      }
+
       const payload = {
         provider: currentProxyTab,
         enabled: isPvn ? $('chk-proxy-enabled').checked : $('chk-kp-enabled').checked,
@@ -6135,9 +6256,10 @@
         }
 
         if (data.success) {
-          showToast(`Đã lưu cấu hình ${isPvn ? 'ProxyVN' : 'KiotProxy'}!`, '💾');
-          addLog(`[Proxy] Đã cập nhật cấu hình: ${isPvn ? 'ProxyVN' : 'KiotProxy'} (Bật: ${payload.enabled}).`);
-          await refreshProxyInfo();
+          const provName = isPvn ? 'ProxyVN' : 'KiotProxy';
+          showToast(`Đã lưu và kích hoạt cấu hình ${provName}!`, '💾');
+          addLog(`[Proxy] Đã cập nhật cấu hình: ${provName} (Bật: ${payload.enabled}).`);
+          await refreshProxyInfo(currentProxyTab);
           if (data.init_res && !data.init_res.success) {
             showToast('Lưu ý: ' + (data.init_res.message || 'Chưa nạp được IP'), '⚠️');
           }
@@ -6161,8 +6283,8 @@
       try {
         const isPvn = currentProxyTab === 'proxyvn';
         const bodyPayload = isPvn
-          ? { nhamang: $('pvn-nhamang').value, tinhthanh: $('pvn-tinhthanh').value }
-          : { region: $('select-proxy-region').value };
+          ? { provider: 'proxyvn', nhamang: $('pvn-nhamang').value, tinhthanh: $('pvn-tinhthanh').value }
+          : { provider: 'kiotproxy', region: $('select-proxy-region').value };
 
         const res = await fetch('/api/proxy/new-ip', {
           method: 'POST',
@@ -6180,10 +6302,10 @@
         if (d.success && (d.data || d.proxy_url)) {
           const newIp = d.data?.ip || d.data?.realIpAddress || d.data?.host || '';
           showToast(`Đã đổi IP thành công: ${newIp}!`, '🎉');
-          addLog(`[Proxy Đổi IP] IP mới: ${newIp} (${d.data?.location || d.data?.Vi_Tri || ''})`);
-          await refreshProxyInfo();
+          addLog(`[Proxy Đổi IP] IP mới: ${newIp} (${d.data?.location || d.data?.Vi_Tri || d.data?.region || ''})`);
+          await refreshProxyInfo(currentProxyTab);
         } else {
-          showToast(`Không thể đổi IP: ${d.message || 'Vui lòng kiểm tra lại Key'}`, '⚠️');
+          showToast(`Không thể đổi IP: ${d.message || d.error || 'Vui lòng kiểm tra lại Key'}`, '⚠️');
         }
       } catch (e) {
         showToast('Lỗi gọi API đổi IP: ' + e.message, '❌');
@@ -6204,7 +6326,13 @@
       resEl.innerHTML = '⏳ Đang gửi request kiểm tra qua Proxy...';
 
       try {
-        const res = await fetch('/api/proxy/test', { method: 'POST' });
+        const isPvn = currentProxyTab === 'proxyvn';
+        const keyVal = isPvn ? $('input-proxyvn-key').value.trim() : $('input-proxy-key').value.trim();
+        const res = await fetch('/api/proxy/test', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ provider: currentProxyTab, key: keyVal })
+        });
         let d;
         const text = await res.text();
         try {
@@ -6219,6 +6347,7 @@
           resEl.innerHTML = `✅ <b>Proxy kết nối tốt!</b> IP ra ngoài: <b>${d.ip}</b> | Ping độ trễ: <b>${d.latency_ms} ms</b>`;
           showToast(`Test Ping: ${d.latency_ms}ms (IP: ${d.ip})`, '⚡');
           addLog(`[Proxy Test] Thành công! IP: ${d.ip}, Độ trễ: ${d.latency_ms}ms.`);
+          await refreshProxyInfo(currentProxyTab);
         } else {
           resEl.style.background = '#fee2e2';
           resEl.style.color = '#b91c1c';
@@ -6243,7 +6372,7 @@
         if (d.success) {
           showToast('Đã giải phóng (Out) key thành công!', '⏹️');
           addLog('[Proxy KiotProxy] Đã giải phóng key proxy.');
-          await refreshProxyInfo();
+          await refreshProxyInfo('kiotproxy');
         } else {
           showToast('Lỗi giải phóng key: ' + (d.message || 'Không thành công'), '⚠️');
         }

@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <title>Zalo Order Bot</title>
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <div class="app-container">
+    <!-- Header -->
+    <header class="app-header">
+      <div class="logo-area">
+        <span class="logo-icon">⚡</span>
+        <div>
+          <h1 class="logo-title">Zalo Order Bot</h1>
+          <span class="logo-sub">Lọc Đơn & Báo Mã Vận Đơn Theo Sheet</span>
+        </div>
+      </div>
+      <button id="btn-settings-toggle" class="icon-btn" title="Cài đặt AI & Cấu hình">⚙️</button>
+    </header>
+
+    <!-- Trạng thái kết nối Zalo Web -->
+    <div id="conn-status-bar" class="conn-status-bar connected">
+      <span class="conn-dot"></span>
+      <span id="conn-status-text">🟢 Kết nối tự động với Zalo Web: ĐANG BẬT</span>
+    </div>
+
+    <!-- Navigation Tabs -->
+    <div class="tabs-nav">
+      <button id="tab-btn-orders" class="tab-btn active">⚡ Lọc Đơn Khách</button>
+      <button id="tab-btn-mvd" class="tab-btn">📦 Tra MVĐ & Báo Khách</button>
+    </div>
+
+    <!-- Settings Drawer (Collapsible) -->
+    <div id="settings-panel" class="settings-panel hidden">
+      <div class="setting-item">
+        <label>Gemini API Key (Miễn phí từ Google AI Studio):</label>
+        <div class="input-with-btn">
+          <input type="password" id="input-api-key" placeholder="AIzaSy..." />
+          <button id="btn-save-key" class="btn-sm">Lưu</button>
+        </div>
+        <small class="hint">Dùng AI để chuẩn hóa 100% địa chỉ cũ/mới sáp nhập & dịch SĐT lách phức tạp.</small>
+      </div>
+    </div>
+
+    <!-- ================== TAB 1: LỌC ĐƠN HÀNG ================== -->
+    <div id="tab-content-orders" class="tab-content">
+      <!-- Chế độ Tự Động Bắt Đơn (Auto Mode Switch) -->
+      <div class="auto-mode-card">
+        <div class="auto-mode-info">
+          <div class="auto-mode-title">⚡ Tự Động Bắt Đơn (Auto Mode)</div>
+          <div class="auto-mode-sub">Tự động đọc & lưu khi mở khách hoặc có tin mới</div>
+        </div>
+        <label class="switch">
+          <input type="checkbox" id="toggle-auto-capture" checked>
+          <span class="slider round"></span>
+        </label>
+      </div>
+
+      <!-- Actions Control -->
+      <div class="control-box">
+        <div class="tag-selector">
+          <label for="input-target-tag">🏷️ Lọc theo Thẻ Tag:</label>
+          <input type="text" id="input-target-tag" value="Khách hàng" placeholder="Nhập tên Tag (vd: Khách hàng, Chốt đơn...)" />
+        </div>
+
+        <div class="button-group">
+          <button id="btn-parse-active" class="btn btn-primary" title="Bóc tách ngay tin nhắn của người đang chat">
+            <span>🎯</span> Lọc Khách Đang Mở
+          </button>
+          <button id="btn-auto-batch-scan" class="btn btn-gradient" title="Tự động bấm duyệt toàn bộ khách có gắn thẻ tag">
+            <span>🚀</span> Quét Tự Động Tất Cả Tag
+          </button>
+        </div>
+      </div>
+
+      <!-- Batch Progress Bar -->
+      <div id="progress-box" class="progress-box hidden">
+        <div class="progress-header">
+          <span id="progress-status-text">Đang quét tự động: 0/0</span>
+          <button id="btn-stop-batch" class="btn-mini-danger">Dừng</button>
+        </div>
+        <div class="progress-bar-bg">
+          <div id="progress-bar-fill" class="progress-bar-fill" style="width: 0%"></div>
+        </div>
+      </div>
+
+      <!-- Result Orders List -->
+      <div class="results-header">
+        <h3>📋 Danh Sách Đơn Đã Lọc (<span id="order-count">0</span>)</h3>
+        <div class="export-actions">
+          <button id="btn-sync-tool-pee" class="btn-text" title="Đẩy đơn sang Tool Shopee Tracker (Port 8080)">🔗 Đẩy Tool Shopee</button>
+          <button id="btn-export-csv" class="btn-text" title="Tải file Excel/CSV">📥 Xuất Excel</button>
+          <button id="btn-clear-all" class="btn-text danger" title="Xóa danh sách">🗑️ Xóa</button>
+        </div>
+      </div>
+
+      <div id="order-list" class="order-list">
+        <!-- Empty state -->
+        <div id="empty-state" class="empty-state">
+          <span class="empty-icon">📦</span>
+          <p>Chưa có dữ liệu đơn hàng.</p>
+          <small>Hãy mở một cuộc trò chuyện trên <a href="https://chat.zalo.me" target="_blank">chat.zalo.me</a>. Khi bật chế độ tự động, bot sẽ tự bắt đơn ngay!</small>
+        </div>
+      </div>
+    </div>
+
+    <!-- ================== TAB 2: TRA MVĐ & BÁO KHÁCH ================== -->
+    <div id="tab-content-mvd" class="tab-content hidden">
+      <!-- Chế độ Chatbot Tự Động Trả Lời MVĐ Khi Khách Nhắn SĐT -->
+      <div class="auto-mode-card" style="background:#fef3c7; border-color:#fde68a;">
+        <div class="auto-mode-info">
+          <div class="auto-mode-title" style="color:#92400e;">🤖 Chatbot Tự Trả Lời MVĐ</div>
+          <div class="auto-mode-sub" style="color:#b45309;">Tự tra Sheet & gửi mã khi khách nhắn SĐT thật</div>
+        </div>
+        <label class="switch">
+          <input type="checkbox" id="toggle-bot-reply" checked>
+          <span class="slider round"></span>
+        </label>
+      </div>
+
+      <div style="display:flex; align-items:center; gap:6px; font-size:11px; color:#475569; padding:0 4px;">
+        <input type="checkbox" id="check-auto-send-direct" checked />
+        <label for="check-auto-send-direct" style="cursor:pointer;">⚡ Tự động bấm nút Gửi luôn (Không cần bấm tay)</label>
+      </div>
+
+      <!-- Cấu hình bảo vệ nick chính: Chỉ bot với người có Thẻ Tag -->
+      <div class="tag-filter-mode-card">
+        <div style="display:flex; align-items:center; justify-content:space-between;">
+          <div style="display:flex; flex-direction:column; gap:2px;">
+            <span style="font-size:12px; font-weight:700; color:#1e293b;">🏷️ Chỉ Bot với người có Thẻ Tag</span>
+            <span style="font-size:10px; color:#15803d; font-weight:600;">🛡️ Bảo vệ nick chính: Bỏ qua bạn bè, người thân 100%</span>
+          </div>
+          <label class="switch">
+            <input type="checkbox" id="check-only-tagged" checked>
+            <span class="slider round"></span>
+          </label>
+        </div>
+        <div style="margin-top:6px; display:flex; align-items:center; gap:6px;">
+          <span style="font-size:10px; color:#475569; white-space:nowrap; font-weight:600;">Thẻ áp dụng:</span>
+          <input type="text" id="input-mvd-tags" style="font-size:11px; padding:3px 6px; border:1px solid #cbd5e1; border-radius:4px; flex:1;" value="Khách hàng" placeholder="vd: Khách hàng, Chờ ship, Khách sỉ..." />
+        </div>
+      </div>
+
+      <!-- Thanh đồng bộ Sheet -->
+      <div class="sheet-sync-card">
+        <div class="sheet-sync-info">
+          <span>📊 Dữ liệu Sheet Cloud (Render):</span>
+          <strong id="sheet-order-count">0 đơn có mã</strong>
+        </div>
+        <button id="btn-sync-sheet-orders" class="btn-sm btn-sync">
+          <span>🔄</span> Đồng Bộ Sheet Cloud
+        </button>
+      </div>
+
+      <div style="display:flex; align-items:center; gap:6px; margin-bottom:8px; font-size:10px; color:#475569; background:#f1f5f9; padding:5px 8px; border-radius:6px;">
+        <span style="white-space:nowrap; font-weight:600;">🌐 Nguồn Sheet:</span>
+        <input type="text" id="input-sheet-url" style="font-size:10px; padding:2px 6px; border:1px solid #cbd5e1; border-radius:4px; flex:1;" value="https://shopee-tracker-pro-b1v8.onrender.com" />
+      </div>
+
+      <!-- Ô tìm kiếm theo SĐT -->
+      <div class="control-box">
+        <label for="input-search-phone">📞 Tra cứu Mã Vận Đơn theo Số Điện Thoại:</label>
+        <div class="input-with-btn">
+          <input type="text" id="input-search-phone" placeholder="Nhập SĐT khách (vd: 0388346645)..." />
+          <button id="btn-do-search-phone" class="btn-sm">Tìm Đơn</button>
+        </div>
+        <button id="btn-get-phone-from-chat" class="btn-text-sm" title="Lấy SĐT của người đang mở trên Zalo Web">
+          🎯 Tự lấy SĐT từ hội thoại Zalo đang mở
+        </button>
+      </div>
+
+      <!-- Thẻ kết quả tra cứu MVĐ -->
+      <div id="mvd-result-card" class="mvd-card hidden">
+        <div class="mvd-card-header">
+          <span class="mvd-badge-carrier" id="res-carrier">Giao Hàng Nhanh</span>
+          <span class="mvd-code" id="res-mvd">GYRTVYG7</span>
+        </div>
+        <div class="mvd-card-body">
+          <div class="mvd-row"><strong>👤 Người nhận:</strong> <span id="res-name">Nguyễn Văn A</span> (<span id="res-phone">0388...</span>)</div>
+          <div class="mvd-row"><strong>🚚 Trạng thái:</strong> <span id="res-status" class="status-highlight">Đang vận chuyển</span></div>
+          <div class="mvd-row" id="row-prod"><strong>🛍️ Sản phẩm:</strong> <span id="res-product">...</span></div>
+          <div class="mvd-row" id="row-cod"><strong>💰 Tiền COD:</strong> <span id="res-cod">35.000 đ</span></div>
+          <div class="mvd-row" id="row-driver" style="display:none;"><strong>📱 Shipper:</strong> <span id="res-driver">...</span></div>
+        </div>
+        <div class="mvd-card-actions">
+          <button id="btn-insert-zalo" class="btn btn-primary" style="flex:1;">
+            <span>💬</span> Điền Vào Chat Zalo
+          </button>
+          <button id="btn-copy-reply" class="btn btn-secondary">
+            <span>📋</span> Copy Tin Nhắn
+          </button>
+        </div>
+      </div>
+
+      <div id="mvd-empty-hint" class="empty-state">
+        <span class="empty-icon">🔍</span>
+        <p>Nhập Số Điện Thoại hoặc bấm lấy từ Chat để tra cứu mã vận đơn.</p>
+        <small>Dữ liệu tự động lấy từ Tool Sheet Shopee Tracker.</small>
+      </div>
+    </div>
+
+    <!-- Status Bar chung -->
+    <div id="status-bar" class="status-bar hidden">
+      <span id="status-icon">⏳</span>
+      <span id="status-text">Đang xử lý...</span>
+    </div>
+
+    <!-- Footer -->
+    <footer class="app-footer">
+      <span>Zalo Order Filter Bot v2.2 • Tra Cứu MVĐ & Báo Khách Tự Động</span>
+    </footer>
+  </div>
+
+  <script src="parser.js"></script>
+  <script src="popup.js"></script>
+</body>
+</html>
