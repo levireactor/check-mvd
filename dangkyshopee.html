@@ -526,7 +526,7 @@
             </div>
             <div class="brand-text">
                 <h1>Auto Workflow @dangkyshopee_bot</h1>
-                <p><i class="fa-solid fa-shield-halved" style="color: #10B981;"></i> Tự động tuần tự 3 lệnh: /mailfree ➔ /addtocart ➔ /diachi</p>
+                <p><i class="fa-solid fa-shield-halved" style="color: #10B981;"></i> Tự động tuần tự: /addtocart ➔ /diachi</p>
             </div>
         </div>
         <div class="nav-links">
@@ -550,7 +550,7 @@
 
         <div class="kpi-card green">
             <div class="kpi-info">
-                <h3>Thành Công (Xong 3 Bước)</h3>
+                <h3>Thành Công Hoàn Tất</h3>
                 <div class="kpi-val" id="kpiSuccess">0</div>
             </div>
             <div class="kpi-icon" style="color: var(--success);"><i class="fa-solid fa-circle-check"></i></div>
@@ -581,26 +581,34 @@
             <div class="card">
                 <div class="card-header">
                     <div class="card-title"><i class="fa-solid fa-sliders"></i> Cấu Hình Lệnh Bot</div>
-                    <span class="badge-step">3 Bước Tuần Tự</span>
+                    <span class="badge-step">2 Lệnh Tuần Tự</span>
                 </div>
 
-                <!-- Lệnh 2: Link sản phẩm -->
+                <!-- Lệnh 1: Link sản phẩm -->
                 <div class="form-group">
                     <label for="productLink">
-                        <span class="badge-step">Bước 2</span> Link Sản Phẩm (/addtocart)
+                        <span class="badge-step">Bước 1</span> Link Sản Phẩm (/addtocart)
                     </label>
                     <input type="text" id="productLink" placeholder="Ví dụ: https://s.shopee.vn/2VsIx1Npqi hoặc vn.shp.ee/...">
                 </div>
 
-                <!-- Lệnh 3: Chọn loại lệnh địa chỉ -->
+                <!-- Lệnh 2: Chọn loại lệnh địa chỉ -->
                 <div class="form-group">
                     <label for="addressCommand">
-                        <span class="badge-step">Bước 3</span> Lệnh Thêm Địa Chỉ
+                        <span class="badge-step">Bước 2</span> Lệnh Thêm Địa Chỉ
                     </label>
                     <select id="addressCommand">
                         <option value="/diachi" selected>/diachi (Mặc định)</option>
                         <option value="/addressnew">/addressnew (Tạo mới nâng cao)</option>
                     </select>
+                </div>
+
+                <!-- Tùy chọn mailfree (mặc định tắt) -->
+                <div style="margin-top: 4px; padding-top: 8px; border-top: 1px dashed var(--border-color);">
+                    <label style="cursor: pointer; font-size: 12px; color: var(--text-muted); display: inline-flex; align-items: center; gap: 8px;">
+                        <input type="checkbox" id="useMailfree" style="width: 15px; height: 15px; cursor: pointer;">
+                        <span>Kèm lệnh <code style="color: #C084FC;">/mailfree</code> trước khi thêm giỏ (Mặc định: ĐÃ TẮT)</span>
+                    </label>
                 </div>
             </div>
 
@@ -934,6 +942,7 @@
 
         const config = {
             product_link: productLink,
+            use_mailfree: document.getElementById('useMailfree') ? document.getElementById('useMailfree').checked : false,
             address_command: document.getElementById('addressCommand').value,
             address_area: document.getElementById('addressArea').value.trim(),
             address_name: document.getElementById('addressName').value.trim(),

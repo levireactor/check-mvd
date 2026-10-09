@@ -120,6 +120,7 @@ class DangKyShopeeManager:
 
         self.config = {
             "product_link": "",
+            "use_mailfree": False,  # Mặc định bỏ lệnh mailfree
             "address_command": "/diachi",  # /diachi hoặc /addressnew
             "address_area": "",
             "address_name": "",
@@ -344,67 +345,71 @@ class DangKyShopeeManager:
 
     async def _process_single_account(self, client, bot_entity, item):
         raw_nick = item["raw"]
+        use_mailfree = bool(self.config.get("use_mailfree", False))
 
         # =========================================================================
-        # BƯỚC 1: LỆNH /mailfree
+        # (TÙY CHỌN) LỆNH /mailfree (Mặc định: ĐÃ BỎ)
         # =========================================================================
-        self.current_step = "STEP 1: /mailfree"
-        item["status"] = "mailfree"
-        item["step_detail"] = "Đang gửi lệnh /mailfree..."
-        self.log(f"📤 Gửi Lệnh 1: /mailfree cho nick...", "info")
+        if use_mailfree:
+            self.current_step = "LỆNH: /mailfree"
+            item["status"] = "mailfree"
+            item["step_detail"] = "Đang gửi lệnh /mailfree..."
+            self.log(f"📤 Gửi Lệnh: /mailfree cho nick...", "info")
 
-        mail_cmd = f"/mailfree {raw_nick}"
-        success_mail, mail_res = await self._execute_mailfree(client, bot_entity, mail_cmd)
-        if not success_mail:
-            item["error"] = f"Lỗi Bước 1 (/mailfree): {mail_res}"
-            return False
+            mail_cmd = f"/mailfree {raw_nick}"
+            success_mail, mail_res = await self._execute_mailfree(client, bot_entity, mail_cmd)
+            if not success_mail:
+                item["error"] = f"Lỗi Bước /mailfree: {mail_res}"
+                return False
 
-        item["mail_info"] = mail_res
-        self.log(f"✅ Bước 1 (/mailfree) THÀNH CÔNG! {mail_res}", "success")
-        await asyncio.sleep(2)
+            item["mail_info"] = mail_res
+            self.log(f"✅ Lệnh /mailfree THÀNH CÔNG! {mail_res}", "success")
+            await asyncio.sleep(2)
 
-        if self.should_stop:
-            return False
+            if self.should_stop:
+                return False
 
         # =========================================================================
-        # BƯỚC 2: LỆNH /addtocart
+        # BƯỚC 1: LỆNH /addtocart
         # =========================================================================
-        self.current_step = "STEP 2: /addtocart"
+        step_cart_num = "BƯỚC 2" if use_mailfree else "BƯỚC 1"
+        self.current_step = f"{step_cart_num}: /addtocart"
         item["status"] = "addtocart"
         item["step_detail"] = "Đang gửi lệnh /addtocart..."
         prod_link = self.config.get("product_link", "").strip()
-        self.log(f"📤 Gửi Lệnh 2: /addtocart {prod_link}|<nick>...", "info")
+        self.log(f"📤 Gửi {step_cart_num}: /addtocart {prod_link}|<nick>...", "info")
 
         cart_cmd = f"/addtocart {prod_link}|{raw_nick}"
         success_cart, cart_res = await self._execute_addtocart(client, bot_entity, cart_cmd)
         if not success_cart:
-            item["error"] = f"Lỗi Bước 2 (/addtocart): {cart_res}"
+            item["error"] = f"Lỗi {step_cart_num} (/addtocart): {cart_res}"
             return False
 
         item["cart_info"] = cart_res
-        self.log(f"✅ Bước 2 (/addtocart) THÀNH CÔNG! {cart_res}", "success")
+        self.log(f"✅ {step_cart_num} (/addtocart) THÀNH CÔNG! {cart_res}", "success")
         await asyncio.sleep(2)
 
         if self.should_stop:
             return False
 
         # =========================================================================
-        # BƯỚC 3: LỆNH /diachi hoặc /addressnew (Interactive Wizard)
+        # BƯỚC 2: LỆNH /diachi hoặc /addressnew (Interactive Wizard)
         # =========================================================================
-        self.current_step = "STEP 3: ĐỊA CHỈ"
+        step_addr_num = "BƯỚC 3" if use_mailfree else "BƯỚC 2"
+        self.current_step = f"{step_addr_num}: ĐỊA CHỈ"
         item["status"] = "diachi"
         item["step_detail"] = "Đang gửi lệnh thêm địa chỉ..."
         addr_cmd_type = self.config.get("address_command", "/diachi")
-        self.log(f"📤 Gửi Lệnh 3: {addr_cmd_type} cho nick...", "info")
+        self.log(f"📤 Gửi {step_addr_num}: {addr_cmd_type} cho nick...", "info")
 
         addr_cmd = f"{addr_cmd_type} {raw_nick}"
         success_addr, addr_res = await self._execute_address_wizard(client, bot_entity, addr_cmd)
         if not success_addr:
-            item["error"] = f"Lỗi Bước 3 ({addr_cmd_type}): {addr_res}"
+            item["error"] = f"Lỗi {step_addr_num} ({addr_cmd_type}): {addr_res}"
             return False
 
         item["address_info"] = addr_res
-        self.log(f"✅ Bước 3 ({addr_cmd_type}) THÀNH CÔNG! {addr_res}", "success")
+        self.log(f"✅ {step_addr_num} ({addr_cmd_type}) THÀNH CÔNG! {addr_res}", "success")
         return True
 
     # -------------------------------------------------------------------------

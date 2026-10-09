@@ -1,12 +1,11 @@
 @echo off
 chcp 65001 >nul
-title DIEU PHOI BOT @dangkyshopee_bot (MAILFREE + CART + DIA CHI)
+title DIEU PHOI BOT @dangkyshopee_bot (CART + DIA CHI)
 color 0A
 echo ================================================================
 echo      HE THONG TU DONG DIEU PHOI BOT @dangkyshopee_bot
-echo        - Lenh 1: /mailfree
-echo        - Lenh 2: /addtocart (Link san pham)
-echo        - Lenh 3: /diachi hoac /addressnew (Wizard dia chi)
+echo        - Lenh 1: /addtocart (Link san pham)
+echo        - Lenh 2: /diachi hoac /addressnew (Wizard dia chi)
 echo ================================================================
 echo.
 echo [*] Dang mo giao dien tren trinh duyet...
