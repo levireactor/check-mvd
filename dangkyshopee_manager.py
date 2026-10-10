@@ -494,12 +494,17 @@ class DangKyShopeeManager:
 
         cart_cmd = f"/addtocart {prod_link}|{raw_nick}"
         success_cart, cart_res = await self._execute_addtocart(client, bot_entity, cart_cmd)
-        if not success_cart:
-            item["error"] = f"Lỗi {step_cart_num} (/addtocart): {cart_res}"
-            return False
+        if success_cart:
+            item["cart_info"] = cart_res
+            self.log(f"✅ {step_cart_num} (/addtocart) THÀNH CÔNG! {cart_res}", "success")
+        else:
+            item["cart_info"] = f"Lỗi: {cart_res}"
+            self.log(f"⚠️ {step_cart_num} (/addtocart) không thành công ({cart_res}). Dọn dẹp phiên và tiếp tục chạy lệnh địa chỉ...", "warning")
+            try:
+                await client.send_message(bot_entity, "/stop")
+            except Exception:
+                pass
 
-        item["cart_info"] = cart_res
-        self.log(f"✅ {step_cart_num} (/addtocart) THÀNH CÔNG! {cart_res}", "success")
         await asyncio.sleep(2)
 
         if self.should_stop:
@@ -675,31 +680,10 @@ class DangKyShopeeManager:
         return valid_btns[0], "FIRST_CHOICE"
 
     async def _execute_addtocart(self, client, bot_entity, cmd_text):
-        """Thực thi thêm giỏ hàng kèm cơ chế thử lại nếu lỗi: đợi 8s để chạy lại"""
-        max_retries = int(self.config.get("max_cart_retries", 3))
-
-        for attempt in range(1, max_retries + 1):
-            if self.should_stop:
-                return False, "Tiến trình bị dừng"
-
-            if attempt > 1:
-                self.log(f"🔄 Đang thử lại Lệnh Thêm Giỏ Hàng (Lần {attempt}/{max_retries})...", "warning")
-
-            success, res_or_err = await self._run_single_addtocart(client, bot_entity, cmd_text)
-            if success:
-                return True, res_or_err
-
-            # Nếu phiên bị lỗi: gửi /stop và đợi 20s để chạy lại theo yêu cầu
-            if attempt < max_retries and not self.should_stop:
-                self.log(f"⚠️ Phiên thêm giỏ bị lỗi: '{res_or_err}'. Đã gửi /stop, đang đợi 20 giây để chạy lại...", "warning")
-                # Gửi /stop để dọn dẹp nếu bot đang kẹt phiên dở
-                try:
-                    await client.send_message(bot_entity, "/stop")
-                except Exception:
-                    pass
-                await asyncio.sleep(20)
-
-        return False, f"Thêm giỏ thất bại sau {max_retries} lần thử"
+        """Thực thi thêm giỏ hàng 1 lần duy nhất (không lặp lại/không retry)"""
+        if self.should_stop:
+            return False, "Tiến trình bị dừng"
+        return await self._run_single_addtocart(client, bot_entity, cmd_text)
 
     async def _run_single_addtocart(self, client, bot_entity, cmd_text):
         """
