@@ -596,6 +596,18 @@ class DangKyShopeeManager:
             return True
         return False
 
+    def _is_mail_button(self, btn_text):
+        """Kiểm tra nếu nút mang ý nghĩa Đọc Mail / Hộp thư / Mailfree"""
+        if not btn_text:
+            return False
+        low = btn_text.strip().lower()
+        mail_keywords = [
+            "đọc mail", "doc mail", "đọc thư", "doc thu", "hộp thư", "hop thu",
+            "xem mail", "xem thư", "lấy mail", "lay mail", "email", "mail", "inbox",
+            "xác minh mail", "xac minh mail", "cấp mail", "cap mail"
+        ]
+        return any(mk in low for mk in mail_keywords)
+
     def _is_confirm_button(self, btn_text):
         """
         Kiểm tra nếu nút là nút Xác nhận thêm sản phẩm vào giỏ
@@ -603,7 +615,7 @@ class DangKyShopeeManager:
         """
         if not btn_text:
             return False
-        if self._is_cancel_button(btn_text) or self._is_qty_button(btn_text):
+        if self._is_cancel_button(btn_text) or self._is_qty_button(btn_text) or self._is_mail_button(btn_text):
             return False
 
         low = btn_text.strip().lower()
@@ -641,6 +653,7 @@ class DangKyShopeeManager:
         - Bỏ qua tuyệt đối các nút mang ý nghĩa Hủy/Cancel/Quay lại/Đóng.
         - Bỏ qua các nút tăng giảm số lượng (- / +).
         - Bỏ qua các nút Xác nhận thêm sản phẩm.
+        - Bỏ qua tuyệt đối các nút Đọc Mail / Hộp thư / Mailfree.
         - Tìm nút trùng hoặc gần giống nhất với tên phân loại đã nhập.
         - Nếu không quét thấy hoặc không nhập phân loại: Tự động chọn nút phân loại đầu tiên hợp lệ!
         """
@@ -659,6 +672,9 @@ class DangKyShopeeManager:
                     continue
                 # Bỏ qua nút xác nhận thêm sản phẩm (để bấm ở bước xác nhận riêng)
                 if self._is_confirm_button(b_txt):
+                    continue
+                # Bỏ qua nút Đọc Mail / Hộp thư
+                if self._is_mail_button(b_txt):
                     continue
                 valid_btns.append(btn)
 
@@ -688,7 +704,7 @@ class DangKyShopeeManager:
             if best_btn and best_score > 0:
                 return best_btn, "MATCH_SIMILAR"
 
-        # 3. Không trùng khớp hoặc không nhập => Chọn nút phân loại đầu tiên
+        # 3. Không trùng khớp hoặc không nhập => Chọn nút phân loại đầu tiên hợp lệ
         return valid_btns[0], "FIRST_CHOICE"
 
     async def _execute_addtocart(self, client, bot_entity, cmd_text):
@@ -718,12 +734,17 @@ class DangKyShopeeManager:
             if self.should_stop:
                 return False, "Tiến trình bị dừng"
 
-            messages = await client.get_messages(bot_entity, limit=4)
+            messages = await client.get_messages(bot_entity, limit=5)
             for m in messages:
-                if m.out:
+                # Bỏ qua tin nhắn do ta gửi và các tin nhắn cũ trước lệnh /addtocart
+                if m.out or m.id <= last_sent.id:
                     continue
 
                 txt = m.text or ""
+
+                # Bỏ qua các tin nhắn mail cũ nếu còn sót
+                if any(w in txt.lower() for w in ["đọc mail", "hộp thư", "đã cấp mail", "xác minh thành công"]) and "kết quả thêm giỏ" not in txt.lower():
+                    continue
 
                 # 1. Kiểm tra nếu đã có kết quả thêm giỏ
                 if "KẾT QUẢ THÊM GIỎ" in txt:
