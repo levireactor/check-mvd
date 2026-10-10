@@ -478,7 +478,14 @@ class DangKyShopeeManager:
 
             item["mail_info"] = mail_res
             self.log(f"✅ Lệnh /mailfree THÀNH CÔNG! {mail_res}", "success")
-            await asyncio.sleep(2)
+
+            # Delay 80s giữa các lệnh nếu còn lệnh tiếp theo
+            if (use_addtocart or use_address) and not self.should_stop:
+                self.log("⏳ Nghỉ 80s sau lệnh /mailfree trước khi chuyển sang lệnh tiếp theo...", "info")
+                for _ in range(80):
+                    if self.should_stop:
+                        return False
+                    await asyncio.sleep(1)
 
             if self.should_stop:
                 return False
@@ -515,9 +522,15 @@ class DangKyShopeeManager:
                 if not use_address:
                     item["error"] = f"Lỗi /addtocart: {cart_res}"
                     return False
-                self.log(f"⚠️ Lệnh /addtocart không thành công ({cart_res}), tiếp tục chạy luôn lệnh địa chỉ...", "warning")
+                self.log(f"⚠️ Lệnh /addtocart không thành công ({cart_res}), tiếp tục chuyển sang lệnh địa chỉ...", "warning")
 
-            await asyncio.sleep(2)
+            # Delay 80s giữa các lệnh nếu còn lệnh địa chỉ
+            if use_address and not self.should_stop:
+                self.log("⏳ Nghỉ 80s sau lệnh /addtocart trước khi chuyển sang lệnh địa chỉ...", "info")
+                for _ in range(80):
+                    if self.should_stop:
+                        return False
+                    await asyncio.sleep(1)
 
             if self.should_stop:
                 return False
@@ -871,22 +884,23 @@ class DangKyShopeeManager:
         return False
 
     async def _run_single_address_flow(self, client, bot_entity, cmd_text):
-        """Chạy một chu trình đầy đủ của wizard địa chỉ"""
-        timeout = int(self.config.get("timeout_step", 60))
+        """
+        Chạy một chu trình đầy đủ của wizard địa chỉ:
+        Theo dõi chặt chẽ từng thông báo nảy ra từ bot trước khi bấm nút hoặc gửi dữ liệu.
+        """
+        timeout = int(self.config.get("timeout_address", 180))
         last_sent = await client.send_message(bot_entity, cmd_text)
-        wizard_msg_id = None
         start_time = time.time()
 
-        # =====================================================================
-        # GIAI ĐOẠN 0: CHỜ BOT TRẢ VỀ HOẶC MỞ WIZARD
-        # =====================================================================
-        phase = "WAIT_INITIAL"
-        step1_sent = False
-        step2_clicked = False
+        # Các cờ trạng thái tuần tự theo dõi từng thông báo nảy ra
+        step1_area_sent = False
+        step1_choice_clicked = False
+        step2_btn_clicked = False
         step2_name_sent = False
-        step3_phone_handled = False
-        step4_clicked = False
-        step4_addr_sent = False
+        step3_btn_clicked = False
+        step3_phone_sent = False
+        step4_btn_clicked = False
+        step4_street_sent = False
 
         target_area = self.config.get("address_area", "").strip() or "Phường Tràng Tiền, Hoàn Kiếm, Hà Nội"
         target_name = self.config.get("address_name", "").strip() or "Nguyễn Văn Trung"
@@ -898,92 +912,97 @@ class DangKyShopeeManager:
             if self.should_stop:
                 return False, "Tiến trình bị dừng"
 
-            # Lấy 4 tin nhắn gần nhất (cả tin nhắn mới lẫn tin nhắn bot sửa đổi)
-            messages = await client.get_messages(bot_entity, limit=4)
+            # Quét các tin nhắn bot phản hồi sau lệnh
+            messages = await client.get_messages(bot_entity, limit=5)
             for m in messages:
-                if m.out:
+                if m.out or m.id <= last_sent.id:
                     continue
 
                 txt = m.text or ""
 
-                # 1. Trường hợp bot báo THÊM ĐỊA CHỈ THÀNH CÔNG ngay lập tức!
+                # 1. Bot thông báo THÊM ĐỊA CHỈ THÀNH CÔNG!
                 if "THÊM ĐỊA CHỈ THÀNH CÔNG!" in txt:
-                    # Trích xuất thông tin người nhận
                     addr_summary = [ln.strip() for ln in txt.split("\n") if ln.strip() and not ln.startswith("✅")]
                     summary_text = " | ".join(addr_summary[:3]) if addr_summary else "Đã thêm địa chỉ thành công"
+                    self.log(f"🎉 [Bot Xác Nhận]: {summary_text}", "success")
                     return True, summary_text
 
-                # 2. Trường hợp lỗi đăng nhập / hết hạn cookie
+                # 2. Bot báo lỗi đăng nhập / hết hạn cookie
                 if "Không đăng nhập được" in txt or "Cookie đăng nhập đã hết hạn" in txt or "SPC_F chưa được chấp nhận" in txt:
                     return False, txt.split("\n")[0]
 
-                # 3. Kiểm tra lỗi tìm kiếm khu vực ở Bước 1
+                # 3. Bot báo lỗi tra cứu khu vực
                 if "Lỗi tìm kiếm: Chưa tra cứu được khu vực" in txt:
                     return False, "AREA_SEARCH_ERROR"
 
-                # 4. BƯỚC 1: BƯỚC NHẬP KHU VỰC
-                if "BƯỚC 1: NHẬP KHU VỰC" in txt and not step1_sent:
-                    wizard_msg_id = m.id
-                    self.log(f"📍 Bot yêu cầu BƯỚC 1: Nhập khu vực ➔ Gửi: '{target_area}'", "info")
+                # 4. BƯỚC 1: Thông báo nhập khu vực nảy ra
+                if not step1_area_sent and ("BƯỚC 1: NHẬP KHU VỰC" in txt or "nhập khu vực" in txt.lower()):
+                    first_line = txt.splitlines()[0] if txt else "Nhập khu vực"
+                    self.log(f"🔔 [Bot Thông Báo]: {first_line} ➔ Gửi: '{target_area}'", "info")
                     await client.send_message(bot_entity, target_area)
-                    step1_sent = True
+                    step1_area_sent = True
                     await asyncio.sleep(2)
                     break
 
-                # 5. BƯỚC 1 KẾT QUẢ: Bot hiện danh sách các nút kết quả khu vực
-                if ("Chọn khu vực phù hợp:" in txt or "Đã chọn:" not in txt and m.buttons and len(m.buttons) >= 2) and step1_sent and not step2_clicked:
-                    # Tìm nút phù hợp nhất
-                    clicked = False
-                    for row in m.buttons:
-                        for btn in row:
-                            b_text = btn.text.strip()
-                            if b_text.startswith("1.") or "Tràng Tiền" in b_text or target_area.split(",")[0].strip() in b_text:
-                                self.log(f"👉 Bấm chọn nút khu vực: '{b_text}'", "info")
-                                await btn.click()
-                                clicked = True
-                                await asyncio.sleep(2)
-                                break
-                        if clicked:
-                            break
-                    if not clicked and m.buttons:
-                        # Mặc định bấm nút đầu tiên nếu không khớp
-                        first_btn = m.buttons[0][0]
-                        self.log(f"👉 Bấm chọn khu vực kết quả đầu tiên: '{first_btn.text}'", "info")
-                        await first_btn.click()
-                        await asyncio.sleep(2)
-                    break
-
-                # 6. BƯỚC 2: TÊN NGƯỜI NHẬN (Hỏi Random hay Tự nhập)
-                if "BƯỚC 2: TÊN NGƯỜI NHẬN" in txt and not step2_clicked:
-                    self.log("👤 Bot yêu cầu BƯỚC 2: Tên người nhận ➔ Bấm nút 'Tự nhập Tên'...", "info")
-                    clicked_name = False
-                    if m.buttons:
+                # 5. BƯỚC 1 KẾT QUẢ: Danh sách khu vực tìm kiếm nảy ra
+                if step1_area_sent and not step1_choice_clicked and m.buttons:
+                    has_results = (
+                        "chọn khu vực phù hợp" in txt.lower() or 
+                        "kết quả tìm kiếm" in txt.lower() or 
+                        any((btn.text or "").strip().startswith("1.") for row in m.buttons for btn in row)
+                    )
+                    if has_results:
+                        chosen_btn = None
                         for row in m.buttons:
                             for btn in row:
-                                if "tự nhập tên" in btn.text.lower():
+                                b_text = (btn.text or "").strip()
+                                if b_text.startswith("1.") or "Tràng Tiền" in b_text or target_area.split(",")[0].strip() in b_text:
+                                    chosen_btn = btn
+                                    break
+                            if chosen_btn:
+                                break
+                        if not chosen_btn:
+                            chosen_btn = m.buttons[0][0]
+
+                        self.log(f"🔔 [Bot Thông Báo]: Danh sách khu vực nảy ra ➔ Bấm chọn: '{chosen_btn.text}'", "info")
+                        await chosen_btn.click()
+                        step1_choice_clicked = True
+                        await asyncio.sleep(2)
+                        break
+
+                # 6. BƯỚC 2: Thông báo Tên Người Nhận nảy ra
+                if step1_choice_clicked and not step2_btn_clicked and m.buttons:
+                    if "tên người nhận" in txt.lower():
+                        for row in m.buttons:
+                            for btn in row:
+                                b_text = (btn.text or "").strip().lower()
+                                if "tự nhập tên" in b_text or "tự nhập" in b_text:
+                                    self.log(f"🔔 [Bot Thông Báo]: Bước Tên nảy ra ➔ Bấm nút: '{btn.text}'", "info")
                                     await btn.click()
-                                    clicked_name = True
-                                    step2_clicked = True
+                                    step2_btn_clicked = True
                                     await asyncio.sleep(2)
                                     break
-                            if clicked_name:
+                            if step2_btn_clicked:
                                 break
-                    break
+                        if step2_btn_clicked:
+                            break
 
-                # 7. Bot yêu cầu chat Tên người nhận vào
-                if ("Tên người nhận" in txt or "chat Tên" in txt or step2_clicked) and not step2_name_sent and "BƯỚC 2: SỐ ĐIỆN THOẠI" not in txt:
-                    self.log(f"✍️ Gửi Tên người nhận: '{target_name}'", "info")
-                    await client.send_message(bot_entity, target_name)
-                    step2_name_sent = True
-                    await asyncio.sleep(2)
-                    break
+                # 7. BƯỚC 2 NHẬP: Ô yêu cầu chat Tên nảy ra
+                if step2_btn_clicked and not step2_name_sent:
+                    is_name_input_prompt = any(w in txt.lower() for w in ["chat tên", "nhập tên", "gửi tên", "chat ten", "nhap ten"]) or ("tên người nhận" in txt.lower() and not m.buttons)
+                    if is_name_input_prompt:
+                        self.log(f"🔔 [Bot Thông Báo]: Ô nhập tên nảy ra ➔ Gửi: '{target_name}'", "info")
+                        await client.send_message(bot_entity, target_name)
+                        step2_name_sent = True
+                        await asyncio.sleep(2)
+                        break
 
-                # 8. BƯỚC 3: SỐ ĐIỆN THOẠI (Kiểm tra acc có SĐT hay Không tìm thấy)
-                if "BƯỚC 2: SỐ ĐIỆN THOẠI" in txt or "SĐT Acc:" in txt or ("SỐ ĐIỆN THOẠI" in txt and "BƯỚC 3: ĐỊA CHỈ" not in txt):
-                    if not step3_phone_handled:
-                        # Kiểm tra xem có tìm thấy SĐT Acc không
+                # 8. BƯỚC 3: Thông báo Số Điện Thoại nảy ra
+                if step2_name_sent and not step3_phone_sent:
+                    is_phone_prompt = ("số điện thoại" in txt.lower() or "sđt" in txt.lower()) and "địa chỉ chi tiết" not in txt.lower()
+                    if is_phone_prompt:
                         has_acc_phone = "Không tìm thấy" not in txt and "SĐT Acc:" in txt
-
+                        should_random = False
                         if phone_mode == "random":
                             should_random = True
                         elif phone_mode == "custom":
@@ -992,54 +1011,76 @@ class DangKyShopeeManager:
                             should_random = not has_acc_phone
 
                         if not should_random and has_acc_phone and phone_mode != "custom":
-                            # Bấm lấy SĐT Acc
-                            self.log("📞 Tài khoản còn SĐT ➔ Bấm nút 'Lấy SĐT Acc'...", "info")
+                            # Bấm Lấy SĐT Acc nếu tài khoản có sẵn SĐT
                             if m.buttons:
                                 for row in m.buttons:
                                     for btn in row:
-                                        if "lấy sđt" in btn.text.lower():
+                                        if "lấy sđt" in (btn.text or "").lower():
+                                            self.log(f"🔔 [Bot Thông Báo]: SĐT Acc có sẵn ➔ Bấm nút: '{btn.text}'", "info")
                                             await btn.click()
-                                            step3_phone_handled = True
+                                            step3_phone_sent = True
                                             await asyncio.sleep(2)
                                             break
+                                    if step3_phone_sent:
+                                        break
+                                if step3_phone_sent:
+                                    break
                         else:
-                            # Tự nhập SĐT
-                            self.log("📞 Bấm nút 'Tự nhập SĐT'...", "info")
-                            if m.buttons:
+                            # Cần tự nhập SĐT
+                            if not step3_btn_clicked and m.buttons:
                                 for row in m.buttons:
                                     for btn in row:
-                                        if "tự nhập sđt" in btn.text.lower() or "tự nhập" in btn.text.lower():
+                                        b_text = (btn.text or "").lower()
+                                        if "tự nhập sđt" in b_text or "tự nhập" in b_text:
+                                            self.log(f"🔔 [Bot Thông Báo]: Bước SĐT nảy ra ➔ Bấm nút: '{btn.text}'", "info")
                                             await btn.click()
-                                            await asyncio.sleep(2)
-                                            # Tạo số điện thoại
-                                            phone_to_send = custom_phone if (custom_phone and phone_mode == "custom") else generate_random_vn_phone()
-                                            self.log(f"📱 Gửi Số điện thoại: '{phone_to_send}'", "info")
-                                            await client.send_message(bot_entity, phone_to_send)
-                                            step3_phone_handled = True
+                                            step3_btn_clicked = True
                                             await asyncio.sleep(2)
                                             break
-                        break
+                                    if step3_btn_clicked:
+                                        break
+                                if step3_btn_clicked:
+                                    break
 
-                # 9. BƯỚC 4: ĐỊA CHỈ CHI TIẾT
-                if ("BƯỚC 3: ĐỊA CHỈ CHI TIẾT" in txt or "ĐỊA CHỈ CHI TIẾT" in txt) and not step4_clicked:
-                    self.log("🏠 Bot yêu cầu BƯỚC 4: Địa chỉ chi tiết ➔ Bấm nút 'Tự nhập'...", "info")
-                    if m.buttons:
-                        for row in m.buttons:
-                            for btn in row:
-                                if "tự nhập" in btn.text.lower() and "random" not in btn.text.lower():
-                                    await btn.click()
-                                    step4_clicked = True
+                            # Đợi thông báo yêu cầu chat SĐT nảy ra
+                            if step3_btn_clicked and not step3_phone_sent:
+                                is_phone_input_prompt = any(w in txt.lower() for w in ["chat số", "nhập số", "chat sđt", "nhập sđt", "gửi sđt", "nhap sdt"]) or ("số điện thoại" in txt.lower() and not m.buttons)
+                                if is_phone_input_prompt:
+                                    phone_to_send = custom_phone if (custom_phone and phone_mode == "custom") else generate_random_vn_phone()
+                                    self.log(f"🔔 [Bot Thông Báo]: Ô nhập SĐT nảy ra ➔ Gửi: '{phone_to_send}'", "info")
+                                    await client.send_message(bot_entity, phone_to_send)
+                                    step3_phone_sent = True
                                     await asyncio.sleep(2)
                                     break
-                    break
 
-                # 10. Gửi text địa chỉ chi tiết
-                if step4_clicked and not step4_addr_sent and "THÊM ĐỊA CHỈ THÀNH CÔNG" not in txt:
-                    self.log(f"🏠 Gửi Địa chỉ chi tiết: '{target_street}'", "info")
-                    await client.send_message(bot_entity, target_street)
-                    step4_addr_sent = True
-                    await asyncio.sleep(3)
-                    break
+                # 9. BƯỚC 4: Thông báo Địa Chỉ Chi Tiết nảy ra
+                if step3_phone_sent and not step4_street_sent:
+                    is_street_prompt = "địa chỉ chi tiết" in txt.lower() and "thành công" not in txt.lower()
+                    if is_street_prompt:
+                        if not step4_btn_clicked and m.buttons:
+                            for row in m.buttons:
+                                for btn in row:
+                                    b_text = (btn.text or "").lower()
+                                    if "tự nhập" in b_text and "random" not in b_text:
+                                        self.log(f"🔔 [Bot Thông Báo]: Bước Địa chỉ chi tiết nảy ra ➔ Bấm nút: '{btn.text}'", "info")
+                                        await btn.click()
+                                        step4_btn_clicked = True
+                                        await asyncio.sleep(2)
+                                        break
+                                if step4_btn_clicked:
+                                    break
+                            if step4_btn_clicked:
+                                break
+
+                        # Đợi thông báo yêu cầu chat Địa chỉ chi tiết nảy ra
+                        if step4_btn_clicked and not step4_street_sent:
+                            is_street_input_prompt = any(w in txt.lower() for w in ["chat địa chỉ", "nhập địa chỉ", "số nhà", "tên đường", "chat dia chi"]) or ("địa chỉ chi tiết" in txt.lower() and not m.buttons)
+                            if is_street_input_prompt:
+                                self.log(f"🔔 [Bot Thông Báo]: Ô nhập địa chỉ chi tiết nảy ra ➔ Gửi: '{target_street}'", "info")
+                                await client.send_message(bot_entity, target_street)
+                                step4_street_sent = True
+                                await asyncio.sleep(3)
+                                break
 
             await asyncio.sleep(1.5)
 
