@@ -581,98 +581,116 @@
             <div class="card">
                 <div class="card-header">
                     <div class="card-title"><i class="fa-solid fa-sliders"></i> Cấu Hình Lệnh Bot</div>
-                    <span class="badge-step">2 Lệnh Tuần Tự</span>
+                    <span class="badge-step" id="activeCmdsBadge">2 Lệnh Được Chọn</span>
                 </div>
 
-                <!-- Lệnh 1: Link sản phẩm -->
-                <div class="form-group">
-                    <label for="productLink">
-                        <span class="badge-step">Bước 1</span> Link Sản Phẩm (/addtocart)
-                    </label>
-                    <input type="text" id="productLink" placeholder="Ví dụ: https://s.shopee.vn/2VsIx1Npqi hoặc vn.shp.ee/...">
-                </div>
-
-                <!-- Phân loại / Mẫu mong muốn -->
-                <div class="form-group">
-                    <label for="productVariant">
-                        <i class="fa-solid fa-shapes" style="color: #06B6D4;"></i> Phân Loại / Mẫu Mong Muốn (Tùy chọn)
-                    </label>
-                    <input type="text" id="productVariant" placeholder="Ví dụ: Trắng, Size L, 500g (Để trống sẽ tự động Random)">
-                    <div style="font-size: 11px; color: var(--text-muted); display: flex; align-items: center; gap: 5px;">
-                        <i class="fa-solid fa-wand-magic-sparkles" style="color: var(--cyan);"></i>
-                        <span>Quét chọn ô trùng/gần nhất. Không thấy sẽ <b>Random ô sản phẩm</b> (không bấm Hủy). Lỗi tự đợi 8s thử lại.</span>
+                <!-- KHU VỰC TÍCH CHỌN CÁC LỆNH (TÙY CHỌN, KHÔNG BẮT BUỘC) -->
+                <div style="background: rgba(255, 255, 255, 0.03); border: 1px solid var(--border-color); border-radius: var(--radius-sm); padding: 12px 14px; display: flex; flex-direction: column; gap: 8px;">
+                    <div style="font-size: 12px; font-weight: 700; color: #fff; display: flex; justify-content: space-between; align-items: center;">
+                        <span><i class="fa-solid fa-list-check" style="color: var(--primary);"></i> Tùy chọn các lệnh (Tích để chạy):</span>
+                        <span id="activeCmdsCount" style="font-size: 11px; color: var(--cyan); font-weight: 600;">2/3 Lệnh</span>
                     </div>
-                </div>
-
-                <!-- KHU VỰC CẤU HÌNH SHOPEE AFFILIATE -->
-                <div style="background: rgba(99, 102, 241, 0.08); border: 1px solid rgba(99, 102, 241, 0.25); border-radius: var(--radius-sm); padding: 12px; margin-top: 4px;">
-                    <div style="display: flex; justify-content: space-between; align-items: center; cursor: pointer;" onclick="toggleAffiliatePanel()">
-                        <div style="display: flex; align-items: center; gap: 8px;">
-                            <i class="fa-solid fa-link" style="color: #06B6D4;"></i>
-                            <span style="font-size: 13px; font-weight: 700; color: #fff;">Chuyển Đổi Sang Link Affiliate Của Tôi</span>
-                            <span id="badgeAffStatus" class="status-badge status-pending" style="font-size: 10px; padding: 1px 6px;">Tắt</span>
-                        </div>
-                        <i class="fa-solid fa-chevron-down" id="iconAffChevron" style="color: var(--text-muted); font-size: 12px; transition: 0.2s;"></i>
-                    </div>
-
-                    <div id="panelAffiliate" style="display: none; margin-top: 12px; flex-direction: column; gap: 10px;">
-                        <label style="cursor: pointer; font-size: 12px; color: var(--text-main); display: inline-flex; align-items: center; gap: 8px;">
-                            <input type="checkbox" id="affEnabled" style="width: 15px; height: 15px; cursor: pointer;" onchange="updateAffBadge()">
-                            <span><b>Bật tự động chuyển đổi</b> link sản phẩm sang link Affiliate của tôi khi chạy</span>
+                    <div style="display: flex; flex-direction: column; gap: 8px; margin-top: 2px;">
+                        <label style="cursor: pointer; font-size: 13px; color: var(--text-main); display: inline-flex; align-items: center; gap: 10px;">
+                            <input type="checkbox" id="useMailfree" style="width: 17px; height: 17px; cursor: pointer; accent-color: #A855F7;" onchange="updateSelectedCmdsUI()">
+                            <span><code style="color: #C084FC; font-weight: 700; background: rgba(168,85,247,0.15); padding: 2px 6px; border-radius: 4px;">/mailfree</code> — Cấp & xác minh email</span>
                         </label>
-
-                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
-                            <div class="form-group">
-                                <label style="font-size: 11px;">App ID (Shopee Open API):</label>
-                                <input type="text" id="affAppId" placeholder="Ví dụ: 17300000000" style="padding: 7px 10px; font-size: 12px;">
-                            </div>
-                            <div class="form-group">
-                                <label style="font-size: 11px;">Sub ID (Tùy chọn):</label>
-                                <input type="text" id="affSubId" placeholder="Ví dụ: bot_cart" style="padding: 7px 10px; font-size: 12px;">
-                            </div>
-                        </div>
-
-                        <div class="form-group">
-                            <label style="font-size: 11px;">API Secret Key:</label>
-                            <input type="password" id="affSecret" placeholder="Dán API Secret Key vào đây" style="padding: 7px 10px; font-size: 12px;">
-                        </div>
-
-                        <div style="display: flex; gap: 8px; justify-content: flex-end; margin-top: 4px;">
-                            <button type="button" class="btn btn-secondary" onclick="testAffiliateConvert()" style="padding: 6px 12px; font-size: 11px;">
-                                <i class="fa-solid fa-vial"></i> Test Chuyển Link Thử
-                            </button>
-                            <button type="button" class="btn btn-primary" onclick="saveAffiliateConfig()" style="padding: 6px 14px; font-size: 11px; flex: unset;">
-                                <i class="fa-solid fa-floppy-disk"></i> Lưu Cấu Hình
-                            </button>
-                        </div>
-                        <div id="affTestResult" style="display: none; font-size: 11px; padding: 8px; border-radius: 6px; background: rgba(0, 0, 0, 0.4); word-break: break-all;"></div>
+                        <label style="cursor: pointer; font-size: 13px; color: var(--text-main); display: inline-flex; align-items: center; gap: 10px;">
+                            <input type="checkbox" id="useAddtocart" checked style="width: 17px; height: 17px; cursor: pointer; accent-color: #F59E0B;" onchange="updateSelectedCmdsUI()">
+                            <span><code style="color: #FBBF24; font-weight: 700; background: rgba(245,158,11,0.15); padding: 2px 6px; border-radius: 4px;">/addtocart</code> — Thêm sản phẩm vào giỏ hàng</span>
+                        </label>
+                        <label style="cursor: pointer; font-size: 13px; color: var(--text-main); display: inline-flex; align-items: center; gap: 10px;">
+                            <input type="checkbox" id="useAddress" checked style="width: 17px; height: 17px; cursor: pointer; accent-color: #3B82F6;" onchange="updateSelectedCmdsUI()">
+                            <span><code style="color: #60A5FA; font-weight: 700; background: rgba(59,130,246,0.15); padding: 2px 6px; border-radius: 4px;">/diachi</code> hoặc <code style="color: #60A5FA; font-weight: 700; background: rgba(59,130,246,0.15); padding: 2px 6px; border-radius: 4px;">/addressnew</code> — Cài đặt địa chỉ</span>
+                        </label>
                     </div>
                 </div>
 
-                <!-- Lệnh 2: Chọn loại lệnh địa chỉ -->
-                <div class="form-group">
+                <!-- KHU VỰC LỆNH /addtocart (ẨN/HIỆN THEO CHECKBOX) -->
+                <div id="groupAddtocart" style="display: flex; flex-direction: column; gap: 14px; margin-top: 4px;">
+                    <!-- Lệnh 1: Link sản phẩm -->
+                    <div class="form-group">
+                        <label for="productLink">
+                            <span class="badge-step" style="background: rgba(245,158,11,0.2); color: #FBBF24; border-color: rgba(245,158,11,0.4);">/addtocart</span> Link Sản Phẩm
+                        </label>
+                        <input type="text" id="productLink" placeholder="Ví dụ: https://s.shopee.vn/2VsIx1Npqi hoặc vn.shp.ee/...">
+                    </div>
+
+                    <!-- Phân loại / Mẫu mong muốn -->
+                    <div class="form-group">
+                        <label for="productVariant">
+                            <i class="fa-solid fa-shapes" style="color: #06B6D4;"></i> Phân Loại / Mẫu Mong Muốn (Tùy chọn)
+                        </label>
+                        <input type="text" id="productVariant" placeholder="Ví dụ: Trắng, Size L, 500g (Để trống sẽ tự động Random)">
+                        <div style="font-size: 11px; color: var(--text-muted); display: flex; align-items: center; gap: 5px;">
+                            <i class="fa-solid fa-wand-magic-sparkles" style="color: var(--cyan);"></i>
+                            <span>Quét chọn ô trùng/gần nhất, sau đó tự động ấn nút xác nhận thêm sản phẩm.</span>
+                        </div>
+                    </div>
+
+                    <!-- KHU VỰC CẤU HÌNH SHOPEE AFFILIATE -->
+                    <div style="background: rgba(99, 102, 241, 0.08); border: 1px solid rgba(99, 102, 241, 0.25); border-radius: var(--radius-sm); padding: 12px; margin-top: 2px;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; cursor: pointer;" onclick="toggleAffiliatePanel()">
+                            <div style="display: flex; align-items: center; gap: 8px;">
+                                <i class="fa-solid fa-link" style="color: #06B6D4;"></i>
+                                <span style="font-size: 13px; font-weight: 700; color: #fff;">Chuyển Đổi Sang Link Affiliate Của Tôi</span>
+                                <span id="badgeAffStatus" class="status-badge status-pending" style="font-size: 10px; padding: 1px 6px;">Tắt</span>
+                            </div>
+                            <i class="fa-solid fa-chevron-down" id="iconAffChevron" style="color: var(--text-muted); font-size: 12px; transition: 0.2s;"></i>
+                        </div>
+
+                        <div id="panelAffiliate" style="display: none; margin-top: 12px; flex-direction: column; gap: 10px;">
+                            <label style="cursor: pointer; font-size: 12px; color: var(--text-main); display: inline-flex; align-items: center; gap: 8px;">
+                                <input type="checkbox" id="affEnabled" style="width: 15px; height: 15px; cursor: pointer;" onchange="updateAffBadge()">
+                                <span><b>Bật tự động chuyển đổi</b> link sản phẩm sang link Affiliate của tôi khi chạy</span>
+                            </label>
+
+                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                                <div class="form-group">
+                                    <label style="font-size: 11px;">App ID (Shopee Open API):</label>
+                                    <input type="text" id="affAppId" placeholder="Ví dụ: 17300000000" style="padding: 7px 10px; font-size: 12px;">
+                                </div>
+                                <div class="form-group">
+                                    <label style="font-size: 11px;">Sub ID (Tùy chọn):</label>
+                                    <input type="text" id="affSubId" placeholder="Ví dụ: bot_cart" style="padding: 7px 10px; font-size: 12px;">
+                                </div>
+                            </div>
+
+                            <div class="form-group">
+                                <label style="font-size: 11px;">API Secret Key:</label>
+                                <input type="password" id="affSecret" placeholder="Dán API Secret Key vào đây" style="padding: 7px 10px; font-size: 12px;">
+                            </div>
+
+                            <div style="display: flex; gap: 8px; justify-content: flex-end; margin-top: 4px;">
+                                <button type="button" class="btn btn-secondary" onclick="testAffiliateConvert()" style="padding: 6px 12px; font-size: 11px;">
+                                    <i class="fa-solid fa-vial"></i> Test Chuyển Link Thử
+                                </button>
+                                <button type="button" class="btn btn-primary" onclick="saveAffiliateConfig()" style="padding: 6px 14px; font-size: 11px; flex: unset;">
+                                    <i class="fa-solid fa-floppy-disk"></i> Lưu Cấu Hình
+                                </button>
+                            </div>
+                            <div id="affTestResult" style="display: none; font-size: 11px; padding: 8px; border-radius: 6px; background: rgba(0, 0, 0, 0.4); word-break: break-all;"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- KHU VỰC LỆNH ĐỊA CHỈ (ẨN/HIỆN THEO CHECKBOX) -->
+                <div id="groupAddressCmd" class="form-group">
                     <label for="addressCommand">
-                        <span class="badge-step">Bước 2</span> Lệnh Thêm Địa Chỉ
+                        <span class="badge-step" style="background: rgba(59,130,246,0.2); color: #60A5FA; border-color: rgba(59,130,246,0.4);">/diachi</span> Chọn Loại Lệnh Địa Chỉ
                     </label>
                     <select id="addressCommand">
                         <option value="/diachi" selected>/diachi (Mặc định)</option>
                         <option value="/addressnew">/addressnew (Tạo mới nâng cao)</option>
                     </select>
                 </div>
-
-                <!-- Tùy chọn mailfree (mặc định tắt) -->
-                <div style="margin-top: 4px; padding-top: 8px; border-top: 1px dashed var(--border-color);">
-                    <label style="cursor: pointer; font-size: 12px; color: var(--text-muted); display: inline-flex; align-items: center; gap: 8px;">
-                        <input type="checkbox" id="useMailfree" style="width: 15px; height: 15px; cursor: pointer;">
-                        <span>Kèm lệnh <code style="color: #C084FC;">/mailfree</code> trước khi thêm giỏ (Mặc định: ĐÃ TẮT)</span>
-                    </label>
-                </div>
             </div>
 
             <!-- CARD 2: CẤU HÌNH ĐỊA CHỈ (LỰA CHỌN 2 & 3) -->
-            <div class="card">
+            <div class="card" id="cardAddress">
                 <div class="card-header">
                     <div class="card-title"><i class="fa-solid fa-location-dot"></i> Dữ Liệu Địa Chỉ Cho Bot</div>
+                    <span id="badgeAddressStatus" class="badge-step" style="background: rgba(16,185,129,0.2); color: #34D399; border-color: rgba(16,185,129,0.4);">Đang Bật</span>
                 </div>
 
                 <!-- Tab bar -->
@@ -978,11 +996,66 @@
         return text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
     }
 
+    // Cập nhật giao diện khi người dùng tích/bỏ tích các lệnh
+    function updateSelectedCmdsUI() {
+        const useMailfree = document.getElementById('useMailfree') ? document.getElementById('useMailfree').checked : false;
+        const useAddtocart = document.getElementById('useAddtocart') ? document.getElementById('useAddtocart').checked : true;
+        const useAddress = document.getElementById('useAddress') ? document.getElementById('useAddress').checked : true;
+
+        let count = 0;
+        if (useMailfree) count++;
+        if (useAddtocart) count++;
+        if (useAddress) count++;
+
+        const countEl = document.getElementById('activeCmdsCount');
+        const badgeEl = document.getElementById('activeCmdsBadge');
+        if (countEl) countEl.textContent = `${count}/3 Lệnh`;
+        if (badgeEl) badgeEl.textContent = `${count} Lệnh Được Chọn`;
+
+        const groupCart = document.getElementById('groupAddtocart');
+        if (groupCart) {
+            groupCart.style.display = useAddtocart ? 'flex' : 'none';
+        }
+
+        const groupAddrCmd = document.getElementById('groupAddressCmd');
+        if (groupAddrCmd) {
+            groupAddrCmd.style.display = useAddress ? 'flex' : 'none';
+        }
+
+        const cardAddr = document.getElementById('cardAddress');
+        const badgeAddr = document.getElementById('badgeAddressStatus');
+        if (cardAddr) {
+            cardAddr.style.opacity = useAddress ? '1' : '0.45';
+        }
+        if (badgeAddr) {
+            if (useAddress) {
+                badgeAddr.textContent = 'Đang Bật';
+                badgeAddr.style.background = 'rgba(16,185,129,0.2)';
+                badgeAddr.style.color = '#34D399';
+                badgeAddr.style.borderColor = 'rgba(16,185,129,0.4)';
+            } else {
+                badgeAddr.textContent = 'Đã Tắt';
+                badgeAddr.style.background = 'rgba(156,163,175,0.15)';
+                badgeAddr.style.color = '#9CA3AF';
+                badgeAddr.style.borderColor = 'rgba(156,163,175,0.3)';
+            }
+        }
+    }
+
     // Bắt đầu chiến dịch
     async function startWorkflow() {
+        const useMailfree = document.getElementById('useMailfree') ? document.getElementById('useMailfree').checked : false;
+        const useAddtocart = document.getElementById('useAddtocart') ? document.getElementById('useAddtocart').checked : true;
+        const useAddress = document.getElementById('useAddress') ? document.getElementById('useAddress').checked : true;
+
+        if (!useMailfree && !useAddtocart && !useAddress) {
+            alert('Vui lòng tích chọn ít nhất 1 lệnh để bot thực thi (/mailfree, /addtocart hoặc /diachi)!');
+            return;
+        }
+
         const productLink = document.getElementById('productLink').value.trim();
-        if (!productLink) {
-            alert('Vui lòng nhập Link Sản Phẩm để bot thêm vào giỏ hàng!');
+        if (useAddtocart && !productLink) {
+            alert('Bạn đã tích chọn lệnh Thêm Giỏ Hàng (/addtocart), vui lòng nhập Link Sản Phẩm!');
             document.getElementById('productLink').focus();
             return;
         }
@@ -998,9 +1071,11 @@
         }
 
         const config = {
+            use_mailfree: useMailfree,
+            use_addtocart: useAddtocart,
+            use_address: useAddress,
             product_link: productLink,
             product_variant: document.getElementById('productVariant') ? document.getElementById('productVariant').value.trim() : '',
-            use_mailfree: document.getElementById('useMailfree') ? document.getElementById('useMailfree').checked : false,
             address_command: document.getElementById('addressCommand').value,
             address_area: document.getElementById('addressArea').value.trim(),
             address_name: document.getElementById('addressName').value.trim(),
@@ -1236,6 +1311,7 @@
 
     // Khởi tạo
     window.addEventListener('DOMContentLoaded', () => {
+        updateSelectedCmdsUI();
         updateLineCount();
         checkTelegramAuth();
         loadAffiliateConfig();

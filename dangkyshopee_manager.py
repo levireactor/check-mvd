@@ -222,6 +222,8 @@ class DangKyShopeeManager:
             "product_variant": "",  # Phân loại/mẫu sản phẩm mong muốn (nếu có)
             "max_cart_retries": 3,
             "use_mailfree": False,  # Mặc định bỏ lệnh mailfree
+            "use_addtocart": True,  # Tùy chọn lệnh addtocart (mặc định bật)
+            "use_address": True,   # Tùy chọn lệnh diachi (mặc định bật)
             "address_command": "/diachi",  # /diachi hoặc /addressnew
             "address_area": "",
             "address_name": "",
@@ -307,9 +309,17 @@ class DangKyShopeeManager:
         if not nicks_raw or not isinstance(nicks_raw, list) or len(nicks_raw) == 0:
             return False, "Danh sách nick trống!"
 
-        product_link = str(config.get("product_link", "")).strip()
-        if not product_link:
-            return False, "Vui lòng nhập Link sản phẩm để thêm vào giỏ!"
+        use_mailfree = bool(config.get("use_mailfree", False))
+        use_addtocart = bool(config.get("use_addtocart", True))
+        use_address = bool(config.get("use_address", True))
+
+        if not (use_mailfree or use_addtocart or use_address):
+            return False, "Vui lòng chọn ít nhất 1 lệnh để thực thi (Mailfree, Thêm Giỏ Hàng hoặc Địa Chỉ)!"
+
+        if use_addtocart:
+            product_link = str(config.get("product_link", "")).strip()
+            if not product_link:
+                return False, "Bạn đã bật lệnh Thêm Giỏ Hàng, vui lòng nhập Link sản phẩm!"
 
         self.config.update(config)
         self.should_stop = False
@@ -447,9 +457,11 @@ class DangKyShopeeManager:
     async def _process_single_account(self, client, bot_entity, item):
         raw_nick = item["raw"]
         use_mailfree = bool(self.config.get("use_mailfree", False))
+        use_addtocart = bool(self.config.get("use_addtocart", True))
+        use_address = bool(self.config.get("use_address", True))
 
         # =========================================================================
-        # (TÙY CHỌN) LỆNH /mailfree (Mặc định: ĐÃ BỎ)
+        # (TÙY CHỌN) LỆNH 1: /mailfree
         # =========================================================================
         if use_mailfree:
             self.current_step = "LỆNH: /mailfree"
@@ -471,59 +483,63 @@ class DangKyShopeeManager:
                 return False
 
         # =========================================================================
-        # BƯỚC 1: LỆNH /addtocart
+        # (TÙY CHỌN) LỆNH 2: /addtocart
         # =========================================================================
-        step_cart_num = "BƯỚC 2" if use_mailfree else "BƯỚC 1"
-        self.current_step = f"{step_cart_num}: /addtocart"
-        item["status"] = "addtocart"
-        item["step_detail"] = "Đang gửi lệnh /addtocart..."
-        prod_link = self.config.get("product_link", "").strip()
+        if use_addtocart:
+            self.current_step = "LỆNH: /addtocart"
+            item["status"] = "addtocart"
+            item["step_detail"] = "Đang gửi lệnh /addtocart..."
+            prod_link = self.config.get("product_link", "").strip()
 
-        # Kiểm tra tự động chuyển đổi sang link Affiliate của người dùng
-        aff_cfg = load_affiliate_config()
-        if aff_cfg.get("enabled") and aff_cfg.get("app_id") and aff_cfg.get("secret"):
-            self.log("🔗 Đang chuyển đổi link sản phẩm sang link Affiliate của bạn...", "info")
-            aff_ok, aff_res = convert_shopee_affiliate_link(prod_link)
-            if aff_ok:
-                prod_link = aff_res
-                self.log(f"✅ Đã chuyển đổi thành công link Affiliate: {prod_link}", "success")
+            # Kiểm tra tự động chuyển đổi sang link Affiliate của người dùng
+            aff_cfg = load_affiliate_config()
+            if aff_cfg.get("enabled") and aff_cfg.get("app_id") and aff_cfg.get("secret"):
+                self.log("🔗 Đang chuyển đổi link sản phẩm sang link Affiliate của bạn...", "info")
+                aff_ok, aff_res = convert_shopee_affiliate_link(prod_link)
+                if aff_ok:
+                    prod_link = aff_res
+                    self.log(f"✅ Đã chuyển đổi thành công link Affiliate: {prod_link}", "success")
+                else:
+                    self.log(f"⚠️ Chuyển đổi link Affiliate chưa được: {aff_res}. Tiếp tục dùng link gốc.", "warning")
+
+            self.log(f"📤 Gửi /addtocart {prod_link}|<nick>...", "info")
+
+            cart_cmd = f"/addtocart {prod_link}|{raw_nick}"
+            success_cart, cart_res = await self._execute_addtocart(client, bot_entity, cart_cmd)
+            if success_cart:
+                item["cart_info"] = cart_res
+                self.log(f"✅ Lệnh /addtocart THÀNH CÔNG! {cart_res}", "success")
             else:
-                self.log(f"⚠️ Chuyển đổi link Affiliate chưa được: {aff_res}. Tiếp tục dùng link gốc.", "warning")
+                item["cart_info"] = f"Lỗi: {cart_res}"
+                if not use_address:
+                    item["error"] = f"Lỗi /addtocart: {cart_res}"
+                    return False
+                self.log(f"⚠️ Lệnh /addtocart không thành công ({cart_res}), tiếp tục chạy luôn lệnh địa chỉ...", "warning")
 
-        self.log(f"📤 Gửi {step_cart_num}: /addtocart {prod_link}|<nick>...", "info")
+            await asyncio.sleep(2)
 
-        cart_cmd = f"/addtocart {prod_link}|{raw_nick}"
-        success_cart, cart_res = await self._execute_addtocart(client, bot_entity, cart_cmd)
-        if success_cart:
-            item["cart_info"] = cart_res
-            self.log(f"✅ {step_cart_num} (/addtocart) THÀNH CÔNG! {cart_res}", "success")
-        else:
-            item["cart_info"] = f"Lỗi: {cart_res}"
-            self.log(f"⚠️ {step_cart_num} (/addtocart) không thành công ({cart_res}), tiếp tục chạy luôn lệnh địa chỉ...", "warning")
-
-        await asyncio.sleep(2)
-
-        if self.should_stop:
-            return False
+            if self.should_stop:
+                return False
 
         # =========================================================================
-        # BƯỚC 2: LỆNH /diachi hoặc /addressnew (Interactive Wizard)
+        # (TÙY CHỌN) LỆNH 3: /diachi hoặc /addressnew (Interactive Wizard)
         # =========================================================================
-        step_addr_num = "BƯỚC 3" if use_mailfree else "BƯỚC 2"
-        self.current_step = f"{step_addr_num}: ĐỊA CHỈ"
-        item["status"] = "diachi"
-        item["step_detail"] = "Đang gửi lệnh thêm địa chỉ..."
-        addr_cmd_type = self.config.get("address_command", "/diachi")
-        self.log(f"📤 Gửi {step_addr_num}: {addr_cmd_type} cho nick...", "info")
+        if use_address:
+            self.current_step = "LỆNH: ĐỊA CHỈ"
+            item["status"] = "diachi"
+            item["step_detail"] = "Đang gửi lệnh thêm địa chỉ..."
+            addr_cmd_type = self.config.get("address_command", "/diachi")
+            self.log(f"📤 Gửi lệnh {addr_cmd_type} cho nick...", "info")
 
-        addr_cmd = f"{addr_cmd_type} {raw_nick}"
-        success_addr, addr_res = await self._execute_address_wizard(client, bot_entity, addr_cmd)
-        if not success_addr:
-            item["error"] = f"Lỗi {step_addr_num} ({addr_cmd_type}): {addr_res}"
-            return False
+            addr_cmd = f"{addr_cmd_type} {raw_nick}"
+            success_addr, addr_res = await self._execute_address_wizard(client, bot_entity, addr_cmd)
+            if not success_addr:
+                item["error"] = f"Lỗi ({addr_cmd_type}): {addr_res}"
+                return False
 
-        item["address_info"] = addr_res
-        self.log(f"✅ {step_addr_num} ({addr_cmd_type}) THÀNH CÔNG! {addr_res}", "success")
+            item["address_info"] = addr_res
+            self.log(f"✅ Lệnh {addr_cmd_type} THÀNH CÔNG! {addr_res}", "success")
+
         return True
 
     # -------------------------------------------------------------------------
