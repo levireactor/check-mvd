@@ -772,7 +772,7 @@
                     </div>
                     <div class="form-group" style="flex: 1;">
                         <label>Timeout mỗi bước (giây):</label>
-                        <input type="number" id="timeoutStep" value="50" min="20" max="180">
+                        <input type="number" id="timeoutStep" value="80" min="20" max="240">
                     </div>
                 </div>
 
@@ -1083,7 +1083,8 @@
             phone_mode: document.getElementById('phoneMode').value,
             custom_phone: document.getElementById('customPhone').value.trim(),
             delay_between_nicks: parseInt(document.getElementById('delayBetween').value) || 6,
-            timeout_step: parseInt(document.getElementById('timeoutStep').value) || 50
+            timeout_step: parseInt(document.getElementById('timeoutStep').value) || 80,
+            timeout_cart: 80
         };
 
         try {

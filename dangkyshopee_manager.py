@@ -231,7 +231,8 @@ class DangKyShopeeManager:
             "phone_mode": "auto",  # auto: lấy sđt acc nếu có, ko có thì random; random: luôn random; custom: dùng số chỉ định
             "custom_phone": "",
             "delay_between_nicks": 6,
-            "timeout_step": 50,
+            "timeout_step": 80,
+            "timeout_cart": 80,
             "max_area_retries": 3
         }
 
@@ -721,7 +722,7 @@ class DangKyShopeeManager:
         3. Bấm nút XÁC NHẬN thêm sản phẩm (VD: '✅ Thêm 1 sản phẩm')
         4. Chờ bot trả về 'KẾT QUẢ THÊM GIỎ'
         """
-        timeout = int(self.config.get("timeout_step", 50))
+        timeout = int(self.config.get("timeout_cart", 80))
         target_variant = self.config.get("product_variant", "").strip()
 
         last_sent = await client.send_message(bot_entity, cmd_text)
