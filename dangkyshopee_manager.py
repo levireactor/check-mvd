@@ -689,15 +689,15 @@ class DangKyShopeeManager:
             if success:
                 return True, res_or_err
 
-            # Nếu phiên bị lỗi: đợi 8s để chạy lại theo yêu cầu
+            # Nếu phiên bị lỗi: gửi /stop và đợi 20s để chạy lại theo yêu cầu
             if attempt < max_retries and not self.should_stop:
-                self.log(f"⚠️ Phiên thêm giỏ bị lỗi: '{res_or_err}'. Đang đợi 8 giây để chạy lại...", "warning")
+                self.log(f"⚠️ Phiên thêm giỏ bị lỗi: '{res_or_err}'. Đã gửi /stop, đang đợi 20 giây để chạy lại...", "warning")
                 # Gửi /stop để dọn dẹp nếu bot đang kẹt phiên dở
                 try:
                     await client.send_message(bot_entity, "/stop")
                 except Exception:
                     pass
-                await asyncio.sleep(8)
+                await asyncio.sleep(20)
 
         return False, f"Thêm giỏ thất bại sau {max_retries} lần thử"
 
