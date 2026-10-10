@@ -499,11 +499,7 @@ class DangKyShopeeManager:
             self.log(f"✅ {step_cart_num} (/addtocart) THÀNH CÔNG! {cart_res}", "success")
         else:
             item["cart_info"] = f"Lỗi: {cart_res}"
-            self.log(f"⚠️ {step_cart_num} (/addtocart) không thành công ({cart_res}). Dọn dẹp phiên và tiếp tục chạy lệnh địa chỉ...", "warning")
-            try:
-                await client.send_message(bot_entity, "/stop")
-            except Exception:
-                pass
+            self.log(f"⚠️ {step_cart_num} (/addtocart) không thành công ({cart_res}), tiếp tục chạy luôn lệnh địa chỉ...", "warning")
 
         await asyncio.sleep(2)
 
