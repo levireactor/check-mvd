@@ -558,25 +558,90 @@ class DangKyShopeeManager:
         return False, f"Hết thời gian chờ phản hồi ({timeout}s)"
 
     # -------------------------------------------------------------------------
-    # BỘ XỬ LÝ LỆNH 2: /addtocart (NÂNG CẤP: QUÉT PHÂN LOẠI & RETRY 8S)
+    # BỘ XỬ LÝ LỆNH: /addtocart (NÂNG CẤP: CHỌN PHÂN LOẠI & BẤM NÚT XÁC NHẬN THÊM SẢN PHẨM)
     # -------------------------------------------------------------------------
+    def _is_cancel_button(self, btn_text):
+        """Kiểm tra nếu nút mang ý nghĩa Hủy/Cancel/Quay lại/Đóng"""
+        if not btn_text:
+            return False
+        t = btn_text.strip().lower()
+        cancel_keywords = ["hủy", "huy", "cancel", "quay lại", "thoát", "close", "đóng", "back", "dừng", "stop"]
+        return any(ck in t for ck in cancel_keywords)
+
+    def _is_qty_button(self, btn_text):
+        """Kiểm tra nếu nút là nút tăng giảm số lượng (- / +)"""
+        if not btn_text:
+            return False
+        t = btn_text.strip()
+        if t in ["-", "+", "➖", "➕", "--", "++", "<", ">", "<<", ">>"]:
+            return True
+        if re.fullmatch(r'[-+➖➕]+', t):
+            return True
+        return False
+
+    def _is_confirm_button(self, btn_text):
+        """
+        Kiểm tra nếu nút là nút Xác nhận thêm sản phẩm vào giỏ
+        (VD: '✅ Thêm 1 sản phẩm', 'Thêm vào giỏ', 'Xác nhận', 'Hoàn tất')
+        """
+        if not btn_text:
+            return False
+        if self._is_cancel_button(btn_text) or self._is_qty_button(btn_text):
+            return False
+
+        low = btn_text.strip().lower()
+
+        # 1. Chứa 'thêm' kết hợp với từ khóa sản phẩm / giỏ / món
+        if "thêm" in low and any(w in low for w in ["sản phẩm", "sp", "vào giỏ", "giỏ hàng", "món", "hang", "hàng"]):
+            return True
+
+        # 2. Bắt đầu bằng icon check/tick và có chữ 'thêm' (VD: '✅ Thêm 1 sản phẩm', '✓ Thêm...')
+        if any(ic in btn_text for ic in ["✅", "✔", "✓", "☑"]) and "thêm" in low:
+            return True
+
+        # 3. Mẫu 'thêm <số lượng>' (VD: 'Thêm 1', 'Thêm 2')
+        if re.search(r'thêm\s+\d+', low):
+            return True
+
+        # 4. Từ khóa xác nhận rõ ràng
+        if any(ck in low for ck in ["xác nhận thêm", "xác nhận", "hoàn tất"]):
+            return True
+
+        return False
+
+    def _find_confirm_button(self, buttons):
+        """Tìm nút xác nhận thêm sản phẩm trong danh sách buttons"""
+        for row in buttons:
+            for btn in row:
+                b_txt = (btn.text or "").strip()
+                if self._is_confirm_button(b_txt):
+                    return btn
+        return None
+
     def _find_best_variant_button(self, buttons, target_variant=""):
         """
         Quét danh sách các nút phân loại của sản phẩm:
         - Bỏ qua tuyệt đối các nút mang ý nghĩa Hủy/Cancel/Quay lại/Đóng.
+        - Bỏ qua các nút tăng giảm số lượng (- / +).
+        - Bỏ qua các nút Xác nhận thêm sản phẩm.
         - Tìm nút trùng hoặc gần giống nhất với tên phân loại đã nhập.
-        - Nếu không quét thấy hoặc không nhập phân loại: Tự động chọn RANDOM một nút sản phẩm hợp lệ!
+        - Nếu không quét thấy hoặc không nhập phân loại: Tự động chọn nút phân loại đầu tiên hợp lệ!
         """
         valid_btns = []
-        cancel_keywords = ["hủy", "huy", "cancel", "quay lại", "thoát", "close", "đóng", "back", "dừng", "stop"]
 
         for row in buttons:
             for btn in row:
                 b_txt = (btn.text or "").strip()
                 if not b_txt:
                     continue
-                # Bỏ qua hoàn toàn các nút Hủy / Cancel
-                if any(ck in b_txt.lower() for ck in cancel_keywords):
+                # Bỏ qua nút Hủy / Cancel
+                if self._is_cancel_button(b_txt):
+                    continue
+                # Bỏ qua nút tăng giảm số lượng
+                if self._is_qty_button(b_txt):
+                    continue
+                # Bỏ qua nút xác nhận thêm sản phẩm (để bấm ở bước xác nhận riêng)
+                if self._is_confirm_button(b_txt):
                     continue
                 valid_btns.append(btn)
 
@@ -606,9 +671,8 @@ class DangKyShopeeManager:
             if best_btn and best_score > 0:
                 return best_btn, "MATCH_SIMILAR"
 
-        # 3. Không trùng khớp hoặc không nhập => Chọn RANDOM ô sản phẩm hợp lệ (Không bấm Hủy)
-        chosen = random.choice(valid_btns)
-        return chosen, "RANDOM_CHOICE"
+        # 3. Không trùng khớp hoặc không nhập => Chọn nút phân loại đầu tiên
+        return valid_btns[0], "FIRST_CHOICE"
 
     async def _execute_addtocart(self, client, bot_entity, cmd_text):
         """Thực thi thêm giỏ hàng kèm cơ chế thử lại nếu lỗi: đợi 8s để chạy lại"""
@@ -638,13 +702,21 @@ class DangKyShopeeManager:
         return False, f"Thêm giỏ thất bại sau {max_retries} lần thử"
 
     async def _run_single_addtocart(self, client, bot_entity, cmd_text):
-        """Chạy một chu trình thêm giỏ hàng và xử lý quét nút phân loại"""
+        """
+        Chạy một chu trình thêm giỏ hàng:
+        1. Gửi lệnh /addtocart
+        2. Chọn phân loại sản phẩm (nếu có yêu cầu hoặc chưa chọn)
+        3. Bấm nút XÁC NHẬN thêm sản phẩm (VD: '✅ Thêm 1 sản phẩm')
+        4. Chờ bot trả về 'KẾT QUẢ THÊM GIỎ'
+        """
         timeout = int(self.config.get("timeout_step", 50))
         target_variant = self.config.get("product_variant", "").strip()
 
         last_sent = await client.send_message(bot_entity, cmd_text)
         start_time = time.time()
-        handled_btn_ids = set()
+        variant_clicked = False
+        confirm_clicked = False
+        last_confirm_click_time = 0
 
         while time.time() - start_time < timeout:
             if self.should_stop:
@@ -678,21 +750,52 @@ class DangKyShopeeManager:
                 if "Bạn đang có phiên chạy dở" in txt:
                     return False, "Kẹt phiên chạy dở"
 
-                # 3. Quét các nút phân loại sản phẩm nếu có
-                if m.buttons and m.id not in handled_btn_ids and "KẾT QUẢ THÊM GIỎ" not in txt:
-                    btn, match_type = self._find_best_variant_button(m.buttons, target_variant)
-                    if btn:
-                        handled_btn_ids.add(m.id)
-                        if match_type in ["MATCH_EXACT", "MATCH_SIMILAR"]:
-                            self.log(f"🛒 Quét thấy phân loại khớp '{target_variant}': Bấm chọn '{btn.text}'...", "info")
-                        else:
-                            self.log(f"🎲 Không thấy phân loại trùng khớp, tự động chọn ngẫu nhiên ô: '{btn.text}' (Không chọn Hủy)...", "info")
+                # 3. Quét và xử lý các nút inline của bot
+                if m.buttons and "KẾT QUẢ THÊM GIỎ" not in txt:
+                    confirm_btn = self._find_confirm_button(m.buttons)
+                    variant_btn, match_type = self._find_best_variant_button(m.buttons, target_variant)
 
+                    # TRƯỜNG HỢP A: Có cấu hình phân loại cụ thể và cần bấm chọn phân loại đó trước
+                    need_select_variant = (
+                        bool(target_variant) and 
+                        not variant_clicked and 
+                        variant_btn is not None and 
+                        match_type in ["MATCH_EXACT", "MATCH_SIMILAR"]
+                    )
+
+                    if need_select_variant:
+                        self.log(f"🛒 Quét thấy phân loại khớp '{target_variant}': Bấm chọn '{variant_btn.text}'...", "info")
                         try:
-                            await btn.click()
+                            await variant_btn.click()
+                            variant_clicked = True
                         except Exception as _b_err:
                             self.log(f"⚠️ Lỗi bấm nút phân loại: {_b_err}", "warning")
+                        await asyncio.sleep(2)
+                        break
 
+                    # TRƯỜNG HỢP B: Đã có nút Xác nhận thêm sản phẩm (VD: '✅ Thêm 1 sản phẩm')
+                    if confirm_btn:
+                        now = time.time()
+                        # Bấm nút xác nhận nếu chưa bấm, hoặc thử lại sau 6 giây nếu bot chưa phản hồi
+                        if not confirm_clicked or (now - last_confirm_click_time > 6):
+                            self.log(f"🔘 Bấm nút xác nhận thêm sản phẩm: '{confirm_btn.text}'...", "info")
+                            try:
+                                await confirm_btn.click()
+                                confirm_clicked = True
+                                last_confirm_click_time = now
+                            except Exception as _c_err:
+                                self.log(f"⚠️ Lỗi bấm nút xác nhận thêm sản phẩm: {_c_err}", "warning")
+                            await asyncio.sleep(2)
+                            break
+
+                    # TRƯỜNG HỢP C: Chưa có nút xác nhận và chưa bấm phân loại, nhưng có các nút phân loại để chọn
+                    if not confirm_btn and not variant_clicked and variant_btn:
+                        self.log(f"📦 Bấm chọn phân loại sản phẩm: '{variant_btn.text}'...", "info")
+                        try:
+                            await variant_btn.click()
+                            variant_clicked = True
+                        except Exception as _v_err:
+                            self.log(f"⚠️ Lỗi bấm nút phân loại: {_v_err}", "warning")
                         await asyncio.sleep(2)
                         break
 
