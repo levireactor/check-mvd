@@ -237,6 +237,31 @@ class AutoRegManager:
         return True
 
     def save_account_record(self, account_raw, spc_st, phone):
+        # 1. Trích xuất thông tin định danh để chống trùng lặp tuyệt đối
+        parts = account_raw.split('|')
+        u_name = parts[0].strip() if len(parts) >= 1 else ""
+        u_phone = parts[2].strip() if len(parts) >= 3 else ""
+        
+        # Luôn ưu tiên lấy SĐT thực từ chuỗi account nếu phone truyền vào là 'Acc_Saved'
+        real_phone = u_phone if (u_phone and u_phone != "Acc_Saved") else phone
+        if not real_phone or real_phone == "Acc_Saved":
+            real_phone = u_name
+
+        existing = self.get_accounts()
+        # Kiểm tra xem tài khoản này đã từng được lưu hay chưa
+        for it in existing:
+            ex_raw = it.get("account_raw", "")
+            ex_parts = ex_raw.split('|')
+            ex_uname = ex_parts[0].strip() if len(ex_parts) >= 1 else ""
+            
+            # Trùng khớp Username hoặc toàn bộ chuỗi thông tin account
+            if u_name and ex_uname and u_name.lower() == ex_uname.lower():
+                self.log(f"ℹ️ Tài khoản '{u_name}' đã tồn tại trong danh sách. Bỏ qua không lưu trùng!", "info")
+                return False
+            if account_raw and ex_raw and account_raw.strip() == ex_raw.strip():
+                self.log(f"ℹ️ Thông tin account này đã được lưu trước đó. Bỏ qua ghi trùng!", "info")
+                return False
+
         now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         with open(FILE_TXT, "a", encoding="utf-8") as f:
             f.write(f"[{now}] {account_raw}\n")
@@ -244,16 +269,16 @@ class AutoRegManager:
                 f.write(f"  SPC_ST: {spc_st}\n")
             f.write("-" * 60 + "\n")
 
-        existing = self.get_accounts()
         existing.insert(0, {
             "id": str(int(time.time() * 1000)),
             "time": now,
-            "phone": phone,
+            "phone": real_phone,
             "account_raw": account_raw,
             "spc_st": spc_st
         })
         with open(FILE_JSON, "w", encoding="utf-8") as f:
             json.dump(existing, f, ensure_ascii=False, indent=2)
+        return True
 
     def start(self, server_id="dyn_ab1eb87836", count=1, delay=10, kiotproxy_key="", use_proxy=False):
         if self.is_running:
@@ -369,21 +394,32 @@ class AutoRegManager:
         """Hàm xử lý và lưu tài khoản khi Bot B báo TẠO ACCOUNT THÀNH CÔNG"""
         clean_txt = clean_txt.replace("`", "").strip()
         total_spent_cycle = cmsnpa_price + bot_fee
-        self.log(f"🎉 TẠO ACCOUNT THÀNH CÔNG CHO SĐT {phone_clean}! Chi phí phiên: {total_spent_cycle:,}đ (SIM: {cmsnpa_price:,}đ + Bot: {bot_fee:,}đ)", "success")
         
         acc_match = re.search(r'([a-zA-Z0-9_\-\.]+)\|([^\|\n]+)\|(\d+)\|(SPC_F=[^\s\n\r]+)', clean_txt)
         spc_st_match = re.search(r'(SPC_ST=[^\s\n\r]+)', clean_txt)
 
-        acc_raw = acc_match.group(0) if acc_match else f"Acc_{phone_clean}|Shopee"
-        spc_st = spc_st_match.group(1) if spc_st_match else ""
+        if acc_match:
+            acc_raw = acc_match.group(0)
+            u_phone = acc_match.group(3)
+        else:
+            acc_raw = f"Acc_{phone_clean}|Shopee"
+            u_phone = phone_clean
 
-        # Lưu vào danh sách accounts_reg
-        self.save_account_record(acc_raw, spc_st, phone_clean)
-        
-        # Tự động nạp luôn vào Cookie Vault của tool
+        # Luôn ưu tiên số điện thoại thực từ chuỗi account thay vì Acc_Saved
+        final_phone = u_phone if (u_phone and u_phone != "Acc_Saved") else phone_clean
+
+        # Lưu vào danh sách accounts_reg (có kiểm tra chống trùng lặp)
+        saved_ok = self.save_account_record(acc_raw, spc_st_match.group(1) if spc_st_match else "", final_phone)
+        if not saved_ok:
+            self.log(f"⚠️ Tài khoản này đã từng được lưu từ trước. Bỏ qua ghi đè và không tính trùng lặp!", "warning")
+            return False, "DUPLICATE_IGNORED", 0
+
+        self.log(f"🎉 TẠO ACCOUNT THÀNH CÔNG CHO SĐT {final_phone}! Chi phí phiên: {total_spent_cycle:,}đ (SIM: {cmsnpa_price:,}đ + Bot: {bot_fee:,}đ)", "success")
+
+        # Tự động nạp vào Cookie Vault của tool
         try:
             f_cookie = acc_match.group(4) if acc_match else acc_raw
-            self.save_to_cookie_vault(phone_clean, f_cookie, spc_st)
+            self.save_to_cookie_vault(final_phone, f_cookie, spc_st_match.group(1) if spc_st_match else "")
             self.log(f"💾 Đã tự động lưu vào Kho Cookie & Danh sách!", "success")
         except Exception as _ex:
             self.log(f"⚠️ Lỗi nạp Kho Cookie: {_ex}", "warning")
@@ -518,21 +554,18 @@ class AutoRegManager:
         headers = {"Authorization": f"Bearer {CMSNPA_KEY}", "Content-Type": "application/json"}
         cmsnpa_price = SERVICES.get(server_id, {}).get("price", 3200)
 
-        # 0. Kiểm tra nếu Bot B đang có phiên cũ đang chạy: Chờ kết thúc
+        # 0. Dọn dẹp trạng thái hàng đợi Bot B nếu có phiên treo cũ
         try:
-            recent_b = await client.get_messages(BOT_B, limit=3)
+            recent_b = await client.get_messages(BOT_B, limit=2)
             for m in recent_b:
-                if not m.out:
-                    txt = (m.text or "").lower()
-                    if "đang tạo account" in txt or "shopee đang gọi điện" in txt:
-                        self.log("⏳ Bot B đang có phiên reg đang chạy. Đang chờ 15s cho phiên cũ hoàn tất...", "info")
-                        for _ in range(5):
-                            await asyncio.sleep(3)
-                            msgs_check = await client.get_messages(BOT_B, limit=3)
-                            for mc in msgs_check:
-                                if not mc.out and "tạo account thành công" in (mc.text or "").lower():
-                                    self.log("🎉 Phiên cũ trên Bot B đã hoàn tất thành công!", "success")
-                                    return self._handle_success_account(mc.text, "Acc_Saved", cmsnpa_price, 700)
+                if not m.out and m.buttons:
+                    for row in m.buttons:
+                        for btn in row:
+                            if "hủy" in btn.text.lower() or "cancel" in btn.text.lower():
+                                self.log(f"🧹 Dọn dẹp nút treo cũ '{btn.text}' trên Bot B trước khi chạy lượt mới...", "info")
+                                await btn.click()
+                                await asyncio.sleep(2)
+                                break
         except Exception:
             pass
 

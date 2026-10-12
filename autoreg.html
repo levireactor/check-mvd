@@ -1799,8 +1799,21 @@
         } catch (e) {}
     }
 
-    function renderAccounts(accs) {
+    function renderAccounts(rawAccs) {
         const tbody = document.getElementById('tblAccountsBody');
+        
+        // 1. Chống trùng lặp danh sách (Deduplication theo Username hoặc chuỗi Account)
+        const seen = new Set();
+        const accs = [];
+        for (const it of (rawAccs || [])) {
+            const raw = (it.account_raw || '').trim();
+            const uname = (raw.split('|')[0] || '').toLowerCase().trim();
+            const key = uname ? uname : raw;
+            if (key && seen.has(key)) continue;
+            if (key) seen.add(key);
+            accs.push(it);
+        }
+
         document.getElementById('countAccs').textContent = accs.length;
         
         // Kiểm tra nếu có tài khoản mới tạo
@@ -1820,7 +1833,13 @@
             const parts = raw.split('|');
             const uName = parts[0] || '';
             const uPass = parts[1] || '';
-            const uPhone = it.phone || parts[2] || '';
+            let uPhone = it.phone || '';
+            if (!uPhone || uPhone === 'Acc_Saved') {
+                uPhone = parts[2] || '';
+            }
+            if (!uPhone || uPhone === 'Acc_Saved') {
+                uPhone = uName;
+            }
             const spcF = parts[3] || '';
 
             return `
