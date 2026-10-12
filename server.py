@@ -634,29 +634,88 @@ def _save_telegram_config(cfg):
     except Exception:
         return False
 
-def send_telegram_alert(text):
-    """Gửi tin nhắn Telegram thông báo nếu được kích hoạt"""
+def send_telegram_alert(text, bot_token=None, chat_id=None, force=False):
+    """Gửi tin nhắn Telegram thông báo nếu được kích hoạt hoặc khi force=True"""
     cfg = _load_telegram_config()
-    if not cfg.get('enabled'):
-        return False, "Telegram chưa bật"
-    token = (cfg.get('bot_token') or '').strip()
-    chat_id = (cfg.get('chat_id') or '').strip()
-    if not token or not chat_id:
-        return False, "Thiếu Token hoặc Chat ID"
+    token = (bot_token or cfg.get('bot_token') or '').strip()
+    target_chat = (chat_id or cfg.get('chat_id') or '').strip()
+    
+    # Nếu không phải test trực tiếp và tính năng đang tắt
+    if not force and not cfg.get('enabled') and not (bot_token and chat_id):
+        return False, "Tính năng thông báo Telegram đang tắt trong cấu hình"
+        
+    if not token or not target_chat:
+        return False, "Chưa cung cấp Bot Token hoặc Chat ID Telegram"
+        
     url = f"https://api.telegram.org/bot{token}/sendMessage"
-    payload = json.dumps({'chat_id': chat_id, 'text': text, 'parse_mode': 'HTML'}).encode('utf-8')
+    payload = json.dumps({
+        'chat_id': target_chat,
+        'text': text,
+        'parse_mode': 'HTML',
+        'disable_web_page_preview': True
+    }).encode('utf-8')
     req = urllib.request.Request(url, data=payload, headers={'Content-Type': 'application/json'})
     try:
-        with urllib.request.urlopen(req, context=ssl_ctx, timeout=8) as res:
+        with urllib.request.urlopen(req, context=ssl_ctx, timeout=10) as res:
             res_data = json.loads(res.read().decode('utf-8'))
             if res_data.get('ok'):
                 return True, "Gửi thành công"
-            return False, res_data.get('description', 'Lỗi không xác định')
+            return False, res_data.get('description', 'Lỗi không xác định từ Telegram')
     except urllib.error.HTTPError as e:
         err_msg = e.read().decode('utf-8', errors='replace')
-        return False, f"HTTP {e.code}: {err_msg}"
+        try:
+            err_json = json.loads(err_msg)
+            return False, err_json.get('description', f"HTTP {e.code}: {err_msg}")
+        except Exception:
+            return False, f"HTTP {e.code}: {err_msg}"
     except Exception as e:
         return False, str(e)
+
+def format_order_telegram_message(order):
+    """Format tin nhắn đơn hàng Shopee gửi về Telegram dạng HTML chuyên nghiệp"""
+    sn = order.get('order_sn') or order.get('order_id') or '--'
+    mvd = order.get('tracking_no') or 'Chưa có MVĐ'
+    carrier = order.get('carrier') or 'Shopee Express'
+    status = order.get('status_desc') or order.get('status_badge_text') or 'Đang xử lý'
+    name = order.get('receiver_name') or '--'
+    phone = order.get('receiver_phone') or '--'
+    addr = order.get('receiver_address') or '--'
+    prod = order.get('product_name') or '--'
+    cod = order.get('cod_amount') or '0 đ'
+    pay_st = order.get('payment_status') or 'Chưa thanh toán'
+    time_order = order.get('order_time') or datetime.datetime.now().strftime("%H:%M %d/%m/%Y")
+    shop = order.get('note_name') or ''
+    if not shop and order.get('account'):
+        shop = order['account'].get('username') or order['account'].get('phone') or ''
+
+    # Emoji biểu tượng theo trạng thái
+    st_lower = status.lower()
+    if 'giao thành công' in st_lower or 'đã giao' in st_lower:
+        st_icon = '✅'
+    elif 'hủy' in st_lower:
+        st_icon = '❌'
+    elif 'đang giao' in st_lower or 'vận chuyển' in st_lower or 'bưu cục' in st_lower:
+        st_icon = '🚚'
+    else:
+        st_icon = '📦'
+
+    msg = f"{st_icon} <b>THÔNG TIN ĐƠN HÀNG SHOPEE</b>\n"
+    msg += f"━━━━━━━━━━━━━━━━━━━━━\n"
+    msg += f"🔖 <b>Mã đơn:</b> <code>{sn}</code>\n"
+    msg += f"🚚 <b>Vận đơn (MVĐ):</b> <code>{mvd}</code> <i>({carrier})</i>\n"
+    msg += f"⚡ <b>Trạng thái:</b> <b>{status}</b>\n"
+    msg += f"👤 <b>Người nhận:</b> <b>{name}</b>\n"
+    msg += f"📞 <b>SĐT nhận:</b> <code>{phone}</code>\n"
+    msg += f"📍 <b>Địa chỉ:</b> {addr}\n"
+    msg += f"🛍️ <b>Sản phẩm:</b> {prod}\n"
+    msg += f"💰 <b>COD / Thu hộ:</b> <b>{cod}</b> ({pay_st})\n"
+    msg += f"⏰ <b>Thời gian đặt:</b> {time_order}\n"
+    if shop:
+        msg += f"🏪 <b>Shop / Acc:</b> <code>{shop}</code>\n"
+    msg += f"━━━━━━━━━━━━━━━━━━━━━\n"
+    msg += f"🤖 <i>Shopee Sheet Manager Tracker</i>"
+    return msg
+
 
 # ━━━ HÀNH TRÌNH VẬN CHUYỂN BƯU CỤC (TRACKING TIMELINE) ━━━━━━━━
 def fetch_order_tracking_timeline(order_id, spc_st):
@@ -1882,13 +1941,58 @@ class TrackingRequestHandler(http.server.SimpleHTTPRequestHandler):
             try:
                 body = self._read_body()
                 msg = body.get('message', '').strip() or '🤖 <b>Shopee Tracker Test:</b> Kết nối Telegram Bot thành công!'
-                ok, res_msg = send_telegram_alert(msg)
+                token = body.get('bot_token', '').strip()
+                chat_id = body.get('chat_id', '').strip()
+                ok, res_msg = send_telegram_alert(msg, bot_token=token or None, chat_id=chat_id or None, force=True)
                 if ok:
                     self._json(200, {'success': True, 'message': 'Đã gửi tin nhắn thử nghiệm tới Telegram!'})
                 else:
                     self._json(400, {'error': f'Không thể gửi tin nhắn Telegram: {res_msg}'})
             except Exception as e:
                 self._json(500, {'error': str(e)})
+
+        elif self.path == '/api/telegram/send_order':
+            try:
+                body = self._read_body()
+                order = body.get('order')
+                orders = body.get('orders', [])
+                token = body.get('bot_token', '').strip()
+                chat_id = body.get('chat_id', '').strip()
+
+                if not order and not orders:
+                    return self._json(400, {'error': 'Thiếu dữ liệu đơn hàng'})
+
+                target_orders = [order] if order else orders
+                sent_count = 0
+                failed_count = 0
+                last_err = ""
+
+                for idx, ord_item in enumerate(target_orders):
+                    if not ord_item:
+                        continue
+                    text_msg = format_order_telegram_message(ord_item)
+                    ok, res_msg = send_telegram_alert(text_msg, bot_token=token or None, chat_id=chat_id or None, force=True)
+                    if ok:
+                        sent_count += 1
+                    else:
+                        failed_count += 1
+                        last_err = res_msg
+
+                    # Delay nhẹ để chống Telegram flood limit nếu gửi nhiều đơn
+                    if len(target_orders) > 1 and idx < len(target_orders) - 1:
+                        time.sleep(0.35)
+
+                if sent_count > 0:
+                    self._json(200, {
+                        'success': True,
+                        'message': f'Đã gửi {sent_count}/{len(target_orders)} đơn hàng về Telegram thành công!',
+                        'sent_count': sent_count,
+                        'failed_count': failed_count
+                    })
+                else:
+                    self._json(400, {'error': f'Gửi thất bại: {last_err}'})
+            except Exception as e:
+                self._json(500, {'error': f'Lỗi hệ thống gửi Telegram: {str(e)}'})
 
         elif self.path == '/api/order/tracking-timeline':
             try:

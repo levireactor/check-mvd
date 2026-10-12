@@ -2622,6 +2622,225 @@
     .tag-variable:hover {
       background: #c7d2fe;
     }
+
+    /* ━━━ EXCEL COOKIE INSPECTOR & EXCEL SPREADSHEET STYLES ━━━ */
+    .cookie-cell-wrap {
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+      padding: 2px 0;
+    }
+    .cookie-user-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      font-size: 0.72rem;
+      font-weight: 600;
+      color: #2563eb;
+      background: rgba(37, 99, 235, 0.08);
+      padding: 1px 6px;
+      border-radius: 4px;
+      width: fit-content;
+      max-width: 140px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    body.theme-dark .cookie-user-chip {
+      color: #60a5fa;
+      background: rgba(37, 99, 235, 0.2);
+    }
+    .cookie-sub-row {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+    .btn-cookie-excel {
+      background: rgba(16, 185, 129, 0.12);
+      border: 1px solid rgba(16, 185, 129, 0.35);
+      color: #10b981;
+      padding: 1px 6px;
+      border-radius: 4px;
+      font-size: 0.7rem;
+      font-weight: 700;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 3px;
+      transition: all 0.15s;
+    }
+    .btn-cookie-excel:hover {
+      background: #10b981;
+      color: #fff;
+      box-shadow: 0 2px 6px rgba(16, 185, 129, 0.35);
+    }
+    .btn-tele-row {
+      background: rgba(2, 132, 199, 0.12);
+      border: 1px solid rgba(2, 132, 199, 0.35);
+      color: #0284c7;
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-size: 0.72rem;
+      font-weight: 600;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 3px;
+      transition: all 0.15s;
+    }
+    .btn-tele-row:hover {
+      background: #0284c7;
+      color: #fff;
+      box-shadow: 0 2px 6px rgba(2, 132, 199, 0.35);
+    }
+    body.theme-dark .btn-tele-row {
+      background: rgba(2, 132, 199, 0.2);
+      color: #38bdf8;
+    }
+
+    /* ── Excel Property Table (Inspector) ── */
+    .excel-prop-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.8rem;
+    }
+    .excel-prop-table tr {
+      border-bottom: 1px solid var(--border-light);
+    }
+    .excel-prop-table tr:hover {
+      background: rgba(0, 0, 0, 0.02);
+    }
+    body.theme-dark .excel-prop-table tr:hover {
+      background: rgba(255, 255, 255, 0.03);
+    }
+    .excel-prop-key {
+      width: 150px;
+      font-weight: 600;
+      color: var(--text-muted);
+      padding: 8px 10px;
+      background: rgba(0, 0, 0, 0.02);
+      border-right: 1px solid var(--border-light);
+      vertical-align: middle;
+    }
+    body.theme-dark .excel-prop-key {
+      background: rgba(255, 255, 255, 0.03);
+    }
+    .excel-prop-val {
+      padding: 8px 10px;
+      vertical-align: middle;
+      position: relative;
+    }
+    .excel-code-box {
+      font-family: var(--mono);
+      font-size: 0.75rem;
+      word-break: break-all;
+      background: rgba(0, 0, 0, 0.04);
+      padding: 6px 8px;
+      border-radius: 4px;
+      border: 1px solid var(--border-light);
+      max-height: 80px;
+      overflow-y: auto;
+    }
+    body.theme-dark .excel-code-box {
+      background: #090d16;
+    }
+
+    /* ── Excel Spreadsheet Grid View Modal ── */
+    .excel-ribbon-bar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      padding: 8px 12px;
+      background: linear-gradient(180deg, #107c41, #0f6c38);
+      color: #ffffff;
+      border-radius: 6px 6px 0 0;
+      flex-wrap: wrap;
+    }
+    .excel-ribbon-btn {
+      background: rgba(255, 255, 255, 0.15);
+      border: 1px solid rgba(255, 255, 255, 0.3);
+      color: #ffffff;
+      padding: 4px 10px;
+      border-radius: 4px;
+      font-size: 0.75rem;
+      font-weight: 600;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      transition: background 0.15s;
+    }
+    .excel-ribbon-btn:hover {
+      background: rgba(255, 255, 255, 0.3);
+    }
+    .excel-grid-container {
+      max-height: 480px;
+      overflow: auto;
+      border: 1px solid #107c41;
+      border-top: none;
+      background: var(--bg-table);
+    }
+    .excel-grid-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.78rem;
+      font-family: var(--sans);
+    }
+    .excel-grid-table th {
+      background: #f1f5f9;
+      color: #334155;
+      font-weight: 700;
+      padding: 6px 10px;
+      border: 1px solid #cbd5e1;
+      position: sticky;
+      top: 0;
+      z-index: 10;
+      white-space: nowrap;
+      text-align: left;
+    }
+    body.theme-dark .excel-grid-table th {
+      background: #1e293b;
+      color: #e2e8f0;
+      border-color: #334155;
+    }
+    .excel-grid-table td {
+      padding: 6px 10px;
+      border: 1px solid #e2e8f0;
+      white-space: nowrap;
+      vertical-align: middle;
+    }
+    body.theme-dark .excel-grid-table td {
+      border-color: #334155;
+    }
+    .excel-grid-table tr:hover {
+      background: #f8fafc;
+    }
+    body.theme-dark .excel-grid-table tr:hover {
+      background: #1e293b;
+    }
+    .excel-cell-mono {
+      font-family: var(--mono);
+      font-size: 0.74rem;
+    }
+    .excel-badge-live {
+      display: inline-block;
+      padding: 1px 6px;
+      border-radius: 99px;
+      background: rgba(16, 185, 129, 0.15);
+      color: #10b981;
+      font-weight: 700;
+      font-size: 0.7rem;
+    }
+    .excel-badge-die {
+      display: inline-block;
+      padding: 1px 6px;
+      border-radius: 99px;
+      background: rgba(239, 68, 68, 0.15);
+      color: #ef4444;
+      font-weight: 700;
+      font-size: 0.7rem;
+    }
   </style>
 </head>
 
@@ -2713,6 +2932,9 @@
     <button class="top-btn btn-copy" onclick="copyAllMVD()" title="Sao chép nhanh danh sách tất cả mã vận đơn">
       📋 Copy MVĐ
     </button>
+    <button class="top-btn" id="btn-top-excel-cookie" onclick="openCookieExcelModal()" title="Xem và quản lý tất cả Cookie dạng Bảng Tính Excel" style="background: rgba(16, 185, 129, 0.12); color: #10b981; border: 1px solid rgba(16, 185, 129, 0.35); font-weight: 700;">
+      <span>📊</span> <span>Bảng Excel Cookie</span>
+    </button>
 
     <!-- Ô Tìm Kiếm Nhanh -->
     <div class="top-search-wrap">
@@ -2725,6 +2947,13 @@
     <input type="file" id="json-file-input" accept=".json" onchange="importJSON(event)">
 
     <div class="top-spacer">
+      <!-- Nút Telegram Bot -->
+      <button class="top-btn" id="btn-top-telegram" onclick="openTelegramModal()" title="Cài đặt & Gửi đơn hàng về Telegram Bot">
+        <span id="top-tele-icon">🤖</span>
+        <span id="top-tele-text">Telegram: Kiểm tra...</span>
+        <span class="proxy-dot" id="top-tele-dot"></span>
+      </button>
+
       <!-- Nút Proxy -->
       <button class="top-btn btn-proxy" id="btn-top-proxy" onclick="openProxyModal()"
         title="Cài đặt & Quản lý Proxy KiotProxy">
@@ -2857,7 +3086,7 @@
       mới đã chọn</button>
     <button class="bulk-btn" onclick="bulkCopyMVD()">📋 Copy MVĐ</button>
     <button class="bulk-btn" onclick="bulkSetPaid(true)">💰 Đã thanh toán</button>
-    <button class="bulk-btn" onclick="bulkSetPaid(false)">⚠️ Chưa thanh toán</button>
+    <button class="bulk-btn" style="background:#0284c7;border-color:#0369a1;color:#fff;font-weight:600" onclick="bulkSendTelegram()">📲 Gửi Tele (<span id="bulk-tele-count">0</span>)</button>
     <button class="bulk-btn btn-danger" onclick="bulkDelete()">🗑 Xóa đã chọn</button>
     <button class="bulk-btn" onclick="clearSelection()" style="color:#94a3b8">Bỏ chọn</button>
   </div>
@@ -2935,6 +3164,9 @@
           </button>
         </div>
         <div style="display:flex;gap:6px">
+          <button class="top-btn" onclick="sendCurrentDetailOrderToTelegram()" style="background:#0284c7;color:#fff;border-color:#0369a1;font-weight:600" title="Bắn thông tin đơn hàng này về Telegram Bot">
+            ✈️ Bắn Về Tele
+          </button>
           <button class="top-btn btn-primary" onclick="recheckCurrentDetail()">🔄 Renew</button>
           <button class="top-btn" onclick="copyDetailCookie()">🍪 Cookie</button>
           <button class="top-btn" onclick="closeDetailModal()">Đóng</button>
@@ -3485,6 +3717,179 @@
     </div>
   </div>
 
+  <!-- ━━━ MODAL: CHI TIẾT COOKIE & TÀI KHOẢN (EXCEL INSPECTOR) ━━━ -->
+  <div class="modal-overlay" id="modal-cookie-inspector" onclick="if(event.target===this) closeCookieInspector()">
+    <div class="modal-box" style="max-width: 720px;">
+      <div class="modal-header" style="background: linear-gradient(135deg, #059669, #10b981); color: #fff;">
+        <div style="display:flex;align-items:center;gap:10px">
+          <span style="font-size:1.4rem">📊</span>
+          <div>
+            <h3 style="margin:0;font-size:1.02rem;color:#fff" id="inspector-modal-title">Chi Tiết Cookie & Thuộc Tính Excel</h3>
+            <div style="font-size:0.75rem;color:#d1fae5">Phân tích token, thông tin shop, kiểm tra phiên và sao chép trường dữ liệu</div>
+          </div>
+        </div>
+        <button class="modal-close" onclick="closeCookieInspector()" style="color:#fff">&times;</button>
+      </div>
+
+      <div class="modal-body" style="padding:1.1rem;gap:0.9rem">
+        <!-- Bảng thuộc tính chuẩn Excel -->
+        <div style="border:1px solid var(--border-light);border-radius:8px;overflow:hidden;background:var(--bg-table)">
+          <table class="excel-prop-table">
+            <tbody>
+              <tr>
+                <td class="excel-prop-key">🏷️ Tên Shop / Ghi chú</td>
+                <td class="excel-prop-val">
+                  <div style="display:flex;gap:6px;align-items:center">
+                    <input type="text" id="inspector-input-name" class="top-search-input" style="flex:1" placeholder="Nhập tên shop...">
+                    <button class="top-btn" onclick="saveInspectorName()" title="Lưu ghi chú cho dòng này">💾 Lưu</button>
+                  </div>
+                </td>
+              </tr>
+              <tr>
+                <td class="excel-prop-key">👤 Tài Khoản / User ID</td>
+                <td class="excel-prop-val">
+                  <div style="display:flex;justify-content:space-between;align-items:center">
+                    <b id="inspector-val-username" style="color:var(--primary-blue)">--</b>
+                    <span id="inspector-val-userid" style="font-size:0.75rem;color:var(--text-muted);font-family:var(--mono)">--</span>
+                  </div>
+                </td>
+              </tr>
+              <tr>
+                <td class="excel-prop-key">📱 Số Điện Thoại</td>
+                <td class="excel-prop-val">
+                  <div style="display:flex;justify-content:space-between;align-items:center">
+                    <b id="inspector-val-phone" style="font-family:var(--mono);color:#10b981">--</b>
+                    <button class="top-btn" style="padding:2px 8px;font-size:0.72rem" onclick="copyInspectorField('phone')">📋 Copy SĐT</button>
+                  </div>
+                </td>
+              </tr>
+              <tr>
+                <td class="excel-prop-key">⚡ Trạng Thái Phiên</td>
+                <td class="excel-prop-val">
+                  <div style="display:flex;justify-content:space-between;align-items:center">
+                    <div id="inspector-val-status">
+                      <span class="excel-badge-live">🟢 Đang hoạt động (Live)</span>
+                    </div>
+                    <button class="top-btn" style="padding:3px 9px;font-size:0.74rem" onclick="testCookieInInspector()">🔍 Check Sống/Chết</button>
+                  </div>
+                </td>
+              </tr>
+              <tr>
+                <td class="excel-prop-key">🔑 Token SPC_ST</td>
+                <td class="excel-prop-val">
+                  <div class="excel-code-box" id="inspector-box-spcst">--</div>
+                  <div style="display:flex;justify-content:flex-end;gap:6px;margin-top:4px">
+                    <button class="top-btn" style="padding:2px 8px;font-size:0.72rem" onclick="copyInspectorField('spc_st')">📋 Copy SPC_ST</button>
+                  </div>
+                </td>
+              </tr>
+              <tr>
+                <td class="excel-prop-key">🛡️ Token SPC_F / Device</td>
+                <td class="excel-prop-val">
+                  <div class="excel-code-box" id="inspector-box-spcf">--</div>
+                  <div style="display:flex;justify-content:flex-end;gap:6px;margin-top:4px">
+                    <button class="top-btn" style="padding:2px 8px;font-size:0.72rem" onclick="copyInspectorField('spc_f')">📋 Copy SPC_F</button>
+                  </div>
+                </td>
+              </tr>
+              <tr>
+                <td class="excel-prop-key">🍪 Full Raw Cookie</td>
+                <td class="excel-prop-val">
+                  <div class="excel-code-box" id="inspector-box-raw" style="max-height:60px">--</div>
+                  <div style="display:flex;justify-content:space-between;align-items:center;margin-top:4px">
+                    <span style="font-size:0.72rem;color:var(--text-muted)">Độ dài: <b id="inspector-val-cookielen">0</b> ký tự</span>
+                    <button class="top-btn" style="padding:2px 8px;font-size:0.72rem" onclick="copyInspectorField('raw')">📋 Copy Toàn Bộ</button>
+                  </div>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- Thay thế Cookie mới nếu cần -->
+        <div class="proxy-card" style="padding:0.75rem 1rem">
+          <div style="font-weight:700;font-size:0.8rem;margin-bottom:4px;color:var(--primary-blue)">🔄 Cập Nhật / Đổi Cookie Mới Cho Đơn Hàng Này:</div>
+          <div style="display:flex;gap:6px;align-items:center">
+            <input type="text" id="inspector-input-newcookie" class="top-search-input" style="flex:1" placeholder="Dán SPC_ST=... mới nếu cookie cũ hết hạn">
+            <button class="top-btn btn-primary" onclick="applyNewCookieInInspector()">Cập Nhật</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="modal-footer" style="display:flex;justify-content:space-between">
+        <button class="top-btn" onclick="saveInspectorToVault()" title="Đưa cookie này vào Kho Cookie Vault để dùng lại">🏪 Lưu Vào Kho Cookie</button>
+        <button class="top-btn" onclick="closeCookieInspector()">Đóng</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ━━━ MODAL: BẢNG QUẢN LÝ COOKIE DẠNG EXCEL SPREADSHEET ━━━ -->
+  <div class="modal-overlay" id="modal-cookie-excel" onclick="if(event.target===this) closeCookieExcelModal()">
+    <div class="modal-box" style="max-width: 1080px; width: 95vw;">
+      <div class="excel-ribbon-bar">
+        <div style="display:flex;align-items:center;gap:10px">
+          <span style="font-size:1.4rem">📊</span>
+          <div>
+            <h3 style="margin:0;font-size:1.02rem;color:#fff">Bảng Quản Lý Cookie (Excel Spreadsheet View)</h3>
+            <div style="font-size:0.74rem;color:#e2e8f0">Tổng hợp tất cả tài khoản & Cookie đang hoạt động trong bảng đơn hàng</div>
+          </div>
+        </div>
+        <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
+          <button class="excel-ribbon-btn" onclick="exportCookiesToExcel()"><i class="fa-solid fa-file-excel"></i> 📥 Xuất File Excel (.csv)</button>
+          <button class="excel-ribbon-btn" onclick="copyColumnCookies('spc_st')">📋 Copy Cột SPC_ST</button>
+          <button class="excel-ribbon-btn" onclick="copyColumnCookies('full')">📋 Copy Cột Full Cookie</button>
+          <button class="excel-ribbon-btn" onclick="checkAllCookiesExcelHealth()">⚡ Check Sống Tất Cả</button>
+          <button class="modal-close" onclick="closeCookieExcelModal()" style="color:#fff;margin-left:8px">&times;</button>
+        </div>
+      </div>
+
+      <div class="modal-body" style="padding:0.75rem;gap:0.75rem">
+        <!-- Thanh Tìm kiếm & Thống kê nhanh -->
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap">
+          <div style="display:flex;gap:8px;align-items:center">
+            <input type="text" id="excel-search-input" class="top-search-input" style="width:240px" placeholder="Tìm tên shop, SĐT, User... " oninput="filterCookieExcelTable(this.value)">
+            <select id="excel-filter-status" class="select-filter" onchange="filterCookieExcelTable()">
+              <option value="all">Tất cả trạng thái</option>
+              <option value="live">🟢 Chỉ Cookie Live</option>
+              <option value="die">🔴 Cookie Die / Hết hạn</option>
+            </select>
+          </div>
+          <div style="font-size:0.78rem;color:var(--text-muted)">
+            Tổng số: <b id="excel-stat-total" style="color:var(--primary-blue)">0</b> Cookie | 
+            Live: <b id="excel-stat-live" style="color:#10b981">0</b> | 
+            Hết hạn: <b id="excel-stat-die" style="color:#ef4444">0</b>
+          </div>
+        </div>
+
+        <!-- Bảng tính lưới Excel (Grid View) -->
+        <div class="excel-grid-container">
+          <table class="excel-grid-table">
+            <thead>
+              <tr>
+                <th style="width:40px;text-align:center">#</th>
+                <th style="width:140px">Tên Shop / Ghi chú</th>
+                <th style="width:120px">Tài Khoản / SĐT</th>
+                <th>Token SPC_ST</th>
+                <th style="width:130px">Token SPC_F</th>
+                <th style="width:90px;text-align:center">Trạng Thái</th>
+                <th style="width:80px;text-align:center">Số Đơn</th>
+                <th style="width:110px;text-align:center">Thao Tác</th>
+              </tr>
+            </thead>
+            <tbody id="excel-grid-body">
+              <tr><td colspan="8" style="text-align:center;padding:30px;color:var(--text-muted)">Đang tải danh sách cookie...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="modal-footer" style="display:flex;justify-content:space-between">
+        <span style="font-size:0.75rem;color:var(--text-muted)">💡 <i>Mẹo:</i> Bấm vào bất kỳ ô token nào để sao chép nhanh vào bộ nhớ tạm.</span>
+        <button class="top-btn" onclick="closeCookieExcelModal()">Đóng</button>
+      </div>
+    </div>
+  </div>
+
   <!-- ━━━ SIDE DRAWER: TÙY CHỌN CỘT & GIAO DIỆN (TRƯỢT MƯỢT MÀ BÊN PHẢI) ━━━ -->
   <div class="theme-drawer-backdrop" id="theme-drawer-backdrop" onclick="closeThemeDrawer()"></div>
 
@@ -3611,6 +4016,7 @@
       initProxyStatus();
       loadVaultList();
       initAutoRenewFromStorage();
+      updateTelegramTopBarStatus();
 
       // Keyboard shortcut Ctrl + S
       window.addEventListener('keydown', e => {
@@ -4165,6 +4571,18 @@
         if (row.payment_status === 'Chưa thanh toán') payClass = 'pay-unpaid';
         else if (row.payment_status === 'Đã thanh toán') payClass = 'pay-paid';
 
+        // Trích xuất thông tin tài khoản/SĐT để hiển thị chip Excel thông minh
+        let accPhone = (row.account && row.account.phone) ? row.account.phone : '';
+        let accUser = (row.account && row.account.username) ? row.account.username : '';
+        if (!accPhone) {
+          const mPhone = (row.cookie_raw || '').match(/(?:\+?84|0)[3|5|7|8|9]\d{8}/);
+          if (mPhone) accPhone = mPhone[0];
+        }
+        let chipLabel = accPhone || accUser || (row.note_name ? row.note_name.slice(0, 16) : '');
+        const cookieAccChip = chipLabel 
+          ? `<div class="cookie-user-chip" title="Tài khoản / SĐT: ${escapeHtml(chipLabel)}" onclick="openCookieInspector('${row.id}')">👤 ${escapeHtml(chipLabel)}</div>` 
+          : '';
+
         const cookieShort = row.cookie_preview || 'SPC...';
         const tagHtml = row.order_tag ? `<span class="badge-order-tag">${escapeHtml(row.order_tag)}</span>` : '';
 
@@ -4214,9 +4632,13 @@
       </td>
       <td data-col="cookie" class="col-cookie">
         <div class="cookie-cell-wrap">
-          <span class="cookie-text" title="${escapeHtml(row.cookie_raw || '')}">${escapeHtml(cookieShort)}</span>
+          ${cookieAccChip}
+          <div class="cookie-sub-row">
+            <span class="cookie-text" style="cursor:pointer" onclick="openCookieInspector('${row.id}')" title="Bấm để xem chi tiết Cookie dạng Excel Inspector">${escapeHtml(cookieShort)}</span>
+            <button class="btn-cookie-excel" onclick="openCookieInspector('${row.id}')" title="📊 Mở bảng thuộc tính Cookie kiểu Excel">📊 Excel</button>
+            <button class="btn-cookie-search" id="btn-renew-${row.id}" onclick="recheckSingleRow('${row.id}', event)" title="🔍 Bấm để kiểm tra lại (Renew) đơn hàng này">🔍</button>
+          </div>
           ${tagHtml}
-          <button class="btn-cookie-search" id="btn-renew-${row.id}" onclick="recheckSingleRow('${row.id}', event)" title="🔍 Bấm để kiểm tra lại (Renew) đơn hàng này">🔍</button>
         </div>
       </td>
       <td data-col="ordersn" class="col-ordersn">
@@ -4251,7 +4673,8 @@
         <span style="font-family:var(--mono);font-size:0.75rem">${escapeHtml(row.last_check || '--')}</span>
       </td>
       <td data-col="tool" class="col-tool cell-center">
-        <div style="display:inline-flex;gap:3px">
+        <div style="display:inline-flex;gap:3px;align-items:center">
+          <button class="btn-tele-row" onclick="sendOrderToTelegram('${row.id}')" title="✈️ Bắn thông tin đơn này về Bot Telegram">✈️ Tele</button>
           <button class="btn-msg-row" onclick="openMessageTemplateModal('${row.id}')" title="Soạn tin nhắn cho khách/shipper">💬</button>
           <button class="btn-del-row" onclick="deleteRow('${row.id}')" title="Xóa dòng này">🗑</button>
         </div>
@@ -4826,6 +5249,7 @@
         });
         if (d.success) {
           showToast('Đã lưu cấu hình Telegram!', '🤖');
+          updateTelegramTopBarStatus();
           closeTelegramModal();
         } else {
           showToast(d.error || 'Lỗi lưu cấu hình', '❌');
@@ -4837,20 +5261,510 @@
 
     async function testSendTelegram() {
       showToast('Đang gửi tin thử nghiệm...', '⏳');
+      const token = $('input-tele-token').value.trim();
+      const chat_id = $('input-tele-chatid').value.trim();
       try {
         const d = await safeApiCall('/api/telegram/test', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ message: '🤖 <b>[Shopee Tracker Test]</b> Kết nối Telegram Bot thành công 100%!' })
+          body: JSON.stringify({ 
+            message: '🤖 <b>[Shopee Tracker Test]</b> Kết nối Telegram Bot thành công 100%!',
+            bot_token: token,
+            chat_id: chat_id
+          })
         });
         if (d.success) {
           showToast('Đã gửi tin nhắn thành công qua Telegram!', '✅');
+          updateTelegramTopBarStatus();
         } else {
           alert(d.error || 'Gửi thất bại, vui lòng kiểm tra lại Bot Token và Chat ID.');
         }
       } catch (e) {
         alert('Lỗi: ' + e.message);
       }
+    }
+
+    // ── TELEGRAM STATUS & GỬI ĐƠN HÀNG ──
+    async function updateTelegramTopBarStatus() {
+      try {
+        const d = await safeApiCall('/api/telegram/info');
+        const txt = $('top-tele-text');
+        const dot = $('top-tele-dot');
+        const icon = $('top-tele-icon');
+        if (d && d.enabled) {
+          if (txt) txt.textContent = 'Telegram: Bật';
+          if (dot) {
+            dot.style.background = '#10b981';
+            dot.style.boxShadow = '0 0 8px #10b981';
+          }
+          if (icon) icon.textContent = '🤖';
+        } else {
+          if (txt) txt.textContent = 'Telegram: Tắt';
+          if (dot) {
+            dot.style.background = '#94a3b8';
+            dot.style.boxShadow = 'none';
+          }
+          if (icon) icon.textContent = '🤖';
+        }
+      } catch (e) {}
+    }
+
+    async function sendOrderToTelegram(rowId) {
+      const order = sheetRows.find(r => r.id === rowId);
+      if (!order) {
+        showToast('Không tìm thấy thông tin đơn hàng!', '⚠️');
+        return;
+      }
+
+      showToast(`Đang gửi đơn ${order.order_sn || order.order_id || ''} về Telegram...`, '⏳');
+      try {
+        const res = await safeApiCall('/api/telegram/send_order', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ order })
+        });
+
+        if (res.success) {
+          showToast(`✅ Đã gửi đơn ${order.order_sn || order.order_id} về Telegram!`, '🎉');
+          addLog(`[Telegram] Đã gửi thông tin đơn ${order.order_sn || order.order_id} về bot.`);
+        } else {
+          if ((res.error || '').includes('chưa bật') || (res.error || '').includes('Chưa cung cấp')) {
+            if (confirm(`Chưa cấu hình hoặc chưa bật Telegram Bot!\nBạn có muốn mở bảng cài đặt để thiết lập Bot Token & Chat ID ngay bây giờ không?`)) {
+              openTelegramModal();
+            }
+          } else {
+            showToast(res.error || 'Gửi Telegram thất bại', '❌');
+          }
+        }
+      } catch (e) {
+        showToast('Lỗi gửi Telegram: ' + e.message, '❌');
+      }
+    }
+
+    function sendCurrentDetailOrderToTelegram() {
+      if (typeof currentDetailRowId !== 'undefined' && currentDetailRowId) {
+        sendOrderToTelegram(currentDetailRowId);
+      } else {
+        showToast('Không xác định được đơn hàng hiện tại!', '⚠️');
+      }
+    }
+
+    async function bulkSendTelegram() {
+      const selected = sheetRows.filter(r => selectedRowIds.has(r.id));
+      if (!selected.length) {
+        showToast('Vui lòng tick chọn ít nhất 1 đơn hàng để gửi!', '⚠️');
+        return;
+      }
+
+      if (!confirm(`Bạn có chắc chắn muốn gửi ${selected.length} đơn hàng đã chọn về Telegram Bot không?`)) {
+        return;
+      }
+
+      showToast(`⏳ Đang gửi ${selected.length} đơn hàng về Telegram...`, '🤖');
+      try {
+        const res = await safeApiCall('/api/telegram/send_order', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ orders: selected })
+        });
+
+        if (res.success) {
+          showToast(`🎉 ${res.message || 'Gửi thành công!'}`, '✅');
+          addLog(`[Telegram Bulk] Đã gửi ${res.sent_count} đơn hàng về bot Telegram.`);
+        } else {
+          if ((res.error || '').includes('chưa bật') || (res.error || '').includes('Chưa cung cấp')) {
+            if (confirm(`Chưa cấu hình hoặc chưa bật Telegram Bot!\nBạn có muốn mở bảng cài đặt để cấu hình không?`)) {
+              openTelegramModal();
+            }
+          } else {
+            alert(res.error || 'Gửi thất bại');
+          }
+        }
+      } catch (e) {
+        showToast('Lỗi gửi Telegram: ' + e.message, '❌');
+      }
+    }
+
+    // ━━━ EXCEL COOKIE INSPECTOR LOGIC ━━━
+    let currentInspectorRowId = null;
+
+    function openCookieInspector(rowId) {
+      const row = sheetRows.find(r => r.id === rowId);
+      if (!row) {
+        showToast('Không tìm thấy thông tin dòng đơn hàng!', '⚠️');
+        return;
+      }
+      currentInspectorRowId = rowId;
+
+      const raw = row.cookie_raw || '';
+      const mSpcSt = raw.match(/SPC_ST=([^;\s\n]+)/) || [null, raw];
+      const mSpcF = raw.match(/SPC_F=([^;\s\n]+)/);
+      const mPhone = (row.account && row.account.phone) ? row.account.phone : ((raw.match(/(?:\+?84|0)[3|5|7|8|9]\d{8}/) || [])[0] || '--');
+      const uName = (row.account && row.account.username) ? row.account.username : (row.note_name || 'Chưa định danh');
+      const uId = (row.account && row.account.userid) ? `(UID: ${row.account.userid})` : '';
+
+      $('inspector-modal-title').textContent = `📊 Thuộc Tính Cookie: ${row.order_sn || row.order_id || 'Đơn Hàng'}`;
+      $('inspector-input-name').value = row.note_name || '';
+      $('inspector-val-username').textContent = uName;
+      $('inspector-val-userid').textContent = uId;
+      $('inspector-val-phone').textContent = mPhone;
+      
+      const stToken = mSpcSt[1] || raw;
+      $('inspector-box-spcst').textContent = stToken || '--';
+      $('inspector-box-spcf').textContent = mSpcF ? mSpcF[1] : (row.spc_f || '--');
+      $('inspector-box-raw').textContent = raw || '--';
+      $('inspector-val-cookielen').textContent = raw.length;
+      $('inspector-input-newcookie').value = '';
+
+      // Trạng thái live/die
+      $('inspector-val-status').innerHTML = raw.length > 20 
+        ? `<span class="excel-badge-live">🟢 Cookie Cấu Trúc Hợp Lệ</span>`
+        : `<span class="excel-badge-die">🔴 Cookie Thiếu / Ngắn</span>`;
+
+      $('modal-cookie-inspector').classList.add('show');
+    }
+
+    function closeCookieInspector() {
+      $('modal-cookie-inspector').classList.remove('show');
+      currentInspectorRowId = null;
+    }
+
+    function saveInspectorName() {
+      if (!currentInspectorRowId) return;
+      const val = $('inspector-input-name').value.trim();
+      const row = sheetRows.find(r => r.id === currentInspectorRowId);
+      if (row) {
+        row.note_name = val;
+        markUnsaved();
+        renderTable();
+        showToast('Đã lưu tên shop cho đơn này!', '💾');
+      }
+    }
+
+    function copyInspectorField(field) {
+      if (!currentInspectorRowId) return;
+      const row = sheetRows.find(r => r.id === currentInspectorRowId);
+      if (!row) return;
+
+      const raw = row.cookie_raw || '';
+      let textToCopy = '';
+      if (field === 'phone') {
+        textToCopy = $('inspector-val-phone').textContent;
+      } else if (field === 'spc_st') {
+        textToCopy = $('inspector-box-spcst').textContent;
+      } else if (field === 'spc_f') {
+        textToCopy = $('inspector-box-spcf').textContent;
+      } else if (field === 'raw') {
+        textToCopy = raw;
+      }
+
+      if (textToCopy && textToCopy !== '--') {
+        navigator.clipboard.writeText(textToCopy).then(() => {
+          showToast(`Đã sao chép ${field.toUpperCase()} vào bộ nhớ tạm!`, '📋');
+        }).catch(() => {
+          copyFallback(textToCopy);
+          showToast(`Đã sao chép!`, '📋');
+        });
+      }
+    }
+
+    async function testCookieInInspector() {
+      if (!currentInspectorRowId) return;
+      const row = sheetRows.find(r => r.id === currentInspectorRowId);
+      if (!row || !row.cookie_raw) return;
+
+      showToast('Đang kiểm tra kết nối tài khoản Shopee...', '⏳');
+      try {
+        const res = await safeApiCall('/api/vault/check', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ cookie: row.cookie_raw })
+        });
+        if (res.status === 'live') {
+          $('inspector-val-status').innerHTML = `<span class="excel-badge-live">🟢 Live 100% (${escapeHtml(res.username || 'Hợp lệ')})</span>`;
+          showToast('Cookie đang LIVE hoạt động bình thường!', '✅');
+        } else {
+          $('inspector-val-status').innerHTML = `<span class="excel-badge-die">🔴 Hết Hạn / Die (${escapeHtml(res.error || 'Error 19')})</span>`;
+          showToast('Cookie đã hết hạn hoặc bị đăng xuất!', '❌');
+        }
+      } catch (e) {
+        showToast('Lỗi kiểm tra: ' + e.message, '❌');
+      }
+    }
+
+    function applyNewCookieInInspector() {
+      if (!currentInspectorRowId) return;
+      const newCookie = $('inspector-input-newcookie').value.trim();
+      if (!newCookie) {
+        showToast('Vui lòng dán cookie SPC_ST mới!', '⚠️');
+        return;
+      }
+      const row = sheetRows.find(r => r.id === currentInspectorRowId);
+      if (row) {
+        row.cookie_raw = newCookie;
+        row.cookie_preview = newCookie.slice(0, 14) + '...';
+        markUnsaved();
+        renderTable();
+        openCookieInspector(currentInspectorRowId);
+        showToast('Đã cập nhật cookie mới cho đơn hàng!', '🎉');
+      }
+    }
+
+    async function saveInspectorToVault() {
+      if (!currentInspectorRowId) return;
+      const row = sheetRows.find(r => r.id === currentInspectorRowId);
+      if (!row || !row.cookie_raw) return;
+
+      const shopName = row.note_name || ($('inspector-val-phone').textContent !== '--' ? `Shopee ${$('inspector-val-phone').textContent}` : 'Shop Đơn Hàng');
+      showToast('Đang lưu vào Kho Cookie...', '⏳');
+      try {
+        const res = await safeApiCall('/api/vault/save', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            name: shopName,
+            cookie: row.cookie_raw,
+            tags: 'Sheet Orders'
+          })
+        });
+        if (res.success) {
+          showToast(`Đã lưu "${shopName}" vào Kho Cookie Vault!`, '🏪');
+        } else {
+          showToast(res.error || 'Lỗi lưu kho', '❌');
+        }
+      } catch (e) {
+        showToast('Lỗi: ' + e.message, '❌');
+      }
+    }
+
+    // ━━━ EXCEL SPREADSHEET COOKIE TABLE MODAL ━━━
+    let cachedExcelCookieList = [];
+
+    async function openCookieExcelModal() {
+      $('modal-cookie-excel').classList.add('show');
+      $('excel-grid-body').innerHTML = `<tr><td colspan="8" style="text-align:center;padding:30px;color:var(--text-muted)">⏳ Đang tổng hợp toàn bộ danh sách Cookie...</td></tr>`;
+
+      // 1. Lấy cookie từ bảng đơn hàng hiện tại
+      const mapCookies = new Map();
+
+      sheetRows.forEach(r => {
+        const raw = (r.cookie_raw || '').trim();
+        if (!raw) return;
+        const key = raw.slice(0, 40);
+        if (!mapCookies.has(key)) {
+          let phone = (r.account && r.account.phone) ? r.account.phone : '';
+          if (!phone) {
+            const m = raw.match(/(?:\+?84|0)[3|5|7|8|9]\d{8}/);
+            if (m) phone = m[0];
+          }
+          const mSpcSt = raw.match(/SPC_ST=([^;\s\n]+)/) || [null, raw];
+          const mSpcF = raw.match(/SPC_F=([^;\s\n]+)/);
+
+          mapCookies.set(key, {
+            id: r.id,
+            name: r.note_name || 'Đơn hàng Shopee',
+            user: (r.account && r.account.username) ? r.account.username : (phone || '--'),
+            phone: phone || '--',
+            spc_st: mSpcSt[1] || raw,
+            spc_f: mSpcF ? mSpcF[1] : (r.spc_f || '--'),
+            cookie_raw: raw,
+            status: raw.length > 20 ? 'live' : 'unknown',
+            order_count: 1
+          });
+        } else {
+          mapCookies.get(key).order_count += 1;
+        }
+      });
+
+      // 2. Lấy thêm từ Kho Cookie Vault nếu có
+      try {
+        const vList = await safeApiCall('/api/vault/list');
+        if (vList && vList.items) {
+          vList.items.forEach(v => {
+            const raw = (v.cookie || '').trim();
+            if (!raw) return;
+            const key = raw.slice(0, 40);
+            if (!mapCookies.has(key)) {
+              const mSpcSt = raw.match(/SPC_ST=([^;\s\n]+)/) || [null, raw];
+              const mSpcF = raw.match(/SPC_F=([^;\s\n]+)/);
+              mapCookies.set(key, {
+                id: v.id,
+                name: v.name || 'Shop Vault',
+                user: v.username || '--',
+                phone: v.username && v.username.startsWith('0') ? v.username : '--',
+                spc_st: mSpcSt[1] || raw,
+                spc_f: mSpcF ? mSpcF[1] : '--',
+                cookie_raw: raw,
+                status: v.status || 'unknown',
+                order_count: 0
+              });
+            }
+          });
+        }
+      } catch (e) {}
+
+      cachedExcelCookieList = Array.from(mapCookies.values());
+      renderCookieExcelTable();
+    }
+
+    function closeCookieExcelModal() {
+      $('modal-cookie-excel').classList.remove('show');
+    }
+
+    function filterCookieExcelTable() {
+      const q = ($('excel-search-input').value || '').toLowerCase().trim();
+      const statusFilter = $('excel-filter-status').value;
+      renderCookieExcelTable(q, statusFilter);
+    }
+
+    function renderCookieExcelTable(q = '', stFilter = 'all') {
+      const tbody = $('excel-grid-body');
+      let filtered = cachedExcelCookieList;
+
+      if (q) {
+        filtered = filtered.filter(it => 
+          it.name.toLowerCase().includes(q) ||
+          it.user.toLowerCase().includes(q) ||
+          it.phone.toLowerCase().includes(q) ||
+          it.spc_st.toLowerCase().includes(q)
+        );
+      }
+
+      if (stFilter === 'live') {
+        filtered = filtered.filter(it => it.status === 'live');
+      } else if (stFilter === 'die') {
+        filtered = filtered.filter(it => it.status === 'die');
+      }
+
+      // Thống kê
+      $('excel-stat-total').textContent = cachedExcelCookieList.length;
+      $('excel-stat-live').textContent = cachedExcelCookieList.filter(it => it.status === 'live').length;
+      $('excel-stat-die').textContent = cachedExcelCookieList.filter(it => it.status === 'die').length;
+
+      if (!filtered.length) {
+        tbody.innerHTML = `<tr><td colspan="8" style="text-align:center;padding:30px;color:var(--text-muted)">Không tìm thấy Cookie nào khớp bộ lọc.</td></tr>`;
+        return;
+      }
+
+      tbody.innerHTML = filtered.map((it, idx) => {
+        const shortSt = it.spc_st.length > 25 ? (it.spc_st.slice(0, 15) + '...' + it.spc_st.slice(-8)) : it.spc_st;
+        const shortF = it.spc_f.length > 20 ? (it.spc_f.slice(0, 10) + '...' + it.spc_f.slice(-6)) : it.spc_f;
+        const badgeSt = it.status === 'live' 
+          ? `<span class="excel-badge-live">Live</span>` 
+          : (it.status === 'die' ? `<span class="excel-badge-die">Die</span>` : `<span style="font-size:0.7rem;color:var(--text-muted)">Chưa check</span>`);
+
+        return `
+          <tr>
+            <td style="text-align:center;color:var(--text-muted);font-weight:600">${idx + 1}</td>
+            <td><b>${escapeHtml(it.name)}</b></td>
+            <td>
+              <span style="color:#2563eb;font-weight:600;cursor:pointer" onclick="copyTextDirect('${escapeHtml(it.phone !== '--' ? it.phone : it.user)}', 'SĐT/User')">
+                ${escapeHtml(it.phone !== '--' ? it.phone : it.user)}
+              </span>
+            </td>
+            <td>
+              <span class="excel-cell-mono" style="cursor:pointer;color:#475569" title="Bấm để copy SPC_ST: ${escapeHtml(it.spc_st)}" onclick="copyTextDirect('${escapeHtml(it.spc_st)}', 'SPC_ST')">
+                ${escapeHtml(shortSt)}
+              </span>
+            </td>
+            <td>
+              <span class="excel-cell-mono" style="cursor:pointer;color:#64748b" title="Bấm để copy SPC_F: ${escapeHtml(it.spc_f)}" onclick="copyTextDirect('${escapeHtml(it.spc_f)}', 'SPC_F')">
+                ${escapeHtml(shortF)}
+              </span>
+            </td>
+            <td style="text-align:center">${badgeSt}</td>
+            <td style="text-align:center"><b>${it.order_count}</b></td>
+            <td style="text-align:center">
+              <div style="display:inline-flex;gap:4px">
+                <button class="top-btn" style="padding:2px 7px;font-size:0.72rem" onclick="copyTextDirect('${escapeHtml(it.cookie_raw)}', 'Full Cookie')" title="Copy Full Cookie">📋 Copy</button>
+                <button class="top-btn btn-primary" style="padding:2px 7px;font-size:0.72rem" onclick="quickScanCookie('${escapeHtml(it.spc_st)}', '${escapeHtml(it.name)}')" title="Quét đơn ngay">🚀 Quét</button>
+              </div>
+            </td>
+          </tr>
+        `;
+      }).join('');
+    }
+
+    function copyTextDirect(text, label) {
+      if (!text || text === '--') return;
+      navigator.clipboard.writeText(text).then(() => {
+        showToast(`Đã copy ${label}!`, '📋');
+      }).catch(() => {
+        copyFallback(text);
+        showToast(`Đã copy ${label}!`, '📋');
+      });
+    }
+
+    function copyColumnCookies(type) {
+      if (!cachedExcelCookieList.length) {
+        showToast('Danh sách Cookie đang trống!', '⚠️');
+        return;
+      }
+      const list = type === 'spc_st' 
+        ? cachedExcelCookieList.map(it => it.spc_st).filter(Boolean)
+        : cachedExcelCookieList.map(it => it.cookie_raw).filter(Boolean);
+
+      const content = list.join('\n');
+      navigator.clipboard.writeText(content).then(() => {
+        showToast(`Đã sao chép toàn bộ ${list.length} Cookie vào bộ nhớ tạm!`, '📋');
+      }).catch(() => {
+        copyFallback(content);
+        showToast(`Đã sao chép ${list.length} Cookie!`, '📋');
+      });
+    }
+
+    function exportCookiesToExcel() {
+      if (!cachedExcelCookieList.length) {
+        showToast('Danh sách Cookie đang trống để xuất!', '⚠️');
+        return;
+      }
+
+      // Tạo file CSV có UTF-8 BOM để Excel hiển thị tiếng Việt hoàn hảo
+      let csv = '\uFEFF';
+      csv += 'STT,Tên Shop / Ghi Chú,Tài Khoản / SĐT,Token SPC_ST,Token SPC_F,Trạng Thái,Số Đơn Hàng,Full Cookie\n';
+
+      cachedExcelCookieList.forEach((it, idx) => {
+        const escapeCsv = (str) => `"${(str || '').replace(/"/g, '""')}"`;
+        csv += `${idx + 1},${escapeCsv(it.name)},${escapeCsv(it.phone !== '--' ? it.phone : it.user)},${escapeCsv(it.spc_st)},${escapeCsv(it.spc_f)},${escapeCsv(it.status)},${it.order_count},${escapeCsv(it.cookie_raw)}\n`;
+      });
+
+      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      const nowStr = new Date().toISOString().slice(0, 10);
+      link.setAttribute('href', url);
+      link.setAttribute('download', `Shopee_Cookie_Excel_${nowStr}.csv`);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      showToast('Đã tải xuống file Excel (.csv) thành công!', '📥');
+    }
+
+    async function checkAllCookiesExcelHealth() {
+      if (!cachedExcelCookieList.length) return;
+      showToast(`Đang kiểm tra sống/chết cho ${cachedExcelCookieList.length} Cookie...`, '⏳');
+      for (const it of cachedExcelCookieList) {
+        try {
+          const res = await safeApiCall('/api/vault/check', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ cookie: it.cookie_raw })
+          });
+          it.status = res.status || 'unknown';
+        } catch (e) {
+          it.status = 'unknown';
+        }
+      }
+      renderCookieExcelTable();
+      showToast('Đã kiểm tra xong sức khỏe toàn bộ Cookie!', '✅');
+    }
+
+    function quickScanCookie(cookie, name) {
+      closeCookieExcelModal();
+      openAddModal();
+      $('modal-cookie-input').value = cookie;
+      $('modal-note-input').value = name || '';
+      showToast(`Đã nạp Cookie của ${name || 'Shop'}, bấm "Bắt Đầu Quét" để lấy đơn!`, '🚀');
     }
 
     // ── DATE TABS GENERATION ──
@@ -4920,6 +5834,8 @@
       const bar = $('bulk-bar');
       const count = selectedRowIds.size;
       $('bulk-selected-count').textContent = count;
+      const elTeleCount = $('bulk-tele-count');
+      if (elTeleCount) elTeleCount.textContent = count;
       if (count > 0) bar.classList.add('show');
       else bar.classList.remove('show');
 
@@ -5468,6 +6384,7 @@
 
           if (!hadMvdBefore && row.tracking_no) {
             showToast(`🎉 Đã có MVĐ mới: ${row.tracking_no} (${row.carrier})`, '🚀');
+            try { sendOrderToTelegram(row.id); } catch(e) {}
           } else {
             showToast(`Đã làm mới đơn ${row.order_sn || row.order_id}!`, '✅');
           }
