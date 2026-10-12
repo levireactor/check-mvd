@@ -91,7 +91,7 @@ async def rent_phone_number(session, server_id):
     return None, None
 
 async def check_otp_api(session, rental_id):
-    """Hỏi OTP từ API"""
+    """Hỏi OTP từ API CMSNPA (bao gồm cả mã từ cuộc gọi và tin nhắn)"""
     headers = {
         "Authorization": f"Bearer {CMSNPA_KEY}",
         "Content-Type": "application/json"
@@ -100,13 +100,26 @@ async def check_otp_api(session, rental_id):
     try:
         async with session.post(f"{CMSNPA_BASE}/api/v1/check_code", headers=headers, json=payload, timeout=10) as r:
             data = await r.json()
-            # Kiểm tra các cấu trúc trả về khả dĩ
             if data.get("ResponseCode") == 0:
                 res = data.get("Result", {})
-                code = res.get("Code") or res.get("Otp") or res.get("code")
+                code = (
+                    res.get("Code") or 
+                    res.get("Otp") or 
+                    res.get("code") or 
+                    res.get("otp") or 
+                    res.get("Fields", {}).get("Mã OTP") or
+                    data.get("code") or
+                    data.get("otp")
+                )
+                if not code and isinstance(res, dict):
+                    for v in res.values():
+                        if isinstance(v, (str, int)):
+                            m_sub = re.search(r'\b(\d{4,8})\b', str(v))
+                            if m_sub:
+                                code = m_sub.group(1)
+                                break
                 if code:
                     return str(code).strip()
-            # Hoặc định dạng {"ok": true, "code": "..."}
             if data.get("code"):
                 return str(data.get("code")).strip()
     except Exception:
@@ -146,37 +159,58 @@ def save_account_data(account_raw, spc_st, phone):
     with open(FILE_JSON, "w", encoding="utf-8") as f:
         json.dump(existing, f, ensure_ascii=False, indent=2)
 
-async def cancel_pending_session_on_bot_b():
-    """Tìm nút '❌ Hủy Tạo Acc' trên Bot B và bấm hủy"""
+async def cancel_pending_session_on_bot_b(target_phone=""):
+    """Tìm nút '❌ Hủy Tạo Acc' trên Bot B và bấm hủy (hoặc gửi /huyreg)"""
+    clean_num = target_phone.lstrip("0") if target_phone else ""
     try:
-        msgs = await client.get_messages(BOT_B, limit=6)
+        msgs = await client.get_messages(BOT_B, limit=8)
         for m in msgs:
-            if m.buttons:
+            if not m.out and m.buttons:
+                txt = m.text or ""
+                # Ưu tiên đúng SĐT nếu có
+                if target_phone and (target_phone not in txt and clean_num not in txt):
+                    continue
                 for row in m.buttons:
                     for btn in row:
                         if "hủy" in btn.text.lower() or "cancel" in btn.text.lower():
                             print(f"\n[🛑] Đang bấm nút '{btn.text}' để hủy phiên đang chờ trên Bot B...")
                             await btn.click()
-                            await asyncio.sleep(2.5)
+                            await asyncio.sleep(2)
                             print("[✅] Đã hủy phiên reg trên Bot B thành công!")
                             return True
+        # Bấm trên bất kỳ tin nhắn Bot B nào có nút hủy nếu chưa tìm thấy
+        for m in msgs:
+            if not m.out and m.buttons:
+                for row in m.buttons:
+                    for btn in row:
+                        if "hủy" in btn.text.lower() or "cancel" in btn.text.lower():
+                            print(f"\n[🛑] Đang bấm nút '{btn.text}' trên Bot B...")
+                            await btn.click()
+                            await asyncio.sleep(2)
+                            print("[✅] Đã bấm hủy phiên trên Bot B thành công!")
+                            return True
+
+        # Fallback gửi /huyreg
+        await client.send_message(BOT_B, "/huyreg")
+        await asyncio.sleep(2)
+        return True
     except Exception as e:
         print(f"[!] Lỗi khi bấm hủy trên Bot B: {e}")
     return False
 
 async def click_resend_otp_on_bot_b():
-    """Tìm nút '📲 Gửi Lại Mã' trên Bot B và bấm gửi lại"""
+    """Tìm nút '📲 Gửi Lại Mã / Yêu cầu gọi lại' trên Bot B và bấm gửi lại"""
     try:
         msgs = await client.get_messages(BOT_B, limit=6)
         for m in msgs:
-            if m.buttons:
+            if not m.out and m.buttons:
                 for row in m.buttons:
                     for btn in row:
-                        if "gửi lại" in btn.text.lower() or "resend" in btn.text.lower():
-                            print(f"\n[📲] Đang bấm nút '{btn.text}' trên Bot B để gửi lại OTP...")
+                        if any(k in btn.text.lower() for k in ["gửi lại", "resend", "gọi lại", "cuộc gọi", "nhận mã"]):
+                            print(f"\n[📲] Đang bấm nút '{btn.text}' trên Bot B yêu cầu Shopee gọi lại mã OTP...")
                             await btn.click()
                             await asyncio.sleep(2)
-                            print("[✅] Đã bấm 'Gửi Lại Mã' thành công trên Bot B!")
+                            print("[✅] Đã bấm yêu cầu gọi lại OTP thành công trên Bot B!")
                             return True
     except Exception as e:
         print(f"[!] Lỗi khi bấm gửi lại mã trên Bot B: {e}")
@@ -283,7 +317,7 @@ async def run_single_reg(server_id, kiotproxy_key=""):
 
         # Bước 4: Lắng nghe OTP song song (Kênh 1: API Polling, Kênh 2: Tin nhắn @simclonenpa_bot)
         # Chờ trọn vẹn chu kỳ 300s của nhà mạng bên A (tối đa 310s)
-        print(f"⏳ Đang chờ OTP cho số {phone_clean} (Theo chu kỳ 300s của bên A)...")
+        print(f"⏳ Đang chờ OTP / Cuộc gọi cho số {phone_clean} (Theo chu kỳ 300s của bên A)...")
         otp_found = None
         is_expired = False
         start_wait = time.time()
@@ -292,27 +326,61 @@ async def run_single_reg(server_id, kiotproxy_key=""):
         captured_otp = {"code": None}
         clean_num = phone_clean.lstrip("0")
 
+        def _extract_otp_from_text(raw_text):
+            if not raw_text:
+                return None
+            m = re.search(r'(?:Mã OTP|Mã xác thực|Mã cuộc gọi|Mã|Code|OTP)[\s:]+\**(\d{4,8})\**', raw_text, re.IGNORECASE)
+            if m:
+                return m.group(1)
+            if any(k in raw_text.lower() for k in ["otp", "shopee", "phuocan", "cuộc gọi", "nhận mã", "thành công"]):
+                m2 = re.search(r'\b(\d{6})\b', raw_text)
+                if m2:
+                    return m2.group(1)
+            return None
+
         @client.on(events.NewMessage(chats=BOT_A))
         async def bot_a_handler(event):
             nonlocal is_expired
             text = event.raw_text
-            if "Đã nhận được OTP" in text:
-                if clean_num in text or "Số thuê" not in text:
-                    match = re.search(r'Mã OTP:\s*\**(\d{4,8})\**', text)
-                    if match:
-                        captured_otp["code"] = match.group(1)
-            elif "Hoàn tiền thuê số" in text or "Không nhận được OTP" in text:
-                if clean_num in text:
-                    is_expired = True
+            if clean_num in text or "Số thuê" not in text or phone_clean in text:
+                code = _extract_otp_from_text(text)
+                if code:
+                    captured_otp["code"] = code
+                elif "Hoàn tiền thuê số" in text or "Không nhận được OTP" in text:
+                    if clean_num in text:
+                        is_expired = True
 
-        resend_clicked = False
+        resend_count = 0
+        last_resend_time = 0
+        max_resends = 2
 
         while time.time() - start_wait < timeout:
-            # Tự động bấm '📲 Gửi Lại Mã' trên Bot B sau 100 giây nếu chưa có OTP
-            elapsed_wait = time.time() - start_wait
-            if elapsed_wait >= 100 and not resend_clicked:
-                resend_clicked = True
-                print(f"\n[⏰] Đã qua 100 giây chưa có OTP. Đang bấm nút '📲 Gửi Lại Mã' trên Bot B...")
+            now_t = time.time()
+            elapsed_wait = now_t - start_wait
+
+            # Kiểm tra xem Bot B có báo Shopee đang gọi điện không
+            try:
+                msgs_b_check = await client.get_messages(BOT_B, limit=3)
+                for mb in msgs_b_check:
+                    if mb.id > sent_msg_id and not mb.out:
+                        txt_b = mb.text or ""
+                        if "đang gọi điện" in txt_b.lower() or "cuộc gọi" in txt_b.lower():
+                            # Nhận diện cuộc gọi
+                            pass
+            except Exception:
+                pass
+
+            # Bấm gửi lại OTP / yêu cầu gọi lại: lần 1 sau 65s, lần 2 sau 130s
+            can_resend = False
+            if resend_count == 0 and elapsed_wait >= 65:
+                can_resend = True
+            elif resend_count == 1 and (now_t - last_resend_time >= 65):
+                can_resend = True
+
+            if can_resend and resend_count < max_resends:
+                resend_count += 1
+                last_resend_time = now_t
+                print(f"\n[📲] [Lượt {resend_count}/{max_resends}] Đang bấm nút 'Gửi Lại Mã / Yêu cầu gọi lại' trên Bot B...")
                 await click_resend_otp_on_bot_b()
 
             # 1. Đọc trực tiếp hộp thư Bot A trên Telegram (chống miss event)
@@ -321,17 +389,16 @@ async def run_single_reg(server_id, kiotproxy_key=""):
                 for m in msgs_a:
                     if m.id > sent_msg_id and not m.out:
                         txt_a = m.text or ""
-                        if "Đã nhận được OTP" in txt_a:
-                            if clean_num in txt_a or "số thuê" not in txt_a.lower():
-                                match = re.search(r'Mã OTP:\s*\**(\d{4,8})\**', txt_a)
-                                if match:
-                                    otp_found = match.group(1)
-                                    print(f"\n⚡ Bắt được OTP từ Bot A (@simclonenpa_bot): {otp_found}")
-                                    break
-                        elif "Hoàn tiền thuê số" in txt_a or "Không nhận được OTP" in txt_a:
-                            if clean_num in txt_a:
-                                is_expired = True
+                        if clean_num in txt_a or phone_clean in txt_a or "số thuê" not in txt_a.lower():
+                            code = _extract_otp_from_text(txt_a)
+                            if code:
+                                otp_found = code
+                                print(f"\n⚡ Bắt được OTP từ Bot A (@simclonenpa_bot): {otp_found}")
                                 break
+                            elif "Hoàn tiền thuê số" in txt_a or "Không nhận được OTP" in txt_a:
+                                if clean_num in txt_a:
+                                    is_expired = True
+                                    break
             except Exception:
                 pass
 
@@ -363,10 +430,10 @@ async def run_single_reg(server_id, kiotproxy_key=""):
         if not otp_found:
             print(f"\n🛑 Sim {phone_clean} đã hết hạn/hoàn tiền xong.")
             print(f"👉 Đang bấm '❌ Hủy Tạo Acc' bên Bot B (@sfast_main_bot)...")
-            await cancel_pending_session_on_bot_b()
-            print("⏳ Chờ 5 giây dọn dẹp hàng đợi trước khi bắt đầu phiên mới...")
-            await asyncio.sleep(5)
-            return False
+            await cancel_pending_session_on_bot_b(target_phone=phone_clean)
+            print("⏳ Chờ 3 giây dọn dẹp hàng đợi trước khi bắt đầu phiên mới...")
+            await asyncio.sleep(3)
+            return False, "EXPIRED"
 
         # Bước 5: Bơm OTP vào @sfast_main_bot
         otp_cmd = f"/otp {otp_found}"
@@ -405,13 +472,13 @@ async def run_single_reg(server_id, kiotproxy_key=""):
                     break
                 elif "mã otp nhập không đúng" in txt.lower() or "hết lượt thử" in txt.lower():
                     print(f"\n❌ Bot B báo thất bại: {txt}")
-                    return False
+                    return False, "FAILED"
 
             if account_done:
-                return True
+                return True, "SUCCESS"
 
         print("\n⚠️ Không nhận được phản hồi kết thúc từ Bot B (có thể cần kiểm tra trực tiếp Telegram).")
-        return False
+        return False, "TIMEOUT"
 
 # ========================================================
 # HÀM CHÍNH (MAIN MENU)
@@ -456,11 +523,11 @@ async def main():
 
     print("\nChọn chế độ chạy:")
     print("  [1] Chạy thử 1 tài khoản")
-    print("  [2] Chạy tự động liên tục N tài khoản")
+    print("  [2] Chạy tự động liên tục N tài khoản (Đạt đủ mục tiêu)")
     mode = input("👉 Nhập lựa chọn (1 hoặc 2, mặc định là 1): ").strip()
 
     if mode == "2":
-        count_str = input("👉 Bạn muốn reg bao nhiêu tài khoản?: ").strip()
+        count_str = input("👉 Bạn muốn tạo bao nhiêu tài khoản thành công?: ").strip()
         try:
             total_count = int(count_str)
         except ValueError:
@@ -473,17 +540,38 @@ async def main():
             delay_sec = 10
 
         success = 0
-        for i in range(1, total_count + 1):
-            print(f"\n>>> [TIẾN ĐỘ: {i}/{total_count}] <<<")
-            res = await run_single_reg(selected_srv["id"], kiotproxy_key)
-            if res:
+        failed = 0
+        refunded = 0
+        cycle = 0
+        max_attempts = max(total_count * 6, 20)
+
+        while success < total_count and cycle < max_attempts:
+            cycle += 1
+            print(f"\n>>> [TIẾN ĐỘ: Đã xong {success}/{total_count} Acc | Lượt thử #{cycle}] <<<")
+            res_tuple = await run_single_reg(selected_srv["id"], kiotproxy_key)
+            ok = res_tuple[0] if isinstance(res_tuple, tuple) else bool(res_tuple)
+            reason = res_tuple[1] if isinstance(res_tuple, tuple) else ""
+
+            if ok:
                 success += 1
-            if i < total_count:
-                print(f"💤 Nghỉ {delay_sec} giây trước khi chạy lượt tiếp theo...")
-                await asyncio.sleep(delay_sec)
+                if success < total_count:
+                    print(f"💤 Nghỉ {delay_sec} giây trước khi chạy lượt tiếp theo...")
+                    await asyncio.sleep(delay_sec)
+            else:
+                if reason in ["EXPIRED", "PHONE_REJECTED"]:
+                    refunded += 1
+                    print(f"🔄 SIM hoàn tiền (Lượt đổi SIM: {refunded}) ➡️ Tiếp tục chạy số mới...")
+                else:
+                    failed += 1
+                    print(f"❌ Acc thất bại trên Bot B (Lượt lỗi: {failed})")
+                await asyncio.sleep(3)
 
         print("\n" + "=" * 60)
-        print(f"🏁 HOÀN TẤT CHIẾN DỊCH! Thành công: {success}/{total_count} tài khoản.")
+        print("🏁 KẾT THÚC CHIẾN DỊCH REG SHOPEE")
+        print(f"🎯 Mục tiêu: {total_count} tài khoản")
+        print(f"✅ Thành công: {success} tài khoản")
+        print(f"❌ Thất bại thực tế (Bot B lỗi/hết lượt): {failed}")
+        print(f"🔄 Đổi SIM hoàn tiền (SIM không có OTP): {refunded}")
         print(f"📂 Xem danh sách tài khoản tại file: {FILE_TXT}")
         print("=" * 60)
     else:

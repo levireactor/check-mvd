@@ -318,9 +318,15 @@
         /* Metric Cards */
         .metrics-grid {
             display: grid;
-            grid-template-columns: repeat(4, 1fr);
-            gap: 16px;
+            grid-template-columns: repeat(5, 1fr);
+            gap: 14px;
             margin-bottom: 24px;
+        }
+
+        @media (max-width: 1200px) {
+            .metrics-grid {
+                grid-template-columns: repeat(3, 1fr);
+            }
         }
 
         @media (max-width: 768px) {
@@ -888,17 +894,22 @@
                     <i class="fa-solid fa-circle-check metric-icon-bg"></i>
                 </div>
                 <div class="metric-card">
-                    <div class="metric-title">Thất Bại</div>
+                    <div class="metric-title" title="Chỉ tính tài khoản thực sự lỗi trên Bot B (OTP sai / Hết lượt)">Thất Bại (Bot B)</div>
                     <div class="metric-value" id="valFailed" style="color: var(--danger);">0</div>
                     <i class="fa-solid fa-circle-xmark metric-icon-bg"></i>
                 </div>
                 <div class="metric-card">
-                    <div class="metric-title">Chi Phí Ước Tính</div>
+                    <div class="metric-title" title="Số lượt SIM hết hạn 300s hoặc SĐT cũ đã có nick Shopee được CMSNPA hoàn tiền 100%">Đổi SIM (Hoàn Tiền)</div>
+                    <div class="metric-value" id="valRefunded" style="color: #F59E0B;">0</div>
+                    <i class="fa-solid fa-rotate-left metric-icon-bg"></i>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-title">Chi Phí Thực Tế</div>
                     <div class="metric-value" id="valSpent" style="color: #60A5FA;">0 đ</div>
                     <i class="fa-solid fa-coins metric-icon-bg"></i>
                 </div>
                 <div class="metric-card">
-                    <div class="metric-title">Tiến Độ</div>
+                    <div class="metric-title">Tiến Độ Mục Tiêu</div>
                     <div class="metric-value" id="valProgress" style="color: #C084FC;">0%</div>
                     <i class="fa-solid fa-chart-pie metric-icon-bg"></i>
                 </div>
@@ -1676,8 +1687,13 @@
                 
                 const statusLbl = document.getElementById('lblEngineStatus');
                 if (isRunning) {
-                    statusLbl.textContent = `ĐANG CHẠY: [${d.current_step}]`;
-                    statusLbl.style.color = '#F59E0B';
+                    if (d.current_step === 'RECEIVING_CALL_OTP') {
+                        statusLbl.innerHTML = '<i class="fa-solid fa-phone-volume fa-shake" style="color:#38BDF8;"></i> ĐANG ĐÓN CUỘC GỌI OTP SHOPEE 📞';
+                        statusLbl.style.color = '#38BDF8';
+                    } else {
+                        statusLbl.textContent = `ĐANG CHẠY: [${d.current_step}]`;
+                        statusLbl.style.color = '#F59E0B';
+                    }
                 } else {
                     statusLbl.textContent = 'SẴN SÀNG (IDLE)';
                     statusLbl.style.color = '#10B981';
@@ -1702,11 +1718,16 @@
                 const st = d.stats || {};
                 document.getElementById('valSuccess').textContent = st.success || 0;
                 document.getElementById('valFailed').textContent = st.failed || 0;
+                const elRefunded = document.getElementById('valRefunded');
+                if (elRefunded) {
+                    elRefunded.textContent = st.refunded || 0;
+                }
                 document.getElementById('valSpent').textContent = (st.total_spent || 0).toLocaleString('vi-VN') + ' đ';
 
+                // Tiến độ chuẩn xác: Số acc hoàn thành / Tổng số acc yêu cầu
                 const total = st.total_requested || 1;
-                const done = (st.success || 0) + (st.failed || 0);
-                const pct = total > 0 ? Math.min(100, Math.round((done / total) * 100)) : 0;
+                const successCount = st.success || 0;
+                const pct = total > 0 ? Math.min(100, Math.round((successCount / total) * 100)) : 0;
                 document.getElementById('valProgress').textContent = pct + '%';
 
                 // Cập nhật Logs
@@ -1716,8 +1737,6 @@
             }
         } catch (e) {
             console.error("Lỗi lấy status:", e);
-        } finally {
-            if (icon) icon.classList.remove('fa-spin');
         }
     }
 

@@ -184,6 +184,7 @@ class AutoRegManager:
             "total_requested": 0,
             "success": 0,
             "failed": 0,
+            "refunded": 0,
             "total_spent": 0,
             "current_index": 0
         }
@@ -268,6 +269,7 @@ class AutoRegManager:
             "total_requested": count,
             "success": 0,
             "failed": 0,
+            "refunded": 0,
             "total_spent": 0,
             "current_index": 0
         }
@@ -304,28 +306,38 @@ class AutoRegManager:
             loop.close()
 
     async def cancel_pending_session_on_bot_b(self, client, target_phone=""):
-        """Tìm nút '❌ Hủy Tạo Acc' khớp đúng SĐT trên Bot B và bấm hủy (hoặc gửi /huyreg khi sim đã hết hạn)"""
+        """Tìm nút '❌ Hủy Tạo Acc' trên Bot B và bấm hủy (hoặc gửi /huyreg khi sim đã hết hạn)"""
         clean_num = target_phone.lstrip("0") if target_phone else ""
         try:
             msgs = await client.get_messages(BOT_B, limit=8)
+            # Ưu tiên 1: Tìm tin nhắn có đúng SĐT và có nút Hủy
             for m in msgs:
-                if not m.out:
+                if not m.out and m.buttons:
                     txt = m.text or ""
-                    # Bắt buộc đối chiếu đúng số điện thoại nếu có target_phone
-                    if target_phone and (target_phone not in txt and clean_num not in txt):
-                        continue
-
-                    if m.buttons:
+                    if target_phone and (target_phone in txt or clean_num in txt):
                         for row in m.buttons:
                             for btn in row:
                                 if "hủy" in btn.text.lower() or "cancel" in btn.text.lower():
-                                    phone_info = f" cho SĐT {target_phone}" if target_phone else ""
-                                    self.log(f"🛑 Đang bấm nút '{btn.text}' trên Bot B{phone_info}...", "warning")
+                                    self.log(f"🛑 Đang bấm nút '{btn.text}' trên Bot B cho SĐT {target_phone}...", "warning")
                                     await btn.click()
                                     await asyncio.sleep(2)
                                     self.log("✅ Đã bấm hủy phiên trên Bot B thành công!", "success")
                                     return True
-            # Nếu không tìm thấy nút bấm khớp số, gửi lệnh /huyreg trực tiếp
+
+            # Ưu tiên 2: Bấm nút Hủy trên tin nhắn Bot B mới nhất (kể cả khi Bot B không in lại SĐT)
+            for m in msgs:
+                if not m.out and m.buttons:
+                    for row in m.buttons:
+                        for btn in row:
+                            if "hủy" in btn.text.lower() or "cancel" in btn.text.lower():
+                                phone_info = f" cho SĐT {target_phone}" if target_phone else ""
+                                self.log(f"🛑 Đang bấm nút '{btn.text}' trên Bot B{phone_info}...", "warning")
+                                await btn.click()
+                                await asyncio.sleep(2)
+                                self.log("✅ Đã bấm hủy phiên trên Bot B thành công!", "success")
+                                return True
+
+            # Ưu tiên 3: Gửi lệnh /huyreg trực tiếp
             phone_info = f" (Sim {target_phone} đã hết hạn hoàn tiền trên Bot A)" if target_phone else ""
             self.log(f"🛑 Gửi lệnh /huyreg để làm sạch hàng đợi Bot B{phone_info}...", "info")
             await client.send_message(BOT_B, "/huyreg")
@@ -336,18 +348,18 @@ class AutoRegManager:
         return False
 
     async def click_resend_otp_on_bot_b(self, client):
-        """Tìm nút '📲 Gửi Lại Mã' trên Bot B và click sau 70s"""
+        """Tìm nút '📲 Gửi Lại Mã' trên Bot B và click"""
         try:
-            msgs = await client.get_messages(BOT_B, limit=4)
+            msgs = await client.get_messages(BOT_B, limit=5)
             for m in msgs:
-                if m.buttons:
+                if not m.out and m.buttons:
                     for row in m.buttons:
                         for btn in row:
-                            if "gửi lại" in btn.text.lower() or "resend" in btn.text.lower():
-                                self.log(f"📲 Tìm thấy nút '{btn.text}' trên Bot B. Đang bấm gửi lại OTP...", "info")
+                            if any(k in btn.text.lower() for k in ["gửi lại", "resend", "gọi lại", "cuộc gọi", "nhận mã"]):
+                                self.log(f"📲 Tìm thấy nút '{btn.text}' trên Bot B. Đang bấm gửi lại OTP/gọi lại...", "info")
                                 await btn.click()
                                 await asyncio.sleep(2)
-                                self.log("✅ Đã bấm nút 'Gửi Lại Mã' trên Bot B thành công!", "success")
+                                self.log("✅ Đã bấm nút gửi lại mã / cuộc gọi trên Bot B thành công!", "success")
                                 return True
         except Exception as e:
             self.log(f"⚠️ Lỗi khi bấm gửi lại mã trên Bot B: {e}", "warning")
@@ -389,8 +401,9 @@ class AutoRegManager:
         async with aiohttp.ClientSession() as http:
             current_success = 0
             cycle_count = 0
-            consecutive_fails = 0
-            max_attempts = max(count * 4, 10)  # Giới hạn tối đa số lần thử tránh chạy vô tận
+            consecutive_real_fails = 0
+            consecutive_refunds = 0
+            max_attempts = max(count * 6, 20)  # Giới hạn tối đa số lượt thử tránh chạy vô tận
 
             while current_success < count and not self.should_stop:
                 if cycle_count >= max_attempts:
@@ -406,7 +419,8 @@ class AutoRegManager:
                     current_success += 1
                     self.stats["success"] = current_success
                     self.stats["total_spent"] += spent_cycle
-                    consecutive_fails = 0
+                    consecutive_real_fails = 0
+                    consecutive_refunds = 0
                     
                     if current_success >= count:
                         self.log(f"🎉🎉 ĐÃ HOÀN THÀNH MỤC TIÊU! Tạo thành công {current_success}/{count} tài khoản Shopee.", "success")
@@ -420,25 +434,38 @@ class AutoRegManager:
                                 break
                             await asyncio.sleep(1)
                 else:
-                    self.stats["failed"] += 1
-                    consecutive_fails += 1
-                    if reason == "EXPIRED":
-                        self.log("🔄 SIM KHÔNG CÓ OTP ➡️ Đã dọn dẹp phiên. Tự động thuê số mới chạy tiếp...", "warning")
+                    if reason in ["USER_STOPPED", "STOPPED"]:
+                        self.log("🛑 Người dùng đã bấm dừng tiến trình.", "warning")
+                        break
                     elif reason == "INSUFFICIENT_BALANCE":
+                        self.stats["failed"] += 1
                         self.log("❌ Số dư trên Bot B không đủ. Dừng tiến trình ngay lập tức!", "error")
                         break
-                    elif reason == "PHONE_REJECTED":
-                        self.log("ℹ️ SĐT cũ bị từ chối. Đang thử lại với SĐT mới...", "info")
-                    elif reason == "PROXY_FAILED":
-                        self.log("⚠️ Lỗi đổi Proxy mới: Sẽ tự động thử lại lượt tiếp theo...", "warning")
-                    elif reason == "STOPPED":
-                        break
-                    else:
-                        self.log("⚠️ Phiên thử thất bại. Tự động thử lại lượt tiếp theo...", "warning")
+                    elif reason in ["EXPIRED", "PHONE_REJECTED", "RENT_FAIL", "NO_PHONE", "NETWORK_ERROR", "PROXY_FAILED"]:
+                        # ĐÂY LÀ TRƯỜNG HỢP SIM HOÀN TIỀN / RETRY TỰ ĐỘNG - KHÔNG TÍNH LÀ ACC THẤT BẠI
+                        self.stats["refunded"] += 1
+                        consecutive_refunds += 1
+                        consecutive_real_fails = 0
+                        if reason == "EXPIRED":
+                            self.log(f"🔄 SIM KHÔNG CÓ OTP (Đã hoàn tiền 100%) ➡️ Tự động đổi số mới... [Lượt đổi SIM: {self.stats['refunded']}]", "warning")
+                        elif reason == "PHONE_REJECTED":
+                            self.log(f"ℹ️ SĐT cũ bị từ chối / đã có nick Shopee (Hoàn tiền) ➡️ Tự động đổi số mới... [Lượt đổi SIM: {self.stats['refunded']}]", "info")
+                        elif reason == "PROXY_FAILED":
+                            self.log("⚠️ Đang chờ xoay Proxy mới: Tự động thử lại lượt tiếp theo...", "warning")
+                        else:
+                            self.log(f"⚠️ Lỗi kết nối / thuê số ({reason}): Tự động thử lại...", "warning")
 
-                    if consecutive_fails >= 5:
-                        self.log("❌ Đã thất bại liên tiếp 5 lần! Dừng tiến trình để tránh tiêu tốn chi phí.", "error")
-                        break
+                        if consecutive_refunds >= 10:
+                            self.log("❌ Đã thử liên tiếp 10 số nhưng chưa nhận được OTP từ nhà mạng. Tạm dừng để bạn kiểm tra nguồn SIM.", "error")
+                            break
+                    else:
+                        # THẤT BẠI THỰC TẾ TRÊN BOT B (OTP sai, timeout, lỗi tạo acc)
+                        self.stats["failed"] += 1
+                        consecutive_real_fails += 1
+                        self.log(f"❌ Phiên tạo tài khoản thất bại trên Bot B ({reason}).", "error")
+                        if consecutive_real_fails >= 5:
+                            self.log("❌ Đã thất bại liên tiếp 5 lần trên Bot B! Dừng tiến trình để tránh tiêu tốn chi phí.", "error")
+                            break
 
                     # Nghỉ 3 giây trước khi retry số mới
                     await asyncio.sleep(3)
@@ -630,7 +657,7 @@ class AutoRegManager:
 
         # 4. Chờ OTP & Đồng thời theo dõi Bot B
         self.current_step = "WAITING_OTP"
-        self.log(f"Đang chờ OTP cho số {phone_clean} (Theo dõi chặt chẽ Bot A & Bot B)...", "info")
+        self.log(f"Đang chờ OTP / Cuộc gọi cho số {phone_clean} (Theo dõi chặt chẽ Bot A & Bot B)...", "info")
         otp_found = None
         is_expired = False
         start_wait = time.time()
@@ -639,20 +666,36 @@ class AutoRegManager:
         captured_otp = {"code": None}
         clean_num = phone_clean.lstrip("0")
 
+        def _extract_otp_from_text(raw_text):
+            """Hàm trích xuất mã OTP từ tin nhắn văn bản đa dạng định dạng"""
+            if not raw_text:
+                return None
+            # Định dạng chuẩn: Mã OTP: 123456 hoặc Code: 123456
+            m = re.search(r'(?:Mã OTP|Mã xác thực|Mã cuộc gọi|Mã|Code|OTP)[\s:]+\**(\d{4,8})\**', raw_text, re.IGNORECASE)
+            if m:
+                return m.group(1)
+            # Định dạng tin nhắn chứa 6 chữ số có ngữ cảnh Shopee/OTP
+            if any(k in raw_text.lower() for k in ["otp", "shopee", "phuocan", "cuộc gọi", "nhận mã", "thành công"]):
+                m2 = re.search(r'\b(\d{6})\b', raw_text)
+                if m2:
+                    return m2.group(1)
+            return None
+
         @client.on(events.NewMessage(chats=BOT_A))
         async def bot_a_handler(event):
             nonlocal is_expired
             text = event.raw_text
             if (clean_num in text) or (phone_clean in text):
-                if "Đã nhận được OTP" in text:
-                    match = re.search(r'Mã OTP:\s*\**(\d{4,8})\**', text)
-                    if match:
-                        captured_otp["code"] = match.group(1)
+                code = _extract_otp_from_text(text)
+                if code:
+                    captured_otp["code"] = code
                 elif "Hoàn tiền thuê số" in text or "Không nhận được OTP" in text:
                     is_expired = True
 
         resend_first_seen_time = None
-        resend_clicked = False
+        last_resend_time = 0
+        resend_count = 0
+        max_resends = 2
         last_progress_log = time.time()
 
         while time.time() - start_wait < timeout_sim:
@@ -674,55 +717,66 @@ class AutoRegManager:
                             is_expired = True
                             break
 
-                        # PHẢI QUÉT KĨ SỐ ĐIỆN THOẠI ĐANG ĐƯỢC CHẠY TRONG PHIÊN
-                        if (phone_clean not in txt_b) and (clean_num not in txt_b):
-                            continue
+                        # Nhận diện Shopee đang gọi điện
+                        if "đang gọi điện" in txt_b.lower() or "cuộc gọi" in txt_b.lower():
+                            if self.current_step != "RECEIVING_CALL_OTP":
+                                self.current_step = "RECEIVING_CALL_OTP"
+                                self.log(f"📞 Shopee đang gọi điện gửi mã OTP cho SĐT {phone_clean}... Hệ thống đang sẵn sàng bắt mã!", "info")
 
-                        # Nếu Bot B đã tạo thành công cho đúng số này
-                        if "TẠO ACCOUNT THÀNH CÔNG" in txt_b:
-                            client.remove_event_handler(bot_a_handler)
-                            return self._handle_success_account(txt_b, phone_clean, cmsnpa_price, bot_fee)
-
-                        # Quét nút '📲 Gửi Lại Mã': Ghi nhận thời điểm xuất hiện lần đầu trên Bot B
-                        if mb.buttons and (resend_first_seen_time is None) and (not resend_clicked):
+                        # Quét nút 'Gửi Lại Mã / Yêu cầu gọi lại': Ghi nhận thời điểm xuất hiện lần đầu trên Bot B
+                        if mb.buttons and (resend_first_seen_time is None):
                             for row in mb.buttons:
                                 for btn in row:
-                                    if "gửi lại" in btn.text.lower() or "resend" in btn.text.lower():
+                                    if any(k in btn.text.lower() for k in ["gửi lại", "resend", "gọi lại", "cuộc gọi", "nhận mã"]):
                                         resend_first_seen_time = time.time()
-                                        self.log(f"⏱️ Đã phát hiện nút '{btn.text}' trên Bot B cho SĐT {phone_clean}. Bắt đầu tính đúng 100s kể từ thời điểm này...", "info")
+                                        self.log(f"⏱️ Đã phát hiện nút '{btn.text}' trên Bot B cho SĐT {phone_clean}. Sẵn sàng gửi lại cuộc gọi sau 65s nếu chưa nhận được mã...", "info")
                                         break
+
+                        # PHẢI QUÉT KĨ SỐ ĐIỆN THOẠI NẾU CÓ TRONG THÔNG BÁO THÀNH CÔNG
+                        if "TẠO ACCOUNT THÀNH CÔNG" in txt_b:
+                            if (phone_clean in txt_b) or (clean_num in txt_b) or ("SPC_F=" in txt_b):
+                                client.remove_event_handler(bot_a_handler)
+                                return self._handle_success_account(txt_b, phone_clean, cmsnpa_price, bot_fee)
             except Exception:
                 pass
 
-            # XỬ LÝ BẤM NÚT 'GỬI LẠI MÃ' KHI ĐÃ ĐỦ 100S KỂ TỪ KHI NÚT XUẤT HIỆN
-            if (resend_first_seen_time is not None) and (not resend_clicked):
-                elapsed_btn = time.time() - resend_first_seen_time
-                if elapsed_btn >= 100:
-                    resend_clicked = True
-                    self.log(f"📲 Đã đủ 100s ({int(elapsed_btn)}s) kể từ khi nút xuất hiện. Đang bấm nút 'Gửi Lại Mã' trên Bot B cho SĐT {phone_clean}...", "info")
-                    try:
-                        msgs_b_btn = await client.get_messages(BOT_B, limit=6)
-                        btn_clicked_ok = False
-                        for m_btn in msgs_b_btn:
-                            if not m_btn.out:
-                                txt_m = m_btn.text or ""
-                                if (phone_clean in txt_m) or (clean_num in txt_m):
-                                    if m_btn.buttons:
-                                        for row in m_btn.buttons:
-                                            for b in row:
-                                                if "gửi lại" in b.text.lower() or "resend" in b.text.lower():
-                                                    await b.click()
-                                                    btn_clicked_ok = True
-                                                    self.log(f"✅ Đã bấm nút '{b.text}' trên Bot B cho SĐT {phone_clean} thành công!", "success")
-                                                    break
-                                            if btn_clicked_ok:
-                                                break
-                            if btn_clicked_ok:
-                                break
-                        if not btn_clicked_ok:
-                            self.log(f"ℹ️ Không thấy nút gửi lại mã còn hoạt động trên Bot B cho SĐT {phone_clean}.", "info")
-                    except Exception as _b_err:
-                        self.log(f"⚠️ Lỗi khi bấm nút gửi lại mã: {_b_err}", "warning")
+            # XỬ LÝ BẤM NÚT 'GỬI LẠI MÃ / GỌI LẠI' KHI ĐÃ ĐỦ 65S KỂ TỪ KHI NÚT XUẤT HIỆN
+            now_t = time.time()
+            can_resend = False
+            if resend_first_seen_time is not None and resend_count < max_resends:
+                if resend_count == 0:
+                    # Lần 1: Sau 65s kể từ khi thấy nút
+                    if now_t - resend_first_seen_time >= 65:
+                        can_resend = True
+                else:
+                    # Lần 2: Sau 65s kể từ lần gửi lại trước
+                    if now_t - last_resend_time >= 65:
+                        can_resend = True
+
+            if can_resend:
+                resend_count += 1
+                last_resend_time = now_t
+                self.log(f"📲 [Lượt {resend_count}/{max_resends}] Đang bấm nút 'Gửi Lại Mã / Cuộc Gọi' trên Bot B cho SĐT {phone_clean}...", "info")
+                try:
+                    msgs_b_btn = await client.get_messages(BOT_B, limit=6)
+                    btn_clicked_ok = False
+                    for m_btn in msgs_b_btn:
+                        if not m_btn.out and m_btn.buttons:
+                            for row in m_btn.buttons:
+                                for b in row:
+                                    if any(k in b.text.lower() for k in ["gửi lại", "resend", "gọi lại", "cuộc gọi", "nhận mã"]):
+                                        await b.click()
+                                        btn_clicked_ok = True
+                                        self.log(f"✅ Đã bấm nút '{b.text}' trên Bot B yêu cầu Shopee gọi lại mã OTP!", "success")
+                                        break
+                                if btn_clicked_ok:
+                                    break
+                        if btn_clicked_ok:
+                            break
+                    if not btn_clicked_ok:
+                        self.log(f"ℹ️ Không thấy nút gửi lại mã còn hoạt động trên Bot B cho SĐT {phone_clean}.", "info")
+                except Exception as _b_err:
+                    self.log(f"⚠️ Lỗi khi bấm nút gửi lại mã: {_b_err}", "warning")
 
             # 4.1 ĐỌC TRỰC TIẾP HỘP THƯ BOT A (Đối chiếu chính xác số điện thoại đang chạy trong phiên)
             try:
@@ -731,12 +785,11 @@ class AutoRegManager:
                     if m.id > last_bot_a_id and not m.out:
                         txt_a = m.text or ""
                         if (clean_num in txt_a) or (phone_clean in txt_a):
-                            if "Đã nhận được OTP" in txt_a:
-                                match = re.search(r'Mã OTP:\s*\**(\d{4,8})\**', txt_a)
-                                if match:
-                                    otp_found = match.group(1)
-                                    self.log(f"⚡ Bắt được OTP từ Bot A (@simclonenpa_bot) cho số {phone_clean}: {otp_found}", "otp")
-                                    break
+                            code = _extract_otp_from_text(txt_a)
+                            if code:
+                                otp_found = code
+                                self.log(f"⚡ Bắt được OTP từ Bot A (@simclonenpa_bot) cho số {phone_clean}: {otp_found}", "otp")
+                                break
                             elif "Hoàn tiền thuê số" in txt_a or "Không nhận được OTP" in txt_a:
                                 is_expired = True
                                 self.log(f"⚠️ Bot A (@simclonenpa_bot) đã chính thức thông báo: Sim {phone_clean} hết hạn & hoàn tiền!", "warning")
@@ -747,7 +800,6 @@ class AutoRegManager:
             if otp_found:
                 break
 
-            # CHỈ DỪNG CHỜ KHI SIM TRÊN BOT A THỰC SỰ XÁC NHẬN HẾT HẠN HOÀN TIỀN
             if is_expired:
                 break
 
@@ -762,25 +814,42 @@ class AutoRegManager:
                     res_data = await r.json()
                     if res_data.get("ResponseCode") == 0:
                         res_obj = res_data.get("Result", {})
-                        code = res_obj.get("Code") or res_obj.get("Fields", {}).get("Mã OTP")
-                        if code:
-                            otp_found = str(code).strip()
+                        code_cand = (
+                            res_obj.get("Code") or 
+                            res_obj.get("Otp") or 
+                            res_obj.get("code") or 
+                            res_obj.get("otp") or 
+                            res_obj.get("Fields", {}).get("Mã OTP") or
+                            res_data.get("code") or
+                            res_data.get("otp")
+                        )
+                        if not code_cand and isinstance(res_obj, dict):
+                            for v in res_obj.values():
+                                if isinstance(v, (str, int)):
+                                    m_sub = re.search(r'\b(\d{4,8})\b', str(v))
+                                    if m_sub:
+                                        code_cand = m_sub.group(1)
+                                        break
+                        if code_cand:
+                            otp_found = str(code_cand).strip()
                             self.log(f"⚡ Bắt được OTP từ API CMSNPA cho số {phone_clean}: {otp_found}", "otp")
                             break
             except Exception:
                 pass
 
-            # Log tiến độ chờ định kỳ mỗi 30s
+            # Log tiến độ chờ định kỳ mỗi 25s
             now_wait = time.time()
-            if now_wait - last_progress_log >= 30:
+            if now_wait - last_progress_log >= 25:
                 elapsed_total = int(now_wait - start_wait)
                 extra_status = ""
-                if resend_first_seen_time and not resend_clicked:
-                    sec_left = max(0, 100 - int(now_wait - resend_first_seen_time))
-                    extra_status = f" | Còn {sec_left}s sẽ bấm Gửi Lại Mã"
-                elif resend_clicked:
-                    extra_status = " | Đã bấm Gửi Lại Mã"
-                self.log(f"⏳ Đang đợi OTP cho số {phone_clean} ({elapsed_total}s/300s chu kỳ Sim Bot A{extra_status})...", "info")
+                if resend_first_seen_time and resend_count < max_resends:
+                    next_ref = (65 - int(now_wait - resend_first_seen_time)) if resend_count == 0 else (65 - int(now_wait - last_resend_time))
+                    if next_ref > 0:
+                        extra_status = f" | Còn {next_ref}s sẽ yêu cầu gọi lại lượt {resend_count + 1}"
+                elif resend_count > 0:
+                    extra_status = f" | Đã yêu cầu gọi lại {resend_count} lần"
+                call_note = " (Đón cuộc gọi Shopee)" if self.current_step == "RECEIVING_CALL_OTP" else ""
+                self.log(f"⏳ Đang đợi OTP cho số {phone_clean}{call_note} ({elapsed_total}s/300s chu kỳ Sim Bot A{extra_status})...", "info")
                 last_progress_log = now_wait
 
             await asyncio.sleep(2.5)
@@ -817,10 +886,10 @@ class AutoRegManager:
                     return self._handle_success_account(txt, phone_clean, cmsnpa_price, bot_fee)
                 elif "mã otp nhập không đúng" in txt.lower() or "hết lượt thử" in txt.lower():
                     self.log(f"❌ Bot B báo OTP sai hoặc hết lượt thử: {txt[:80]}", "error")
-                    return False, "FAILED", 0
+                    return False, "FAILED", bot_fee
 
         self.log(f"Hết thời gian chờ kết quả từ Bot B cho số {phone_clean}.", "warning")
-        return False, "TIMEOUT", 0
+        return False, "TIMEOUT", bot_fee
 
     def save_to_cookie_vault(self, phone, spc_f, spc_st):
         """Tự động đưa Cookie vào Kho Cookie của Shopee Tracker"""
