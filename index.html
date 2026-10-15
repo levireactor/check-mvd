@@ -1371,6 +1371,69 @@
       transform: translateY(-1px);
     }
 
+    .btn-delete-cancelled {
+      background: rgba(239, 68, 68, 0.12);
+      color: #f87171;
+      border: 1.5px solid rgba(239, 68, 68, 0.4);
+      font-weight: 600;
+      padding: 0.35rem 0.85rem;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 0.82rem;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.35rem;
+      transition: all 0.15s ease;
+    }
+
+    body.theme-dark .btn-delete-cancelled {
+      background: rgba(239, 68, 68, 0.1);
+      border-color: rgba(239, 68, 68, 0.4);
+      color: #fca5a5;
+    }
+
+    .btn-delete-cancelled:hover {
+      background: rgba(239, 68, 68, 0.25);
+      border-color: #ef4444;
+      color: #fee2e2;
+      transform: translateY(-1px);
+    }
+
+    .btn-delete-cancelled.has-items {
+      background: rgba(239, 68, 68, 0.18);
+      border-color: #ef4444;
+      color: #ef4444;
+      box-shadow: 0 0 10px rgba(239, 68, 68, 0.2);
+    }
+
+    .badge-blocked-cancelled {
+      background: rgba(14, 165, 233, 0.12);
+      color: #38bdf8;
+      border: 1px solid rgba(14, 165, 233, 0.35);
+      border-radius: 8px;
+      padding: 0.35rem 0.75rem;
+      font-size: 0.82rem;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      font-weight: 600;
+      transition: all 0.15s ease;
+    }
+
+    body.theme-dark .badge-blocked-cancelled {
+      background: rgba(14, 165, 233, 0.1);
+      border-color: rgba(14, 165, 233, 0.3);
+      color: #38bdf8;
+    }
+
+    .badge-blocked-cancelled:hover {
+      background: rgba(14, 165, 233, 0.22);
+      border-color: #0284c7;
+      color: #bae6fd;
+      transform: translateY(-1px);
+    }
+
     .code-ordersn {
       font-family: var(--mono);
       font-size: 0.78rem;
@@ -2903,6 +2966,9 @@
         <div class="top-menu-item" onclick="openProxyModal('kiotproxy'); closeMenuDropdowns()">
           <span>🌐</span> <span>Cài đặt Proxy KiotProxy</span>
         </div>
+        <div class="top-menu-item" onclick="openBlockedCancelledModal(); closeMenuDropdowns()">
+          <span>🛡️</span> <span>Quản lý Đơn hủy đã chặn (<b id="menu-blocked-count">0</b>)</span>
+        </div>
         <div class="top-menu-divider"></div>
         <div class="top-menu-item" onclick="openDrawerWithTab('columns', event); closeMenuDropdowns()">
           <span>👁️</span> <span>Cài đặt Cột hiển thị</span>
@@ -3019,6 +3085,14 @@
         title="Tự động tích chọn tất cả đơn hàng chưa có mã vận đơn để thao tác hàng loạt">
         Tích chọn đơn chưa MVĐ
       </button>
+      <button class="btn-delete-cancelled" id="btn-del-cancelled" style="margin-left:6px" onclick="deleteCancelledOrders()"
+        title="Xóa tất cả đơn đã hủy khỏi bảng tính và loại bỏ không quét lại trong tương lai">
+        🗑️ Xóa đơn đã hủy (<span id="chip-del-cancelled-cnt">0</span>)
+      </button>
+      <span class="badge-blocked-cancelled" id="badge-blocked-cancelled" style="margin-left:6px" onclick="openBlockedCancelledModal()"
+        title="Bấm để xem danh sách các đơn đã bị loại bỏ không quét lại">
+        🛡️ Chặn quét lại: <b id="stat-blocked-count">0</b> đơn
+      </span>
     </div>
 
     <!-- Mini KPI Stat Bar -->
@@ -3131,6 +3205,17 @@
           </select>
         </div>
 
+        <div style="margin-top:10px;padding:8px 10px;background:rgba(239,68,68,0.06);border:1px solid rgba(239,68,68,0.2);border-radius:6px;display:flex;flex-direction:column;gap:6px;font-size:0.8rem">
+          <label style="display:flex;align-items:center;gap:6px;cursor:pointer">
+            <input type="checkbox" id="chk-filter-deleted" checked>
+            <span>🛡️ <b>Loại bỏ các đơn đã từng xóa</b> (Không quét hiển thị lại các đơn từng xóa khỏi bảng)</span>
+          </label>
+          <label style="display:flex;align-items:center;gap:6px;cursor:pointer">
+            <input type="checkbox" id="chk-filter-cancelled">
+            <span>❌ <b>Bỏ qua tất cả đơn đã hủy</b> (Không nạp bất kỳ đơn hủy nào vào bảng)</span>
+          </label>
+        </div>
+
         <div class="scan-progress" id="scan-progress-bar">
           <div class="scan-fill" id="scan-progress-fill"></div>
         </div>
@@ -3169,6 +3254,7 @@
           </button>
           <button class="top-btn btn-primary" onclick="recheckCurrentDetail()">🔄 Renew</button>
           <button class="top-btn" onclick="copyDetailCookie()">🍪 Cookie</button>
+          <button class="top-btn" onclick="deleteCurrentDetailOrder()" style="color:#ef4444;border-color:rgba(239,68,68,0.3)" title="Xóa đơn hàng này khỏi bảng tính">🗑️ Xóa</button>
           <button class="top-btn" onclick="closeDetailModal()">Đóng</button>
         </div>
       </div>
@@ -3890,6 +3976,50 @@
     </div>
   </div>
 
+  <!-- ━━━ MODAL: QUẢN LÝ ĐƠN HÀNG ĐÃ HỦY BỊ CHẶN ━━━ -->
+  <div class="modal-overlay" id="modal-blocked-cancelled">
+    <div class="modal-box" style="max-width: 720px;">
+      <div class="modal-header">
+        <h3>🛡️ Quản Lý Đơn Hàng Đã Hủy Bị Chặn Quét Lại</h3>
+        <button class="modal-close" onclick="closeBlockedCancelledModal()">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div style="font-size:0.82rem;color:var(--text-muted);margin-bottom:12px;line-height:1.5">
+          Danh sách các đơn hàng đã bị hủy sau khi bạn xóa khỏi sheet. Hệ thống tự động ghi nhớ và <b>chặn không quét lại</b> khi thực hiện "Làm mới đơn", "Auto Renew" hoặc "Quét Cookie".
+        </div>
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;gap:8px;flex-wrap:wrap">
+          <input type="text" id="search-blocked-cancelled" class="top-search-input" style="flex:1;min-width:200px" placeholder="Tìm mã đơn, SĐT, tên..." oninput="renderBlockedCancelledTable(this.value)">
+          <button class="top-btn" onclick="clearAllBlockedCancelled()" style="color:#ef4444;border-color:rgba(239,68,68,0.3)">
+            🗑️ Xóa toàn bộ bộ nhớ chặn
+          </button>
+        </div>
+        <div style="max-height: 340px; overflow-y: auto; border: 1px solid var(--border-color); border-radius: 8px;">
+          <table class="sheet-table" style="font-size:0.8rem;margin:0;width:100%">
+            <thead>
+              <tr>
+                <th style="width:40px;text-align:center">STT</th>
+                <th>Mã Đơn / Order SN</th>
+                <th>Khách Hàng / SĐT</th>
+                <th>Sản Phẩm</th>
+                <th style="width:130px">Thời Gian Xóa</th>
+                <th style="width:85px;text-align:center">Thao Tác</th>
+              </tr>
+            </thead>
+            <tbody id="blocked-cancelled-tbody">
+              <!-- Rendered via JS -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+      <div class="modal-footer" style="display:flex;justify-content:space-between;align-items:center">
+        <div style="font-size:0.8rem;color:var(--text-muted)">
+          Tổng cộng: <b id="blocked-modal-total-count" style="color:#0284c7">0</b> đơn bị chặn quét lại
+        </div>
+        <button class="top-btn" onclick="closeBlockedCancelledModal()">Đóng</button>
+      </div>
+    </div>
+  </div>
+
   <!-- ━━━ SIDE DRAWER: TÙY CHỌN CỘT & GIAO DIỆN (TRƯỢT MƯỢT MÀ BÊN PHẢI) ━━━ -->
   <div class="theme-drawer-backdrop" id="theme-drawer-backdrop" onclick="closeThemeDrawer()"></div>
 
@@ -3972,6 +4102,10 @@
     let currentDetailRow = null;
     let systemLogs = [];
 
+    // Blocked Cancelled Orders State (Chặn quét lại đơn đã hủy sau khi bị xóa)
+    let blockedCancelledOrders = [];
+    let blockedCancelledSet = new Set();
+
     // Column Visibility State
     const columnConfig = {
       pay: true,
@@ -4006,6 +4140,7 @@
       addLog('Hệ thống khởi động...');
       loadPreferences();
       applyColorSettings();
+      initBlockedCancelledOrders();
 
       const loaded = await loadDraftFromServer();
       if (!loaded) {
@@ -4017,6 +4152,7 @@
       loadVaultList();
       initAutoRenewFromStorage();
       updateTelegramTopBarStatus();
+      updateBlockedCancelledUI();
 
       // Keyboard shortcut Ctrl + S
       window.addEventListener('keydown', e => {
@@ -4034,6 +4170,7 @@
           closeLogModal();
           closeThemeDrawer();
           closeProxyModal();
+          closeBlockedCancelledModal();
           document.querySelectorAll('.menu-dropdown').forEach(m => m.classList.remove('show'));
         }
       });
@@ -4329,17 +4466,270 @@
       }
     }
 
+    // ── QUẢN LÝ ĐƠN HÀNG ĐÃ HỦY VÀ LOẠI BỎ KHÔNG QUÉT LẠI ──
+    function initBlockedCancelledOrders() {
+      try {
+        const raw = localStorage.getItem('shopee_blocked_cancelled_orders');
+        if (raw) {
+          const arr = JSON.parse(raw);
+          if (Array.isArray(arr)) {
+            blockedCancelledOrders = arr;
+            rebuildBlockedCancelledSet();
+          }
+        }
+      } catch (e) {
+        console.error('Lỗi nạp danh sách đơn hủy bị chặn:', e);
+      }
+      updateBlockedCancelledUI();
+    }
+
+    function rebuildBlockedCancelledSet() {
+      blockedCancelledSet.clear();
+      blockedCancelledOrders.forEach(item => {
+        if (item.order_sn) {
+          const sn = String(item.order_sn).trim();
+          blockedCancelledSet.add(sn);
+          blockedCancelledSet.add(sn.toUpperCase());
+        }
+        if (item.order_id) {
+          const oid = String(item.order_id).trim();
+          blockedCancelledSet.add(oid);
+        }
+        if (item.id) {
+          blockedCancelledSet.add(String(item.id).trim());
+        }
+      });
+      updateBlockedCancelledUI();
+    }
+
+    function saveBlockedCancelledOrders() {
+      try {
+        localStorage.setItem('shopee_blocked_cancelled_orders', JSON.stringify(blockedCancelledOrders));
+      } catch (e) { }
+      updateBlockedCancelledUI();
+    }
+
+    function updateBlockedCancelledUI() {
+      const cnt = blockedCancelledOrders.length;
+      if ($('stat-blocked-count')) $('stat-blocked-count').textContent = cnt;
+      if ($('menu-blocked-count')) $('menu-blocked-count').textContent = cnt;
+      if ($('blocked-modal-total-count')) $('blocked-modal-total-count').textContent = cnt;
+      if ($('badge-blocked-cancelled')) {
+        $('badge-blocked-cancelled').style.display = cnt > 0 ? 'inline-flex' : 'none';
+      }
+
+      const cntCancelledInSheet = sheetRows.filter(r => isOrderCancelled(r)).length;
+      const btnDel = $('btn-del-cancelled');
+      const chipDelCnt = $('chip-del-cancelled-cnt');
+      if (chipDelCnt) chipDelCnt.textContent = cntCancelledInSheet;
+      if (btnDel) {
+        if (cntCancelledInSheet > 0) {
+          btnDel.classList.add('has-items');
+        } else {
+          btnDel.classList.remove('has-items');
+        }
+      }
+    }
+
+    function isOrderCancelled(order) {
+      if (!order) return false;
+      if (order.status_badge_type === 'red') return true;
+      const desc = String(order.status_desc || '').toLowerCase();
+      const badgeText = String(order.status_badge_text || '').toLowerCase();
+      if (desc.includes('hủy') || desc.includes('cancel')) return true;
+      if (badgeText.includes('hủy') || badgeText.includes('cancel')) return true;
+      return false;
+    }
+
+    function isOrderBlocked(order) {
+      if (!order) return false;
+      const sn = (order.order_sn || '').trim();
+      const oid = (order.order_id ? String(order.order_id) : '').trim();
+      const id = (order.id ? String(order.id) : '').trim();
+
+      if (sn && (blockedCancelledSet.has(sn) || blockedCancelledSet.has(sn.toUpperCase()))) return true;
+      if (oid && blockedCancelledSet.has(oid)) return true;
+      if (id && blockedCancelledSet.has(id)) return true;
+
+      if (blockedCancelledOrders && blockedCancelledOrders.length > 0) {
+        return blockedCancelledOrders.some(item => {
+          const bSn = (item.order_sn || '').trim();
+          const bOid = (item.order_id ? String(item.order_id) : '').trim();
+          if (sn && bSn && (sn === bSn || sn.toUpperCase() === bSn.toUpperCase())) return true;
+          if (oid && bOid && oid === bOid) return true;
+          if (sn && bOid && sn === bOid) return true;
+          if (oid && bSn && oid === bSn) return true;
+          return false;
+        });
+      }
+      return false;
+    }
+
+    function recordBlockedCancelledOrder(row) {
+      if (!row) return;
+      const sn = (row.order_sn || '').trim();
+      const oid = (row.order_id ? String(row.order_id) : '').trim();
+      const id = (row.id ? String(row.id) : '').trim();
+
+      const exists = blockedCancelledOrders.some(item =>
+        (sn && item.order_sn === sn) || (oid && item.order_id === oid)
+      );
+      if (!exists) {
+        const nowStr = new Date().toLocaleTimeString('vi-VN') + ' ' + new Date().toLocaleDateString('vi-VN');
+        blockedCancelledOrders.unshift({
+          id: id || ('b_' + Date.now()),
+          order_sn: sn,
+          order_id: oid,
+          receiver_name: row.receiver_name || '',
+          receiver_phone: row.receiver_phone || '',
+          product_name: row.product_name || '',
+          status_desc: row.status_desc || row.status_badge_text || (isOrderCancelled(row) ? 'Đã hủy' : 'Đã xóa'),
+          deleted_at: nowStr
+        });
+        if (sn) {
+          blockedCancelledSet.add(sn);
+          blockedCancelledSet.add(sn.toUpperCase());
+        }
+        if (oid) blockedCancelledSet.add(oid);
+        if (id) blockedCancelledSet.add(id);
+        saveBlockedCancelledOrders();
+      }
+    }
+
+    function unblockCancelledOrder(orderSnOrId) {
+      const key = String(orderSnOrId).trim();
+      const keyUpper = key.toUpperCase();
+      blockedCancelledOrders = blockedCancelledOrders.filter(it =>
+        it.order_sn !== key && (it.order_sn ? it.order_sn.toUpperCase() !== keyUpper : true) && it.order_id !== key && it.id !== key
+      );
+      rebuildBlockedCancelledSet();
+      saveBlockedCancelledOrders();
+      renderBlockedCancelledTable($('search-blocked-cancelled') ? $('search-blocked-cancelled').value : '');
+      showToast(`Đã gỡ chặn đơn ${key}!`, 'ℹ️');
+      markUnsaved();
+    }
+
+    function clearAllBlockedCancelled() {
+      if (!blockedCancelledOrders.length) {
+        showToast('Danh sách chặn hiện đang trống.', 'ℹ️');
+        return;
+      }
+      if (!confirm('Bạn có chắc chắn muốn xóa TOÀN BỘ danh sách chặn đơn hủy? (Các đơn hủy trước đây có thể xuất hiện lại nếu quét tài khoản)')) return;
+      blockedCancelledOrders = [];
+      rebuildBlockedCancelledSet();
+      saveBlockedCancelledOrders();
+      renderBlockedCancelledTable('');
+      showToast('Đã xóa sạch danh sách chặn đơn hủy!', '🗑️');
+      markUnsaved();
+    }
+
+    function openBlockedCancelledModal() {
+      const modal = $('modal-blocked-cancelled');
+      if (modal) {
+        modal.classList.add('show');
+        if ($('search-blocked-cancelled')) $('search-blocked-cancelled').value = '';
+        renderBlockedCancelledTable('');
+      }
+    }
+
+    function closeBlockedCancelledModal() {
+      const modal = $('modal-blocked-cancelled');
+      if (modal) modal.classList.remove('show');
+    }
+
+    function renderBlockedCancelledTable(query = '') {
+      const tbody = $('blocked-cancelled-tbody');
+      if (!tbody) return;
+      tbody.innerHTML = '';
+
+      let list = blockedCancelledOrders;
+      if (query && query.trim()) {
+        const q = query.trim().toLowerCase();
+        list = list.filter(item =>
+          (item.order_sn || '').toLowerCase().includes(q) ||
+          (item.order_id || '').toLowerCase().includes(q) ||
+          (item.receiver_name || '').toLowerCase().includes(q) ||
+          (item.receiver_phone || '').toLowerCase().includes(q) ||
+          (item.product_name || '').toLowerCase().includes(q)
+        );
+      }
+
+      if (!list.length) {
+        tbody.innerHTML = `<tr><td colspan="6" style="text-align:center;color:var(--text-muted);padding:24px">
+          ${query ? 'Không tìm thấy đơn hủy nào phù hợp với từ khóa.' : 'Chưa có đơn hủy nào trong danh sách chặn quét.'}
+        </td></tr>`;
+        return;
+      }
+
+      list.forEach((item, idx) => {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td style="text-align:center;color:var(--text-muted)">${idx + 1}</td>
+          <td>
+            <span class="code-ordersn" onclick="copyCell(event, '${escapeHtml(item.order_sn || item.order_id)}')">
+              ${escapeHtml(item.order_sn || item.order_id || '--')}
+            </span>
+          </td>
+          <td>
+            <div style="font-weight:600">${escapeHtml(item.receiver_name || '--')}</div>
+            <div style="font-size:0.75rem;color:var(--text-muted)">${escapeHtml(item.receiver_phone || '')}</div>
+          </td>
+          <td title="${escapeHtml(item.product_name || '')}" style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">
+            ${escapeHtml(item.product_name || '--')}
+          </td>
+          <td style="font-size:0.75rem;color:var(--text-muted)">${escapeHtml(item.deleted_at || '--')}</td>
+          <td style="text-align:center">
+            <button class="top-btn" style="padding:2px 6px;font-size:0.72rem;color:#0284c7;border-color:rgba(2,132,199,0.3)" 
+              onclick="unblockCancelledOrder('${escapeHtml(item.order_sn || item.order_id)}')">
+              Gỡ chặn
+            </button>
+          </td>
+        `;
+        tbody.appendChild(tr);
+      });
+    }
+
+    function deleteCancelledOrders() {
+      const cancelledRows = sheetRows.filter(r => isOrderCancelled(r));
+      if (!cancelledRows.length) {
+        showToast('Hiện không có đơn hàng nào bị hủy trên bảng.', 'ℹ️');
+        return;
+      }
+      if (!confirm(`Bạn có chắc chắn muốn xóa tất cả ${cancelledRows.length} đơn hàng ĐÃ BỊ HỦY khỏi bảng tính?\n(Hệ thống sẽ ghi nhớ loại bỏ và KHÔNG quét lại các đơn này nữa)`)) {
+        return;
+      }
+      cancelledRows.forEach(r => recordBlockedCancelledOrder(r));
+      sheetRows = sheetRows.filter(r => !isOrderCancelled(r));
+      selectedRowIds.clear();
+      markUnsaved();
+      renderTable();
+      updateBlockedCancelledUI();
+      showToast(`Đã xóa ${cancelledRows.length} đơn hàng bị hủy và chặn quét lại thành công!`, '🛡️');
+      addLog(`[Loại bỏ đơn hủy] Đã xóa ${cancelledRows.length} đơn hủy và lưu vào danh sách chặn quét.`);
+    }
+
+    function deleteCurrentDetailOrder() {
+      if (currentDetailRow) {
+        const id = currentDetailRow.id;
+        closeDetailModal();
+        deleteRow(id);
+      }
+    }
+
     async function saveToServer(isAuto = false) {
       const badge = $('autosave-badge');
       const txt = $('save-status-text');
       if (badge) badge.classList.add('saving');
-      if (txt) txt.textContent = isAuto ? '\u0110ang t\u1ef1 l\u01b0u...' : '\u0110ang l\u01b0u...';
+      if (txt) txt.textContent = isAuto ? 'Đang tự lưu...' : 'Đang lưu...';
 
       try {
         const res = await fetch('/api/save-draft', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ rows: sheetRows })
+          body: JSON.stringify({ 
+            rows: sheetRows,
+            blocked_cancelled_orders: blockedCancelledOrders
+          })
         });
         const d = await res.json();
         if (d.success) {
@@ -4347,24 +4737,23 @@
           updateSaveIndicator();
           backupToLocalStorage();
           if (badge) badge.classList.remove('saving');
-          if (txt) txt.textContent = isAuto ? `T\u1ef1 l\u01b0u l\u00fac ${d.saved_at}` : `\u0110\u00e3 l\u01b0u l\u00fac ${d.saved_at}`;
-          // C\u1eadp nh\u1eadt badge ngu\u1ed3n
+          if (txt) txt.textContent = isAuto ? `Tự lưu lúc ${d.saved_at}` : `Đã lưu lúc ${d.saved_at}`;
           updateDbSourceBadge(d.source || 'local');
-          if (d.warning) addLog('[C\u1ea3nh b\u00e1o] ' + d.warning);
+          if (d.warning) addLog('[Cảnh báo] ' + d.warning);
           if (!isAuto) {
-            const dest = d.source === 'supabase' ? 'Supabase \u2601\ufe0f' : 'Server \ud83d\udcbb';
-            showToast(`\u0110\u00e3 l\u01b0u ${d.count} \u0111\u01a1n h\u00e0ng l\u00ean ${dest} th\u00e0nh c\u00f4ng!`, '\ud83d\udcbe');
+            const dest = d.source === 'supabase' ? 'Supabase ☁️' : 'Server 💻';
+            showToast(`Đã lưu ${d.count} đơn hàng lên ${dest} thành công!`, '💾');
           }
-          addLog(`L\u01b0u ${d.count} d\u00f2ng l\u00ean ${d.source || 'server'} th\u00e0nh c\u00f4ng.`);
+          addLog(`Lưu ${d.count} dòng lên ${d.source || 'server'} thành công.`);
         } else {
           if (badge) badge.classList.remove('saving');
-          if (!isAuto) showToast('L\u1ed7i khi l\u01b0u: ' + (d.error || 'Server error'), '\u274c');
+          if (!isAuto) showToast('Lỗi khi lưu: ' + (d.error || 'Server error'), '❌');
         }
       } catch (e) {
         if (badge) badge.classList.remove('saving');
-        if (txt) txt.textContent = '\u0110\u00e3 l\u01b0u tr\u00ean Tr\u00ecnh duy\u1ec7t (Offline)';
+        if (txt) txt.textContent = 'Đã lưu trên Trình duyệt (Offline)';
         updateDbSourceBadge('offline');
-        if (!isAuto) showToast('L\u1ed7i k\u1ebft n\u1ed1i m\u00e1y ch\u1ee7, \u0111\u00e3 l\u01b0u v\u00e0o tr\u00ecnh duy\u1ec7t: ' + e.message, '\u26a0\ufe0f');
+        if (!isAuto) showToast('Lỗi kết nối máy chủ, đã lưu vào trình duyệt: ' + e.message, '⚠️');
       }
     }
 
@@ -4374,20 +4763,30 @@
         const d = await res.json();
         if (d && Array.isArray(d.rows)) {
           sheetRows = d.rows;
+          if (Array.isArray(d.blocked_cancelled_orders)) {
+            d.blocked_cancelled_orders.forEach(it => {
+              const sn = (it.order_sn || '').trim();
+              const oid = (it.order_id ? String(it.order_id) : '').trim();
+              if (!blockedCancelledOrders.some(x => (sn && x.order_sn === sn) || (oid && x.order_id === oid))) {
+                blockedCancelledOrders.push(it);
+              }
+            });
+            rebuildBlockedCancelledSet();
+            saveBlockedCancelledOrders();
+          }
           hasUnsavedChanges = false;
           updateSaveIndicator();
           backupToLocalStorage();
-          // Cập nhật badge nguồn dữ liệu
           updateDbSourceBadge(d.source || 'local');
-          const sourceLabel = d.source === 'supabase' ? 'Supabase \u2601\ufe0f' : 'Server \ud83d\udcbb';
+          const sourceLabel = d.source === 'supabase' ? 'Supabase ☁️' : 'Server 💻';
           $('save-status-text').textContent = d.updated_at
-            ? `\u0110\u00e3 n\u1ea1p l\u00fac ${d.updated_at} (${d.source === 'supabase' ? 'Cloud' : 'Local'})`
-            : (sheetRows.length ? `\u0110\u00e3 n\u1ea1p t\u1eeb ${sourceLabel}` : 'B\u1ea3ng tr\u1ed1ng (S\u1eb5n s\u00e0ng)');
-          addLog(`\u0110\u00e3 n\u1ea1p ${sheetRows.length} \u0111\u01a1n h\u00e0ng t\u1eeb ${sourceLabel}.`);
+            ? `Đã nạp lúc ${d.updated_at} (${d.source === 'supabase' ? 'Cloud' : 'Local'})`
+            : (sheetRows.length ? `Đã nạp từ ${sourceLabel}` : 'Bảng trống (Sẵn sàng)');
+          addLog(`Đã nạp ${sheetRows.length} đơn hàng từ ${sourceLabel}.`);
           return true;
         }
       } catch (e) {
-        addLog('Kh\u00f4ng th\u1ec3 k\u1ebft n\u1ed1i m\u00e1y ch\u1ee7 load-draft: ' + e.message);
+        addLog('Không thể kết nối máy chủ load-draft: ' + e.message);
       }
       return false;
     }
@@ -4422,6 +4821,7 @@
     function backupToLocalStorage() {
       try {
         localStorage.setItem('shopee_sheet_rows', JSON.stringify(sheetRows));
+        localStorage.setItem('shopee_blocked_cancelled_orders', JSON.stringify(blockedCancelledOrders));
         localStorage.setItem('shopee_sheet_updated_at', new Date().toISOString());
       } catch (e) { }
     }
@@ -4432,6 +4832,13 @@
         if (raw) {
           sheetRows = JSON.parse(raw);
           addLog(`Khôi phục ${sheetRows.length} dòng từ localStorage.`);
+        }
+        const rawBlocked = localStorage.getItem('shopee_blocked_cancelled_orders');
+        if (rawBlocked) {
+          try {
+            blockedCancelledOrders = JSON.parse(rawBlocked);
+            rebuildBlockedCancelledSet();
+          } catch (e) { }
         }
       } catch (e) { }
     }
@@ -4457,7 +4864,10 @@
       backupToLocalStorage();
       if (hasUnsavedChanges && sheetRows.length > 0) {
         try {
-          const payload = JSON.stringify({ rows: sheetRows });
+          const payload = JSON.stringify({ 
+            rows: sheetRows,
+            blocked_cancelled_orders: blockedCancelledOrders
+          });
           const blob = new Blob([payload], { type: 'application/json' });
           navigator.sendBeacon('/api/save-draft', blob);
         } catch (e) { }
@@ -4506,11 +4916,11 @@
         }
         if (currentQuickFilter === 'shipping') return row.status_badge_type === 'blue';
         if (currentQuickFilter === 'delivered') return row.status_badge_type === 'green';
-        if (currentQuickFilter === 'cancelled') return row.status_badge_type === 'red';
+        if (currentQuickFilter === 'cancelled') return isOrderCancelled(row);
         if (currentQuickFilter === 'unpaid') return row.payment_status === 'Chưa thanh toán';
-        if (currentQuickFilter === 'no_mvd') return !row.tracking_no || !row.has_tracking;
+        if (currentQuickFilter === 'no_mvd') return (!row.tracking_no || !row.has_tracking) && !isOrderCancelled(row);
         if (currentQuickFilter === 'warning') {
-          return row.status_badge_type === 'red' || (!row.tracking_no && row.status_badge_type !== 'green') || (row.status_desc && (row.status_desc.includes('hủy') || row.status_desc.includes('không thành công') || row.status_desc.includes('giao lại')));
+          return isOrderCancelled(row) || (!row.tracking_no && row.status_badge_type !== 'green') || (row.status_desc && (row.status_desc.includes('hủy') || row.status_desc.includes('không thành công') || row.status_desc.includes('giao lại')));
         }
 
         // Search query filter
@@ -4742,12 +5152,12 @@
       if ($('stat-kpi-cod')) $('stat-kpi-cod').textContent = codStr;
 
       // Filter chips counters
-      const cntNoMvd = sheetRows.filter(r => !r.tracking_no || !r.has_tracking).length;
+      const cntNoMvd = sheetRows.filter(r => (!r.tracking_no || !r.has_tracking) && !isOrderCancelled(r)).length;
       const cntShipping = sheetRows.filter(r => r.status_badge_type === 'blue').length;
       const cntDelivered = sheetRows.filter(r => r.status_badge_type === 'green').length;
-      const cntCancelled = sheetRows.filter(r => r.status_badge_type === 'red').length;
+      const cntCancelled = sheetRows.filter(r => isOrderCancelled(r)).length;
       const cntUnpaid = sheetRows.filter(r => r.payment_status === 'Chưa thanh toán').length;
-      const cntWarning = sheetRows.filter(r => r.status_badge_type === 'red' || (!r.tracking_no && r.status_badge_type !== 'green')).length;
+      const cntWarning = sheetRows.filter(r => isOrderCancelled(r) || (!r.tracking_no && r.status_badge_type !== 'green')).length;
 
       if ($('chip-cnt-all')) $('chip-cnt-all').textContent = total;
       if ($('chip-cnt-no-mvd')) $('chip-cnt-no-mvd').textContent = cntNoMvd;
@@ -4756,6 +5166,8 @@
       if ($('chip-cnt-cancelled')) $('chip-cnt-cancelled').textContent = cntCancelled;
       if ($('chip-cnt-unpaid')) $('chip-cnt-unpaid').textContent = cntUnpaid;
       if ($('chip-cnt-warning')) $('chip-cnt-warning').textContent = cntWarning;
+
+      updateBlockedCancelledUI();
     }
 
     async function safeApiCall(url, options = {}) {
@@ -5874,12 +6286,18 @@
     }
 
     function bulkDelete() {
-      if (!confirm(`Bạn có chắc chắn muốn xóa ${selectedRowIds.size} đơn hàng đã chọn?`)) return;
+      if (!confirm(`Bạn có chắc chắn muốn xóa ${selectedRowIds.size} đơn hàng đã chọn khỏi bảng tính?\n(Các đơn này sẽ được đưa vào danh sách chặn không quét lại)`)) return;
+      sheetRows.forEach(r => {
+        if (selectedRowIds.has(r.id)) {
+          recordBlockedCancelledOrder(r);
+        }
+      });
       sheetRows = sheetRows.filter(r => !selectedRowIds.has(r.id));
       selectedRowIds.clear();
       markUnsaved();
       renderTable();
-      showToast('Đã xóa các đơn hàng đã chọn', '🗑');
+      updateBlockedCancelledUI();
+      showToast('Đã xóa và chặn không quét lại các đơn đã chọn', '🛡️');
     }
 
 
@@ -5902,11 +6320,16 @@
     }
 
     function deleteRow(id) {
+      const row = sheetRows.find(r => r.id === id);
+      if (row) {
+        recordBlockedCancelledOrder(row);
+        showToast(isOrderCancelled(row) ? 'Đã xóa đơn hủy và chặn quét lại!' : 'Đã xóa 1 dòng', '🗑');
+      }
       sheetRows = sheetRows.filter(r => r.id !== id);
       selectedRowIds.delete(id);
       markUnsaved();
       renderTable();
-      showToast('Đã xóa 1 dòng', '🗑');
+      updateBlockedCancelledUI();
     }
 
     // ── SCAN COOKIES MODAL ──
@@ -6030,8 +6453,22 @@
             addLog(`Cookie #${current} lỗi: ${data.error}`);
           } else if (data.orders && data.orders.length > 0) {
             const nowStr = new Date().toLocaleTimeString('vi-VN') + ' ' + new Date().toLocaleDateString('vi-VN');
+            const filterDeleted = $('chk-filter-deleted') ? $('chk-filter-deleted').checked : true;
+            const filterAllCancelled = $('chk-filter-cancelled') ? $('chk-filter-cancelled').checked : false;
 
             data.orders.forEach(order => {
+              // ── BƯỚC 1: Bỏ qua đơn nếu chọn bỏ qua toàn bộ đơn hủy ──
+              if (filterAllCancelled && isOrderCancelled(order)) {
+                addLog(`[Bỏ qua đơn hủy] Bỏ qua đơn ${order.order_sn || order.order_id} (đã bị hủy).`);
+                return;
+              }
+
+              // ── BƯỚC 2: Loại bỏ các đơn đã từng xóa khỏi bảng ──
+              if (filterDeleted && isOrderBlocked(order)) {
+                addLog(`[Đã loại bỏ] Bỏ qua đơn ${order.order_sn || order.order_id} (đơn này đã từng xóa khỏi bảng tính).`);
+                return;
+              }
+
               // ── BƯỚC 3: Giản lược các đơn trùng nhau về 1 cookie/đơn trên sheet ──
               const existingRow = sheetRows.find(r => 
                 (order.order_id && String(r.order_id) === String(order.order_id)) ||
@@ -6448,15 +6885,15 @@
 
     // 3. Chọn tất cả các đơn chưa có MVĐ
     function selectNoMVDOrders() {
-      const noMvdRows = sheetRows.filter(r => !r.tracking_no || !r.has_tracking);
+      const noMvdRows = sheetRows.filter(r => (!r.tracking_no || !r.has_tracking) && !isOrderCancelled(r));
       if (noMvdRows.length === 0) {
-        showToast('Tất cả đơn hàng hiện đều đã có Mã Vận Đơn!', '🎉');
+        showToast('Tất cả đơn hàng (không tính đơn hủy) hiện đều đã có Mã Vận Đơn!', '🎉');
         return;
       }
       selectedRowIds.clear();
       noMvdRows.forEach(r => selectedRowIds.add(r.id));
       renderTable();
-      showToast(`Đã chọn ${noMvdRows.length} đơn chưa có MVĐ!`, '🎯');
+      showToast(`Đã chọn ${noMvdRows.length} đơn chưa có MVĐ (đã loại trừ đơn hủy)!`, '🎯');
     }
 
     // 4. Làm mới đơn hàng (quét lại toàn bộ cookie có trong data, cập nhật thông tin mới nhất)
@@ -6511,6 +6948,11 @@
             const nowStr = new Date().toLocaleTimeString('vi-VN') + ' ' + new Date().toLocaleDateString('vi-VN');
 
             data.orders.forEach(freshOrd => {
+              // Bỏ qua đơn đã từng bị xóa khỏi bảng tính
+              if (isOrderBlocked(freshOrd)) {
+                return;
+              }
+
               // Tìm xem đơn này đã có trong sheetRows chưa
               let existing = sheetRows.find(r => 
                 (freshOrd.order_id && String(r.order_id) === String(freshOrd.order_id)) ||

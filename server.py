@@ -46,7 +46,8 @@ try:
         parse_vietnamese_address,
         load_affiliate_config,
         save_affiliate_config,
-        convert_shopee_affiliate_link
+        convert_shopee_affiliate_link,
+        parse_affiliate_portal_url
     )
     DKS_AVAILABLE = True
 except Exception as _dks_err:
@@ -55,6 +56,7 @@ except Exception as _dks_err:
     load_affiliate_config = None
     save_affiliate_config = None
     convert_shopee_affiliate_link = None
+    parse_affiliate_portal_url = None
     DKS_AVAILABLE = False
     print(f"[!] DangKyShopee manager not loaded: {_dks_err}")
 
@@ -1231,10 +1233,21 @@ class TrackingRequestHandler(http.server.SimpleHTTPRequestHandler):
                             row.pop('updated_at', None)
                         now_str = datetime.datetime.now().strftime("%H:%M:%S %d/%m/%Y")
                         print(f"[Supabase] Đã tải {len(rows)} đơn hàng từ cloud.")
+
+                        # Đồng bộ blocked_cancelled_orders từ file draft.json cục bộ
+                        blocked_orders = []
+                        if os.path.exists(DRAFT_FILE):
+                            try:
+                                with open(DRAFT_FILE, 'r', encoding='utf-8') as df:
+                                    blocked_orders = json.load(df).get('blocked_cancelled_orders', [])
+                            except Exception:
+                                pass
+
                         self._json(200, {
                             'rows': rows,
                             'count': len(rows),
                             'updated_at': now_str,
+                            'blocked_cancelled_orders': blocked_orders,
                             'source': 'supabase'
                         })
                         return
@@ -1247,9 +1260,11 @@ class TrackingRequestHandler(http.server.SimpleHTTPRequestHandler):
                     with open(DRAFT_FILE, 'r', encoding='utf-8') as f:
                         data = json.load(f)
                     data['source'] = 'local'
+                    if 'blocked_cancelled_orders' not in data:
+                        data['blocked_cancelled_orders'] = []
                     self._json(200, data)
                 else:
-                    self._json(200, {'rows': [], 'count': 0, 'updated_at': None, 'source': 'empty'})
+                    self._json(200, {'rows': [], 'count': 0, 'updated_at': None, 'blocked_cancelled_orders': [], 'source': 'empty'})
             except Exception as e:
                 self._json(500, {'error': f'Không thể đọc dữ liệu: {str(e)}'})
 
@@ -1423,7 +1438,9 @@ class TrackingRequestHandler(http.server.SimpleHTTPRequestHandler):
             try:
                 cfg = load_affiliate_config() if load_affiliate_config else {}
                 sec = cfg.get('secret', '')
+                cookie = cfg.get('cookie', '')
                 masked_sec = sec[:4] + '*' * (len(sec) - 8) + sec[-4:] if len(sec) > 8 else ('*' * len(sec) if sec else '')
+                masked_cookie = cookie[:10] + '...' + cookie[-10:] if len(cookie) > 25 else ('Đã lưu' if cookie else '')
                 self._json(200, {
                     'success': True,
                     'data': {
@@ -1431,7 +1448,12 @@ class TrackingRequestHandler(http.server.SimpleHTTPRequestHandler):
                         'app_id': cfg.get('app_id', ''),
                         'has_secret': bool(sec),
                         'secret_masked': masked_sec,
-                        'sub_id': cfg.get('sub_id', '')
+                        'has_cookie': bool(cookie),
+                        'cookie_masked': masked_cookie,
+                        'sub_id': cfg.get('sub_id', ''),
+                        'portal_url': cfg.get('portal_url', ''),
+                        'mmp_pid': cfg.get('mmp_pid', ''),
+                        'af_siteid': cfg.get('af_siteid', '')
                     }
                 })
             except Exception as e:
@@ -1458,10 +1480,16 @@ class TrackingRequestHandler(http.server.SimpleHTTPRequestHandler):
             try:
                 body = self._read_body()
                 rows = body.get('rows', [])
+                blocked_cancelled_orders = body.get('blocked_cancelled_orders', [])
                 now_str = datetime.datetime.now().strftime("%H:%M:%S %d/%m/%Y")
 
                 # ── 1. Luôn lưu backup local trước (đảm bảo không mất dữ liệu) ──
-                local_data = {'rows': rows, 'count': len(rows), 'updated_at': now_str}
+                local_data = {
+                    'rows': rows,
+                    'count': len(rows),
+                    'updated_at': now_str,
+                    'blocked_cancelled_orders': blocked_cancelled_orders
+                }
                 try:
                     with open(DRAFT_FILE, 'w', encoding='utf-8') as f:
                         json.dump(local_data, f, ensure_ascii=False, indent=2)
@@ -2229,15 +2257,36 @@ class TrackingRequestHandler(http.server.SimpleHTTPRequestHandler):
                 else:
                     final_sec = new_sec
 
+                new_cookie = body.get('cookie', '').strip()
+                if not new_cookie or '*' in new_cookie or new_cookie == 'Đã lưu' or '...' in new_cookie:
+                    final_cookie = cur.get('cookie', '')
+                else:
+                    final_cookie = new_cookie
+
+                portal_url = body.get('portal_url', '').strip()
+                parsed_portal = {}
+                if portal_url and parse_affiliate_portal_url:
+                    parsed_portal = parse_affiliate_portal_url(portal_url)
+
+                app_id = body.get('app_id', '').strip() or parsed_portal.get('app_id') or cur.get('app_id', '')
+                sub_id = body.get('sub_id', '').strip() or parsed_portal.get('sub_id') or cur.get('sub_id', '')
+                mmp_pid = body.get('mmp_pid', '').strip() or parsed_portal.get('mmp_pid') or cur.get('mmp_pid', '')
+                af_siteid = body.get('af_siteid', '').strip() or parsed_portal.get('af_siteid') or cur.get('af_siteid', '')
+
                 new_cfg = {
                     'enabled': bool(body.get('enabled', False)),
-                    'app_id': body.get('app_id', '').strip(),
+                    'app_id': app_id,
                     'secret': final_sec,
-                    'sub_id': body.get('sub_id', '').strip()
+                    'cookie': final_cookie,
+                    'sub_id': sub_id,
+                    'mmp_pid': mmp_pid,
+                    'utm_source': parsed_portal.get('utm_source', mmp_pid),
+                    'af_siteid': af_siteid,
+                    'portal_url': portal_url or cur.get('portal_url', '')
                 }
                 if save_affiliate_config:
                     save_affiliate_config(new_cfg)
-                self._json(200, {'success': True, 'message': 'Đã lưu cấu hình Shopee Affiliate thành công'})
+                self._json(200, {'success': True, 'message': 'Đã lưu cấu hình Shopee Affiliate thành công', 'data': new_cfg})
             except Exception as e:
                 self._json(500, {'error': str(e)})
 
@@ -2247,15 +2296,18 @@ class TrackingRequestHandler(http.server.SimpleHTTPRequestHandler):
                 test_url = body.get('url', '').strip()
                 app_id = body.get('app_id', '').strip() or None
                 secret = body.get('secret', '').strip() or None
+                cookie = body.get('cookie', '').strip() or None
                 sub_id = body.get('sub_id', '').strip() or None
                 if secret and '*' in secret:
                     secret = None
+                if cookie and ('*' in cookie or '...' in cookie or cookie == 'Đã lưu'):
+                    cookie = None
 
                 if not test_url:
                     return self._json(400, {'success': False, 'error': 'Vui lòng nhập Link sản phẩm để test'})
 
                 if convert_shopee_affiliate_link:
-                    ok, res = convert_shopee_affiliate_link(test_url, app_id=app_id, secret=secret, sub_id=sub_id)
+                    ok, res = convert_shopee_affiliate_link(test_url, app_id=app_id, secret=secret, sub_id=sub_id, cookie=cookie)
                     if ok:
                         self._json(200, {'success': True, 'short_link': res})
                     else:
