@@ -108,14 +108,32 @@ def parse_vietnamese_address(raw_str):
 
 AFF_CONFIG_FILE = os.path.join(DIRECTORY, "affiliate_config.json")
 
+DEFAULT_AFF_CONFIG = {
+    "enabled": True,
+    "app_id": "17324610663",
+    "secret": "",
+    "sub_id": "meoidungkhoa",
+    "mmp_pid": "an_17320160631",
+    "utm_source": "an_17320160631",
+    "af_siteid": "an_17320160631",
+    "portal_url": "https://affiliate.shopee.vn/offer/custom_link?mmp_pid=an_17320160631&affiliate_id=17324610663&pid=affiliates&utm_source=an_17320160631&utm_medium=affiliates&utm_content=meoidungkhoa&af_siteid=an_17320160631"
+}
+
 def load_affiliate_config():
+    cfg = DEFAULT_AFF_CONFIG.copy()
     if os.path.exists(AFF_CONFIG_FILE):
         try:
             with open(AFF_CONFIG_FILE, "r", encoding="utf-8") as f:
-                return json.load(f)
+                data = json.load(f)
+                if isinstance(data, dict):
+                    cfg.update(data)
         except Exception:
             pass
-    return {"enabled": False, "app_id": "", "secret": "", "sub_id": ""}
+    # Đảm bảo các tham số cốt lõi luôn có giá trị mặc định của người dùng
+    for k, v in DEFAULT_AFF_CONFIG.items():
+        if not cfg.get(k):
+            cfg[k] = v
+    return cfg
 
 def save_affiliate_config(data):
     try:
@@ -321,6 +339,13 @@ def convert_shopee_affiliate_link(raw_url, app_id=None, secret=None, sub_id=None
     sub_id = str(sub_id if sub_id is not None else cfg.get("sub_id", "")).strip()
     cookie = str(cookie if cookie is not None else cfg.get("cookie", "")).strip()
 
+    raw_url = raw_url.strip()
+    # 0. Nếu link đã là link Affiliate (s.shopee.vn hoặc có tham số affiliate_id), dùng trực tiếp
+    if "s.shopee.vn" in raw_url:
+        return True, raw_url
+    if "affiliate_id" in raw_url and ("mmp_pid" in raw_url or "utm_source" in raw_url):
+        return True, raw_url
+
     # 1. Mở rộng link nếu là dạng rút gọn
     canonical_url = expand_shopee_short_url(raw_url)
 
@@ -517,14 +542,19 @@ class DangKyShopeeManager:
 
             # Tự động xử lý chuyển đổi sang link Affiliate trước khi đưa vào bot
             aff_cfg = load_affiliate_config()
-            if aff_cfg.get("enabled"):
-                self.log("🔗 Đang chuyển đổi link sản phẩm sang link Affiliate của bạn...", "info")
-                aff_ok, aff_res = convert_shopee_affiliate_link(product_link)
-                if aff_ok:
-                    config["product_link"] = aff_res
-                    self.log(f"✅ Đã chuyển đổi thành công link Affiliate: {aff_res}", "success")
+            if aff_cfg.get("enabled", True):
+                if not ("s.shopee.vn" in product_link or "affiliate_id" in product_link):
+                    self.log(f"🔗 Đang chuyển đổi link sản phẩm sang link Affiliate của bạn...", "info")
+                    aff_ok, aff_res = convert_shopee_affiliate_link(product_link)
+                    if aff_ok and aff_res:
+                        product_link = aff_res
+                        config["product_link"] = aff_res
+                        self.log(f"✅ Đã chuyển đổi thành công link Affiliate dùng cho /addtocart: {aff_res}", "success")
+                    else:
+                        self.log(f"⚠️ Chuyển đổi link Affiliate chưa được ({aff_res}), dùng link gốc.", "warning")
                 else:
-                    self.log(f"⚠️ Chuyển đổi link Affiliate chưa được ({aff_res}), dùng link gốc.", "warning")
+                    config["product_link"] = product_link
+                    self.log(f"🔗 Sử dụng trực tiếp link Affiliate cho /addtocart: {product_link}", "info")
 
         self.config.update(config)
         self.should_stop = False
@@ -705,17 +735,18 @@ class DangKyShopeeManager:
 
             # Kiểm tra tự động chuyển đổi sang link Affiliate của người dùng
             aff_cfg = load_affiliate_config()
-            if aff_cfg.get("enabled"):
+            if aff_cfg.get("enabled", True):
                 if not ("affiliate_id" in prod_link or "s.shopee.vn" in prod_link):
                     self.log("🔗 Đang chuyển đổi link sản phẩm sang link Affiliate của bạn...", "info")
                     aff_ok, aff_res = convert_shopee_affiliate_link(prod_link)
-                    if aff_ok:
+                    if aff_ok and aff_res:
                         prod_link = aff_res
+                        self.config["product_link"] = aff_res
                         self.log(f"✅ Đã chuyển đổi thành công link Affiliate: {prod_link}", "success")
                     else:
                         self.log(f"⚠️ Chuyển đổi link Affiliate chưa được: {aff_res}. Tiếp tục dùng link gốc.", "warning")
                 else:
-                    self.log(f"🔗 Đang sử dụng link Affiliate đã chuyển đổi: {prod_link}", "info")
+                    self.log(f"🔗 Sử dụng trực tiếp link Affiliate cho /addtocart: {prod_link}", "info")
 
             self.log(f"📤 Gửi /addtocart {prod_link}|<nick>...", "info")
 

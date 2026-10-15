@@ -2217,7 +2217,8 @@ class TrackingRequestHandler(http.server.SimpleHTTPRequestHandler):
                 nicks = body.get('nicks', [])
                 ok, msg = dks_mgr.start(config, nicks)
                 if ok:
-                    self._json(200, {'success': True, 'message': msg})
+                    converted_link = dks_mgr.config.get("product_link", "")
+                    self._json(200, {'success': True, 'message': msg, 'product_link': converted_link})
                 else:
                     self._json(400, {'error': msg})
             except Exception as e:
