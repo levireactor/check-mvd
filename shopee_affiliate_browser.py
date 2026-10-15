@@ -18,6 +18,7 @@ from selenium.webdriver.support import expected_conditions as EC
 CHROME_PATH = r"C:\Program Files\Google\Chrome\Application\chrome.exe"
 PROFILE_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "chrome_aff_profile")
 PORT = 9222
+DEFAULT_PORTAL_URL = "https://affiliate.shopee.vn/offer/custom_link?mmp_pid=an_17320160631&affiliate_id=17324610663&pid=affiliates&utm_source=an_17320160631&utm_medium=affiliates&utm_content=meoidungkhoa&af_siteid=an_17320160631"
 
 def is_chrome_running():
     """Kiểm tra cổng 9222 đã có Chrome lắng nghe chưa"""
@@ -43,7 +44,7 @@ def launch_chrome_affiliate():
         f"--user-data-dir={PROFILE_DIR}",
         "--no-first-run",
         "--no-default-browser-check",
-        "https://affiliate.shopee.vn/offer/custom_link"
+        DEFAULT_PORTAL_URL
     ]
     try:
         subprocess.Popen(cmd)
@@ -87,11 +88,11 @@ def convert_link_via_selenium(product_link, timeout=15):
                 break
 
         if not target_tab:
-            driver.get("https://affiliate.shopee.vn/offer/custom_link")
+            driver.get(DEFAULT_PORTAL_URL)
             time.sleep(2)
         else:
             if "custom_link" not in driver.current_url:
-                driver.get("https://affiliate.shopee.vn/offer/custom_link")
+                driver.get(DEFAULT_PORTAL_URL)
                 time.sleep(2)
 
         # Chờ trang tải và kiểm tra đăng nhập

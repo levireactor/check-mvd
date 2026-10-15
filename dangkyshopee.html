@@ -643,15 +643,15 @@
                             <div style="display: flex; align-items: center; gap: 8px;">
                                 <i class="fa-solid fa-link" style="color: #06B6D4;"></i>
                                 <span style="font-size: 13px; font-weight: 700; color: #fff;">Chuyển Đổi Sang Link Affiliate Của Tôi</span>
-                                <span id="badgeAffStatus" class="status-badge status-pending" style="font-size: 10px; padding: 1px 6px;">Tắt</span>
+                                <span id="badgeAffStatus" class="status-badge status-success" style="font-size: 10px; padding: 1px 6px;">Bật (Mặc định)</span>
                             </div>
                             <i class="fa-solid fa-chevron-down" id="iconAffChevron" style="color: var(--text-muted); font-size: 12px; transition: 0.2s;"></i>
                         </div>
 
                         <div id="panelAffiliate" style="display: none; margin-top: 12px; flex-direction: column; gap: 10px;">
                             <label style="cursor: pointer; font-size: 12px; color: var(--text-main); display: inline-flex; align-items: center; gap: 8px;">
-                                <input type="checkbox" id="affEnabled" style="width: 15px; height: 15px; cursor: pointer;" onchange="updateAffBadge()">
-                                <span><b>Bật tự động chuyển đổi</b> link sản phẩm sang link Affiliate của tôi khi chạy bot</span>
+                                <input type="checkbox" id="affEnabled" checked style="width: 15px; height: 15px; cursor: pointer;" onchange="updateAffBadge()">
+                                <span><b>Bật tự động chuyển đổi</b> link sản phẩm sang link Affiliate của tôi khi chạy bot (Mặc định)</span>
                             </label>
 
                             <!-- CHẾ ĐỘ 1: THỤ ĐỘNG QUA CHROME THẬT (SELENIUM PASSIVE - KHÔNG CẦN API/SUBID) -->
@@ -697,21 +697,21 @@
                             <!-- THÔNG TIN ĐỊNH DANH AFFILIATE & SUB ID -->
                             <div class="form-group">
                                 <label style="font-size: 11px; display: flex; justify-content: space-between;">
-                                    <span>🔗 Link Custom Link / Portal Shopee Affiliate của bạn:</span>
+                                    <span>🔗 Link Custom Link / Portal Shopee Affiliate của bạn (Mặc định):</span>
                                     <span style="color: #38BDF8; font-size: 10px; cursor: pointer;" onclick="quickPastePortalLink()">📋 Dán nhanh link</span>
                                 </label>
-                                <input type="text" id="affPortalUrl" placeholder="Ví dụ: https://affiliate.shopee.vn/offer/custom_link?mmp_pid=...&affiliate_id=..." style="padding: 7px 10px; font-size: 12px;" oninput="handlePortalUrlInput()">
+                                <input type="text" id="affPortalUrl" value="https://affiliate.shopee.vn/offer/custom_link?mmp_pid=an_17320160631&affiliate_id=17324610663&pid=affiliates&utm_source=an_17320160631&utm_medium=affiliates&utm_content=meoidungkhoa&af_siteid=an_17320160631" placeholder="Ví dụ: https://affiliate.shopee.vn/offer/custom_link?mmp_pid=...&affiliate_id=..." style="padding: 7px 10px; font-size: 12px;" oninput="handlePortalUrlInput()">
                                 <div id="affPortalNotice" style="font-size: 10px; color: #34D399; margin-top: 3px; display: none;"></div>
                             </div>
 
                             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
                                 <div class="form-group">
-                                    <label style="font-size: 11px;">App ID / Affiliate ID:</label>
-                                    <input type="text" id="affAppId" placeholder="Ví dụ: 17324610663" style="padding: 7px 10px; font-size: 12px;">
+                                    <label style="font-size: 11px;">App ID / Affiliate ID (Mặc định):</label>
+                                    <input type="text" id="affAppId" value="17324610663" placeholder="Ví dụ: 17324610663" style="padding: 7px 10px; font-size: 12px;">
                                 </div>
                                 <div class="form-group">
-                                    <label style="font-size: 11px;">Sub ID (Tùy chọn):</label>
-                                    <input type="text" id="affSubId" placeholder="Ví dụ: meoidungkhoa" style="padding: 7px 10px; font-size: 12px;">
+                                    <label style="font-size: 11px;">Sub ID (Mặc định):</label>
+                                    <input type="text" id="affSubId" value="meoidungkhoa" placeholder="Ví dụ: meoidungkhoa" style="padding: 7px 10px; font-size: 12px;">
                                 </div>
                             </div>
 
@@ -1401,18 +1401,32 @@
         }
     }
 
+    const DEFAULT_PORTAL_URL = 'https://affiliate.shopee.vn/offer/custom_link?mmp_pid=an_17320160631&affiliate_id=17324610663&pid=affiliates&utm_source=an_17320160631&utm_medium=affiliates&utm_content=meoidungkhoa&af_siteid=an_17320160631';
+    const DEFAULT_AFF_ID = '17324610663';
+    const DEFAULT_SUB_ID = 'meoidungkhoa';
+
     async function loadAffiliateConfig() {
+        // Khởi tạo các giá trị mặc định cho giao diện
+        document.getElementById('affEnabled').checked = true;
+        document.getElementById('affAppId').value = DEFAULT_AFF_ID;
+        document.getElementById('affSubId').value = DEFAULT_SUB_ID;
+        if (document.getElementById('affPortalUrl')) {
+            document.getElementById('affPortalUrl').value = DEFAULT_PORTAL_URL;
+            handlePortalUrlInput();
+        }
+        updateAffBadge();
+
         try {
             const res = await fetch('/api/bot-dks/aff-config');
             const data = await res.json();
             if (data.success && data.data) {
                 const cfg = data.data;
-                document.getElementById('affEnabled').checked = Boolean(cfg.enabled);
-                document.getElementById('affAppId').value = cfg.app_id || '';
-                document.getElementById('affSubId').value = cfg.sub_id || '';
+                document.getElementById('affEnabled').checked = cfg.enabled !== false;
+                document.getElementById('affAppId').value = cfg.app_id || DEFAULT_AFF_ID;
+                document.getElementById('affSubId').value = cfg.sub_id || DEFAULT_SUB_ID;
                 if (document.getElementById('affPortalUrl')) {
-                    document.getElementById('affPortalUrl').value = cfg.portal_url || '';
-                    if (cfg.portal_url) handlePortalUrlInput();
+                    document.getElementById('affPortalUrl').value = cfg.portal_url || DEFAULT_PORTAL_URL;
+                    handlePortalUrlInput();
                 }
                 if (document.getElementById('affCookie') && cfg.has_cookie) {
                     document.getElementById('affCookie').placeholder = 'Đã lưu Cookie: ' + cfg.cookie_masked;

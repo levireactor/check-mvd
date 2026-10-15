@@ -16,7 +16,7 @@ if exist "C:\Program Files\Google\Chrome\Application\chrome.exe" (
     set "CHROME_BIN=C:\Program Files (x86)\Google\Chrome\Application\chrome.exe"
 )
 
-start "" "%CHROME_BIN%" --remote-debugging-port=9222 --user-data-dir="%~dp0chrome_aff_profile" --no-first-run --no-default-browser-check "https://affiliate.shopee.vn/offer/custom_link"
+start "" "%CHROME_BIN%" --remote-debugging-port=9222 --user-data-dir="%~dp0chrome_aff_profile" --no-first-run --no-default-browser-check "https://affiliate.shopee.vn/offer/custom_link?mmp_pid=an_17320160631&affiliate_id=17324610663&pid=affiliates&utm_source=an_17320160631&utm_medium=affiliates&utm_content=meoidungkhoa&af_siteid=an_17320160631"
 
 echo [*] Trình duyệt Chrome đã được mở!
 echo [*] Vui lòng đăng nhập tài khoản Shopee Affiliate của bạn (chỉ cần đăng nhập 1 lần).
