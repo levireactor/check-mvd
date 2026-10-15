@@ -649,6 +649,25 @@
                                 <span><b>Bật tự động chuyển đổi</b> link sản phẩm sang link Affiliate của tôi khi chạy bot</span>
                             </label>
 
+                            <!-- CHẾ ĐỘ 1: THỤ ĐỘNG QUA CHROME THẬT (SELENIUM PASSIVE - KHÔNG CẦN API/SUBID) -->
+                            <div style="background: rgba(59, 130, 246, 0.12); border: 1px solid rgba(59, 130, 246, 0.4); border-radius: 6px; padding: 12px; display: flex; flex-direction: column; gap: 8px;">
+                                <div style="display: flex; justify-content: space-between; align-items: center;">
+                                    <span style="color: #60A5FA; font-weight: 700; font-size: 12px;">
+                                        <i class="fa-brands fa-chrome"></i> CHẾ ĐỘ THỤ ĐỘNG: Tự động qua Chrome thật (Không cần API / Sub ID)
+                                    </span>
+                                    <span id="badgeChromeStatus" class="status-badge status-pending" style="font-size: 10px;">Đang kiểm tra...</span>
+                                </div>
+                                <div style="font-size: 11px; color: #CBD5E1; line-height: 1.4;">
+                                    Tool tự động điều khiển Chrome thật dán link vào web Shopee Affiliate và bấm nút lấy link rút gọn <code>s.shopee.vn</code> y hệt như thao tác tay của bạn, không bị Shopee chặn bot!
+                                </div>
+                                <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
+                                    <button type="button" class="btn btn-primary" onclick="launchAffiliateChrome()" style="padding: 5px 12px; font-size: 11px; background: #2563EB; border: none; flex: unset;">
+                                        <i class="fa-solid fa-arrow-up-right-from-square"></i> Mở Chrome Shopee Affiliate
+                                    </button>
+                                    <span style="font-size: 11px; color: #94A3B8;">(Đăng nhập 1 lần trên Chrome này là dùng vĩnh viễn)</span>
+                                </div>
+                            </div>
+
                             <!-- PHƯƠNG THỨC 1: DÙNG COOKIE WEB (KHÔNG CẦN DUYỆT OPEN API) -->
                             <div style="background: rgba(16, 185, 129, 0.08); border: 1px solid rgba(16, 185, 129, 0.3); border-radius: 6px; padding: 10px;">
                                 <div class="form-group" style="margin-bottom: 0;">
@@ -1306,9 +1325,34 @@
         }
     }
 
-    function toggleAffCookieGuide() {
-        const g = document.getElementById('affCookieGuide');
-        g.style.display = g.style.display === 'none' ? 'block' : 'none';
+    async function checkChromeStatus() {
+        const badge = document.getElementById('badgeChromeStatus');
+        if (!badge) return;
+        try {
+            const res = await fetch('/api/bot-dks/aff-chrome-status');
+            const data = await res.json();
+            if (data.running) {
+                badge.innerText = '🟢 Đã kết nối Chrome';
+                badge.className = 'status-badge status-success';
+            } else {
+                badge.innerText = '⚪ Chưa mở Chrome';
+                badge.className = 'status-badge status-pending';
+            }
+        } catch (e) {
+            badge.innerText = '⚪ Chưa kết nối';
+            badge.className = 'status-badge status-pending';
+        }
+    }
+
+    async function launchAffiliateChrome() {
+        try {
+            const res = await fetch('/api/bot-dks/launch-aff-chrome', { method: 'POST' });
+            const data = await res.json();
+            alert(data.message || (data.success ? 'Đã khởi động Chrome!' : 'Không mở được Chrome'));
+            checkChromeStatus();
+        } catch (e) {
+            alert('Lỗi khởi động: ' + e);
+        }
     }
 
     async function loadAffiliateConfig() {
@@ -1432,8 +1476,10 @@
         updateLineCount();
         checkTelegramAuth();
         loadAffiliateConfig();
+        checkChromeStatus();
         fetchStatus();
         pollInterval = setInterval(fetchStatus, 1500);
+        setInterval(checkChromeStatus, 4000);
     });
 </script>
 

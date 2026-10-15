@@ -324,7 +324,17 @@ def convert_shopee_affiliate_link(raw_url, app_id=None, secret=None, sub_id=None
     # 1. Mở rộng link nếu là dạng rút gọn
     canonical_url = expand_shopee_short_url(raw_url)
 
-    # 2. Thử tạo link qua Web API Cookie (Chuẩn nhất cho người chưa mở khóa Open API)
+    # 2. ƯU TIÊN 1: Chuyển đổi qua Chrome Thật (Selenium Remote Debugging - Không cần API/SubID)
+    try:
+        from shopee_affiliate_browser import is_chrome_running, convert_link_via_selenium
+        if is_chrome_running() or cfg.get("use_selenium"):
+            sel_ok, sel_res = convert_link_via_selenium(canonical_url)
+            if sel_ok and "s.shopee.vn" in sel_res:
+                return True, sel_res
+    except Exception:
+        pass
+
+    # 3. Thử tạo link qua Web API Cookie (nếu có cookie)
     if cookie:
         web_ok, web_res = convert_via_web_custom_link(canonical_url, cookie=cookie, sub_id=sub_id)
         if web_ok:

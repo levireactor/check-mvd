@@ -1459,6 +1459,13 @@ class TrackingRequestHandler(http.server.SimpleHTTPRequestHandler):
             except Exception as e:
                 self._json(500, {'error': str(e)})
 
+        elif self.path == '/api/bot-dks/aff-chrome-status':
+            try:
+                from shopee_affiliate_browser import is_chrome_running
+                self._json(200, {'success': True, 'running': is_chrome_running()})
+            except Exception as e:
+                self._json(200, {'success': False, 'running': False, 'error': str(e)})
+
         else:
             super().do_GET()
 
@@ -2314,6 +2321,14 @@ class TrackingRequestHandler(http.server.SimpleHTTPRequestHandler):
                         self._json(200, {'success': False, 'error': res})
                 else:
                     self._json(500, {'success': False, 'error': 'Module affiliate chưa sẵn sàng'})
+            except Exception as e:
+                self._json(500, {'success': False, 'error': str(e)})
+
+        elif self.path == '/api/bot-dks/launch-aff-chrome':
+            try:
+                from shopee_affiliate_browser import launch_chrome_affiliate
+                ok, msg = launch_chrome_affiliate()
+                self._json(200, {'success': ok, 'message': msg})
             except Exception as e:
                 self._json(500, {'success': False, 'error': str(e)})
 
