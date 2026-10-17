@@ -1,5 +1,6 @@
 {
   "enabled": true,
+  "use_selenium": true,
   "app_id": "17324610663",
   "secret": "",
   "sub_id": "meoidungkhoa",

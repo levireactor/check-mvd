@@ -2428,39 +2428,53 @@
       color: #93c5fd;
     }
 
-    /* 3. Sticky Columns */
+    /* 3. Sticky Columns (Fixed alignment & solid background) */
     .sheet-table thead th.col-chk,
     .sheet-table tbody td.col-chk {
       position: sticky;
       left: 0;
+      width: 34px;
+      min-width: 34px;
+      max-width: 34px;
       z-index: 12;
-      background: inherit;
+      background: var(--bg-table);
     }
     .sheet-table thead th.col-stt,
     .sheet-table tbody td.col-stt {
       position: sticky;
       left: 34px;
+      width: 44px;
+      min-width: 44px;
+      max-width: 44px;
       z-index: 12;
-      background: inherit;
+      background: var(--bg-table);
     }
     .sheet-table thead th.col-ordersn,
     .sheet-table tbody td.col-ordersn {
       position: sticky;
       left: 78px;
+      width: 145px;
+      min-width: 145px;
+      max-width: 145px;
       z-index: 12;
-      background: inherit;
+      background: var(--bg-table);
     }
     .sheet-table thead th.col-mvd,
     .sheet-table tbody td.col-mvd {
       position: sticky;
       left: 223px;
+      width: 145px;
+      min-width: 145px;
+      max-width: 145px;
       z-index: 12;
-      background: inherit;
+      background: var(--bg-table);
       border-right: 2px solid #cbd5e1 !important;
+      box-shadow: 3px 0 6px -2px rgba(0, 0, 0, 0.12);
     }
     body.theme-dark .sheet-table thead th.col-mvd,
     body.theme-dark .sheet-table tbody td.col-mvd {
       border-right-color: #475569 !important;
+      box-shadow: 3px 0 6px -2px rgba(0, 0, 0, 0.45);
     }
     .sheet-table thead th.col-chk,
     .sheet-table thead th.col-stt,
@@ -2468,6 +2482,117 @@
     .sheet-table thead th.col-mvd {
       background: var(--th-bg) !important;
       z-index: 15;
+    }
+    /* Đảm bảo nền của các ô sticky không bị trong suốt khi hover hoặc zebra */
+    .sheet-table:not(.no-zebra) tbody tr:nth-child(even) td.col-chk,
+    .sheet-table:not(.no-zebra) tbody tr:nth-child(even) td.col-stt,
+    .sheet-table:not(.no-zebra) tbody tr:nth-child(even) td.col-ordersn,
+    .sheet-table:not(.no-zebra) tbody tr:nth-child(even) td.col-mvd {
+      background: var(--row-alt);
+    }
+    .sheet-table tbody tr:hover td.col-chk,
+    .sheet-table tbody tr:hover td.col-stt,
+    .sheet-table tbody tr:hover td.col-ordersn,
+    .sheet-table tbody tr:hover td.col-mvd {
+      background: var(--row-hover) !important;
+    }
+    .sheet-table tbody tr.row-selected td.col-chk,
+    .sheet-table tbody tr.row-selected td.col-stt,
+    .sheet-table tbody tr.row-selected td.col-ordersn,
+    .sheet-table tbody tr.row-selected td.col-mvd {
+      background: var(--row-selected) !important;
+    }
+
+    /* 4. Table Density Modes */
+    .sheet-table.density-compact tbody tr {
+      height: 32px !important;
+    }
+    .sheet-table.density-compact tbody td {
+      padding-top: 2px !important;
+      padding-bottom: 2px !important;
+      font-size: 0.76rem !important;
+    }
+    .sheet-table.density-normal tbody tr {
+      height: 38px;
+    }
+    .sheet-table.density-comfortable tbody tr {
+      height: 48px !important;
+    }
+    .sheet-table.density-comfortable tbody td {
+      padding-top: 6px !important;
+      padding-bottom: 6px !important;
+    }
+
+    /* 5. Preset Switcher Styles */
+    .view-preset-dropdown-wrap {
+      position: relative;
+      display: inline-flex;
+      align-items: center;
+      margin-right: 6px;
+    }
+    .btn-preset-selector {
+      background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%);
+      color: #166534;
+      border: 1.5px solid #86efac;
+      padding: 0.32rem 0.75rem;
+      border-radius: 8px;
+      font-size: 0.8rem;
+      font-weight: 700;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.35rem;
+      transition: all 0.15s ease;
+      box-shadow: 0 1px 3px rgba(22, 101, 52, 0.1);
+    }
+    body.theme-dark .btn-preset-selector {
+      background: #064e3b;
+      color: #6ee7b7;
+      border-color: #059669;
+    }
+    .btn-preset-selector:hover {
+      background: #bbf7d0;
+      border-color: #4ade80;
+      transform: translateY(-1px);
+    }
+    .preset-menu {
+      min-width: 290px !important;
+    }
+    .preset-menu-header {
+      padding: 6px 12px;
+      font-size: 0.68rem;
+      font-weight: 800;
+      letter-spacing: 0.5px;
+      color: var(--text-muted);
+      border-bottom: 1px solid var(--border-light);
+    }
+    .density-switch-wrap {
+      display: inline-flex;
+      align-items: center;
+      background: var(--bg-topbar);
+      border: 1px solid var(--border-grid);
+      border-radius: 8px;
+      padding: 2px;
+      margin-right: 6px;
+    }
+    .btn-density {
+      background: transparent;
+      border: none;
+      color: var(--text-muted);
+      padding: 3px 8px;
+      font-size: 0.74rem;
+      font-weight: 600;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: all 0.12s;
+    }
+    .btn-density:hover {
+      color: var(--text-main);
+    }
+    .btn-density.active {
+      background: var(--primary-blue);
+      color: #ffffff;
+      box-shadow: 0 1px 3px rgba(37, 99, 235, 0.3);
     }
     .sheet-table tbody tr {
       background: var(--bg-table);
@@ -3095,17 +3220,64 @@
       </span>
     </div>
 
-    <!-- Mini KPI Stat Bar -->
-    <div class="kpi-mini-bar">
-      <div class="kpi-item">
-        <span>Đơn:</span> <b id="stat-kpi-total">0</b>
+    <!-- Mini KPI Stat Bar & Preset Switcher -->
+    <div style="display:inline-flex;align-items:center;gap:8px;margin-left:auto">
+      <div class="view-preset-dropdown-wrap">
+        <button class="btn-preset-selector" onclick="toggleMenuDropdown('menu-presets', event)" title="Chọn mẫu hiển thị cột thông minh">
+          <span id="current-preset-icon">⚡</span>
+          <span id="current-preset-name">Gọn gàng</span>
+          <span style="font-size:0.65rem;opacity:0.7">▾</span>
+        </button>
+        <div class="top-menu-dropdown preset-menu" id="menu-presets">
+          <div class="preset-menu-header">📐 MẪU CỘT THÔNG MINH</div>
+          <div class="top-menu-item" onclick="applyPreset('compact'); closeMenuDropdowns()">
+            <span>⚡</span>
+            <div>
+              <div style="font-weight:700">1. Gọn gàng (Khuyên dùng)</div>
+              <div style="font-size:0.72rem;color:var(--text-muted)">Vừa vặn 1 màn hình, Mã đơn, MVĐ, SĐT, COD</div>
+            </div>
+          </div>
+          <div class="top-menu-item" onclick="applyPreset('logistics'); closeMenuDropdowns()">
+            <span>🚚</span>
+            <div>
+              <div style="font-weight:700">2. Soát Vận Chuyển</div>
+              <div style="font-size:0.72rem;color:var(--text-muted)">Hành trình bưu cục, Địa chỉ, Sản phẩm & COD</div>
+            </div>
+          </div>
+          <div class="top-menu-item" onclick="applyPreset('store'); closeMenuDropdowns()">
+            <span>🏪</span>
+            <div>
+              <div style="font-weight:700">3. Quản Trị Shop & Cookie</div>
+              <div style="font-size:0.72rem;color:var(--text-muted)">Tên shop, Tài khoản Cookie, Mã đơn & Thanh toán</div>
+            </div>
+          </div>
+          <div class="top-menu-item" onclick="applyPreset('full'); closeMenuDropdowns()">
+            <span>📊</span>
+            <div>
+              <div style="font-weight:700">4. Đầy đủ tất cả cột</div>
+              <div style="font-size:0.72rem;color:var(--text-muted)">Hiện toàn bộ 17 cột dữ liệu để đối soát</div>
+            </div>
+          </div>
+        </div>
       </div>
-      <div class="kpi-item">
-        <span>Có MVĐ:</span> <b id="stat-kpi-mvd" style="color:var(--primary-blue)">0</b>
-        <span class="kpi-progress-pill" id="stat-kpi-pct">0%</span>
+
+      <div class="density-switch-wrap" title="Độ cao dòng bảng tính">
+        <button class="btn-density" id="btn-density-compact" onclick="setTableDensity('compact')" title="Mật độ gọn (32px)">Gọn</button>
+        <button class="btn-density active" id="btn-density-normal" onclick="setTableDensity('normal')" title="Mật độ chuẩn (38px)">Chuẩn</button>
+        <button class="btn-density" id="btn-density-comfortable" onclick="setTableDensity('comfortable')" title="Mật độ rộng (48px)">Rộng</button>
       </div>
-      <div class="kpi-item">
-        <span>Tổng COD:</span> <b id="stat-kpi-cod" style="color:#d97706">0 đ</b>
+
+      <div class="kpi-mini-bar">
+        <div class="kpi-item">
+          <span>Đơn:</span> <b id="stat-kpi-total">0</b>
+        </div>
+        <div class="kpi-item">
+          <span>Có MVĐ:</span> <b id="stat-kpi-mvd" style="color:var(--primary-blue)">0</b>
+          <span class="kpi-progress-pill" id="stat-kpi-pct">0%</span>
+        </div>
+        <div class="kpi-item">
+          <span>Tổng COD:</span> <b id="stat-kpi-cod" style="color:#d97706">0 đ</b>
+        </div>
       </div>
     </div>
   </div>
@@ -3120,23 +3292,23 @@
           <th class="col-chk th-center"><input type="checkbox" id="chk-select-all"
               onchange="toggleSelectAll(this.checked)"></th>
           <th class="col-stt th-center sortable" onclick="sortBy('stt')">STT ⇕</th>
-          <th class="col-pay" data-col="pay">Thanh Toán</th>
-          <th class="col-name" data-col="name">Tên</th>
-          <th class="col-cookie" data-col="cookie">Cookie</th>
           <th class="col-ordersn sortable" data-col="ordersn" onclick="sortBy('order_sn')">Mã đơn hàng ⇕</th>
-          <th class="col-mvd sortable" data-col="mvd" onclick="sortBy('tracking_no')">MVD ⇕</th>
+          <th class="col-mvd sortable" data-col="mvd" onclick="sortBy('tracking_no')">Mã Vận Đơn ⇕</th>
           <th class="col-status" data-col="status">Trạng thái</th>
           <th class="col-receiver" data-col="receiver">Người nhận</th>
-          <th class="col-phone" data-col="phone">SDT nhận</th>
-          <th class="col-addr" data-col="addr">Địa chỉ</th>
+          <th class="col-phone" data-col="phone">SĐT nhận</th>
+          <th class="col-cod th-right sortable" data-col="cod" onclick="sortBy('cod_val')">Tiền COD ⇕</th>
+          <th class="col-pay" data-col="pay">Thanh toán</th>
           <th class="col-product" data-col="product">Sản phẩm</th>
-          <th class="col-product_link col-hidden" data-col="product_link">Link Sản Phẩm</th>
-          <th class="col-driver_phone col-hidden" data-col="driver_phone">SDT ship</th>
-          <th class="col-cod th-right sortable" data-col="cod" onclick="sortBy('cod_val')">COD ⇕</th>
-          <th class="col-full_detail cell-center" data-col="full_detail">Full TT Đơn</th>
-          <th class="col-order_time col-hidden" data-col="order_time">Time Đặt Hàng</th>
+          <th class="col-addr" data-col="addr">Địa chỉ giao</th>
+          <th class="col-name" data-col="name">Tên / Ghi chú</th>
+          <th class="col-cookie" data-col="cookie">Tài khoản Cookie</th>
+          <th class="col-product_link col-hidden" data-col="product_link">Link SP</th>
+          <th class="col-driver_phone col-hidden" data-col="driver_phone">SĐT ship</th>
+          <th class="col-full_detail cell-center col-hidden" data-col="full_detail">Full TT</th>
+          <th class="col-order_time col-hidden" data-col="order_time">Giờ đặt</th>
           <th class="col-last_check col-hidden" data-col="last_check">Last Check</th>
-          <th class="col-tool th-center" data-col="tool">Công cụ</th>
+          <th class="col-tool th-center" data-col="tool">Thao tác</th>
         </tr>
       </thead>
       <tbody id="sheet-body">
@@ -4030,52 +4202,69 @@
     </div>
 
     <div class="theme-drawer-body">
-      <div style="display:flex;gap:0.4rem;margin-bottom:0.75rem">
-        <button class="top-btn" style="flex:1;justify-content:center;font-size:0.76rem;padding:0.4rem"
-          onclick="setAllColumns(true)">
-          ✓ Hiện tất cả
-        </button>
-        <button class="top-btn" style="flex:1;justify-content:center;font-size:0.76rem;padding:0.4rem"
-          onclick="resetDefaultColumns()">
-          ↺ Mặc định
-        </button>
+      <!-- 1. MẪU HIỂN THỊ CỘT THÔNG MINH (PRESETS) -->
+      <div style="margin-bottom:1rem;background:var(--bg-topbar);padding:0.75rem;border-radius:8px;border:1px solid var(--border-light)">
+        <div style="font-size:0.75rem;font-weight:800;color:var(--text-muted);margin-bottom:0.45rem;display:flex;align-items:center;gap:4px">
+          <span>📐</span> <span>MẪU GIAO DIỆN CỘT THÔNG MINH:</span>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.45rem">
+          <button class="top-btn" style="justify-content:center;font-size:0.75rem;padding:0.45rem;font-weight:700" onclick="applyPreset('compact')">
+            ⚡ Gọn gàng (Chuẩn)
+          </button>
+          <button class="top-btn" style="justify-content:center;font-size:0.75rem;padding:0.45rem;font-weight:700" onclick="applyPreset('logistics')">
+            🚚 Soát Vận Chuyển
+          </button>
+          <button class="top-btn" style="justify-content:center;font-size:0.75rem;padding:0.45rem;font-weight:700" onclick="applyPreset('store')">
+            🏪 Shop & Cookie
+          </button>
+          <button class="top-btn" style="justify-content:center;font-size:0.75rem;padding:0.45rem;font-weight:700" onclick="applyPreset('full')">
+            📊 Hiện tất cả cột
+          </button>
+        </div>
+      </div>
+
+      <!-- 2. MẬT ĐỘ DÒNG BẢNG TÍNH -->
+      <div style="margin-bottom:1rem;background:var(--bg-topbar);padding:0.75rem;border-radius:8px;border:1px solid var(--border-light)">
+        <div style="font-size:0.75rem;font-weight:800;color:var(--text-muted);margin-bottom:0.45rem;display:flex;align-items:center;gap:4px">
+          <span>📏</span> <span>MẬT ĐỘ DÒNG (ĐỘ CAO ROW):</span>
+        </div>
+        <div style="display:flex;gap:0.45rem">
+          <button class="top-btn" style="flex:1;justify-content:center;font-size:0.75rem;padding:0.4rem" onclick="setTableDensity('compact')">
+            Gọn (32px)
+          </button>
+          <button class="top-btn" style="flex:1;justify-content:center;font-size:0.75rem;padding:0.4rem" onclick="setTableDensity('normal')">
+            Chuẩn (38px)
+          </button>
+          <button class="top-btn" style="flex:1;justify-content:center;font-size:0.75rem;padding:0.4rem" onclick="setTableDensity('comfortable')">
+            Rộng (48px)
+          </button>
+        </div>
+      </div>
+
+      <!-- 3. TÙY CHỌN TỪNG CỘT RIÊNG LẺ -->
+      <div style="font-size:0.75rem;font-weight:800;color:var(--text-muted);margin-bottom:0.45rem;display:flex;align-items:center;justify-content:space-between">
+        <span>👁️ BẬT / TẮT TỪNG CỘT CỤ THỂ:</span>
+        <span style="font-weight:normal;font-size:0.7rem;cursor:pointer;color:var(--primary-blue)" onclick="resetDefaultColumns()">↺ Mặc định</span>
       </div>
 
       <div class="col-grid-list">
-        <label class="col-card-item"><input type="checkbox" data-col="pay" checked onchange="toggleColumn('pay')"> Thanh
-          toán</label>
-        <label class="col-card-item"><input type="checkbox" data-col="name" checked onchange="toggleColumn('name')"> Tên
-          Shop</label>
-        <label class="col-card-item"><input type="checkbox" data-col="cookie" checked onchange="toggleColumn('cookie')">
-          Cookie</label>
-        <label class="col-card-item"><input type="checkbox" data-col="ordersn" checked
-            onchange="toggleColumn('ordersn')"> Mã đơn hàng</label>
-        <label class="col-card-item"><input type="checkbox" data-col="mvd" checked onchange="toggleColumn('mvd')"> Mã
-          Vận Đơn</label>
-        <label class="col-card-item"><input type="checkbox" data-col="status" checked onchange="toggleColumn('status')">
-          Trạng thái</label>
-        <label class="col-card-item"><input type="checkbox" data-col="receiver" checked
-            onchange="toggleColumn('receiver')"> Người nhận</label>
-        <label class="col-card-item"><input type="checkbox" data-col="phone" checked onchange="toggleColumn('phone')">
-          SĐT nhận</label>
-        <label class="col-card-item"><input type="checkbox" data-col="addr" checked onchange="toggleColumn('addr')"> Địa
-          chỉ</label>
-        <label class="col-card-item"><input type="checkbox" data-col="product" checked
-            onchange="toggleColumn('product')"> Sản phẩm</label>
-        <label class="col-card-item"><input type="checkbox" data-col="product_link"
-            onchange="toggleColumn('product_link')"> Link SP</label>
-        <label class="col-card-item"><input type="checkbox" data-col="driver_phone"
-            onchange="toggleColumn('driver_phone')"> SĐT ship</label>
-        <label class="col-card-item"><input type="checkbox" data-col="cod" checked onchange="toggleColumn('cod')">
-          COD</label>
-        <label class="col-card-item"><input type="checkbox" data-col="full_detail" checked
-            onchange="toggleColumn('full_detail')"> Full TT Đơn</label>
-        <label class="col-card-item"><input type="checkbox" data-col="order_time" onchange="toggleColumn('order_time')">
-          Giờ đặt hàng</label>
-        <label class="col-card-item"><input type="checkbox" data-col="last_check" onchange="toggleColumn('last_check')">
-          Last check</label>
-        <label class="col-card-item"><input type="checkbox" data-col="tool" checked onchange="toggleColumn('tool')"> Nút
-          công cụ</label>
+        <label class="col-card-item"><input type="checkbox" data-col="ordersn" checked onchange="toggleColumn('ordersn')"> Mã đơn hàng</label>
+        <label class="col-card-item"><input type="checkbox" data-col="mvd" checked onchange="toggleColumn('mvd')"> Mã Vận Đơn (MVĐ)</label>
+        <label class="col-card-item"><input type="checkbox" data-col="status" checked onchange="toggleColumn('status')"> Trạng thái</label>
+        <label class="col-card-item"><input type="checkbox" data-col="receiver" checked onchange="toggleColumn('receiver')"> Người nhận</label>
+        <label class="col-card-item"><input type="checkbox" data-col="phone" checked onchange="toggleColumn('phone')"> SĐT nhận</label>
+        <label class="col-card-item"><input type="checkbox" data-col="cod" checked onchange="toggleColumn('cod')"> Tiền COD</label>
+        <label class="col-card-item"><input type="checkbox" data-col="pay" checked onchange="toggleColumn('pay')"> Thanh toán</label>
+        <label class="col-card-item"><input type="checkbox" data-col="product" checked onchange="toggleColumn('product')"> Sản phẩm</label>
+        <label class="col-card-item"><input type="checkbox" data-col="addr" checked onchange="toggleColumn('addr')"> Địa chỉ</label>
+        <label class="col-card-item"><input type="checkbox" data-col="name" onchange="toggleColumn('name')"> Tên Shop / Ghi chú</label>
+        <label class="col-card-item"><input type="checkbox" data-col="cookie" onchange="toggleColumn('cookie')"> Tài khoản Cookie</label>
+        <label class="col-card-item"><input type="checkbox" data-col="product_link" onchange="toggleColumn('product_link')"> Link SP</label>
+        <label class="col-card-item"><input type="checkbox" data-col="driver_phone" onchange="toggleColumn('driver_phone')"> SĐT ship</label>
+        <label class="col-card-item"><input type="checkbox" data-col="full_detail" onchange="toggleColumn('full_detail')"> Full TT Đơn</label>
+        <label class="col-card-item"><input type="checkbox" data-col="order_time" onchange="toggleColumn('order_time')"> Giờ đặt hàng</label>
+        <label class="col-card-item"><input type="checkbox" data-col="last_check" onchange="toggleColumn('last_check')"> Last check</label>
+        <label class="col-card-item"><input type="checkbox" data-col="tool" checked onchange="toggleColumn('tool')"> Nút công cụ</label>
       </div>
     </div>
 
@@ -4106,26 +4295,114 @@
     let blockedCancelledOrders = [];
     let blockedCancelledSet = new Set();
 
-    // Column Visibility State
-    const columnConfig = {
-      pay: true,
-      name: true,
-      cookie: true,
-      ordersn: true,
-      mvd: true,
-      status: true,
-      receiver: true,
-      phone: true,
-      addr: true,
-      product: true,
-      product_link: false,
-      driver_phone: false,
-      cod: true,
-      full_detail: true,
-      order_time: false,
-      last_check: false,
-      tool: true
+    // 4 Bộ Preset Cột Thông Minh
+    const COLUMN_PRESETS = {
+      compact: {
+        key: 'compact',
+        icon: '⚡',
+        name: 'Gọn gàng',
+        desc: 'Vừa vặn 1 màn hình, tập trung Mã đơn, MVĐ, SĐT, COD',
+        cols: {
+          ordersn: true,
+          mvd: true,
+          status: true,
+          receiver: true,
+          phone: true,
+          cod: true,
+          pay: true,
+          product: false,
+          addr: false,
+          name: false,
+          cookie: false,
+          product_link: false,
+          driver_phone: false,
+          full_detail: false,
+          order_time: false,
+          last_check: false,
+          tool: true
+        }
+      },
+      logistics: {
+        key: 'logistics',
+        icon: '🚚',
+        name: 'Soát Vận Chuyển',
+        desc: 'Hành trình bưu cục, Địa chỉ, Sản phẩm & COD',
+        cols: {
+          ordersn: true,
+          mvd: true,
+          status: true,
+          receiver: true,
+          phone: true,
+          cod: true,
+          addr: true,
+          product: true,
+          pay: false,
+          name: false,
+          cookie: false,
+          product_link: false,
+          driver_phone: false,
+          full_detail: false,
+          order_time: false,
+          last_check: false,
+          tool: true
+        }
+      },
+      store: {
+        key: 'store',
+        icon: '🏪',
+        name: 'Shop & Cookie',
+        desc: 'Tên shop, Tài khoản Cookie, Mã đơn & Thanh toán',
+        cols: {
+          ordersn: true,
+          mvd: true,
+          status: true,
+          receiver: true,
+          phone: false,
+          cod: true,
+          pay: true,
+          name: true,
+          cookie: true,
+          product: false,
+          addr: false,
+          product_link: false,
+          driver_phone: false,
+          full_detail: false,
+          order_time: false,
+          last_check: false,
+          tool: true
+        }
+      },
+      full: {
+        key: 'full',
+        icon: '📊',
+        name: 'Đầy đủ tất cả',
+        desc: 'Hiện toàn bộ 17 cột dữ liệu để đối soát',
+        cols: {
+          ordersn: true,
+          mvd: true,
+          status: true,
+          receiver: true,
+          phone: true,
+          cod: true,
+          pay: true,
+          product: true,
+          addr: true,
+          name: true,
+          cookie: true,
+          product_link: true,
+          driver_phone: true,
+          full_detail: true,
+          order_time: true,
+          last_check: true,
+          tool: true
+        }
+      }
     };
+
+    // Default Column Visibility State (Khởi tạo chuẩn Gọn Gàng / Tối Ưu)
+    const columnConfig = Object.assign({}, COLUMN_PRESETS.compact.cols);
+    let currentPresetKey = 'compact';
+    let currentDensity = 'normal';
 
     // Color Customization State
     const colorConfig = {
@@ -4230,24 +4507,56 @@
       openDrawerWithTab('theme', event);
     }
 
+    function applyPreset(presetKey, showToastMsg = true) {
+      const p = COLUMN_PRESETS[presetKey];
+      if (!p) return;
+      currentPresetKey = presetKey;
+      Object.assign(columnConfig, p.cols);
+
+      const iconEl = $('current-preset-icon');
+      const nameEl = $('current-preset-name');
+      if (iconEl) iconEl.innerText = p.icon;
+      if (nameEl) nameEl.innerText = p.name;
+
+      applyColumnVisibility();
+      savePreferences();
+      if (showToastMsg) {
+        showToast(`Đã áp dụng mẫu: ${p.name}`, p.icon);
+      }
+    }
+
+    function setTableDensity(density, showToastMsg = true) {
+      currentDensity = density;
+      const table = $('sheet-table');
+      if (table) {
+        table.classList.remove('density-compact', 'density-normal', 'density-comfortable');
+        table.classList.add(`density-${density}`);
+      }
+      ['compact', 'normal', 'comfortable'].forEach(d => {
+        const b = $(`btn-density-${d}`);
+        if (b) {
+          if (d === density) b.classList.add('active');
+          else b.classList.remove('active');
+        }
+      });
+      savePreferences();
+      if (showToastMsg) {
+        const labels = { compact: 'Gọn (32px)', normal: 'Chuẩn (38px)', comfortable: 'Rộng (48px)' };
+        showToast(`Mật độ dòng: ${labels[density] || density}`, '📏');
+      }
+    }
+
     function setAllColumns(show) {
       for (const col in columnConfig) {
         columnConfig[col] = show;
       }
       savePreferences();
       applyColumnVisibility();
+      showToast(show ? 'Đã hiển thị tất cả cột' : 'Đã ẩn tất cả cột', '👁️');
     }
 
     function resetDefaultColumns() {
-      const defaults = {
-        pay: true, name: true, cookie: true, ordersn: true, mvd: true,
-        status: true, receiver: true, phone: true, addr: true, product: true,
-        product_link: false, driver_phone: false, cod: true, full_detail: true,
-        order_time: false, last_check: false, tool: true
-      };
-      Object.assign(columnConfig, defaults);
-      savePreferences();
-      applyColumnVisibility();
+      applyPreset('compact', true);
     }
 
     // Close dropdowns when clicking outside
@@ -4374,6 +4683,8 @@
       try {
         localStorage.setItem('shopee_sheet_columns', JSON.stringify(columnConfig));
         localStorage.setItem('shopee_sheet_colors', JSON.stringify(colorConfig));
+        localStorage.setItem('shopee_sheet_preset', currentPresetKey);
+        localStorage.setItem('shopee_sheet_density', currentDensity);
       } catch (e) { }
     }
 
@@ -4383,6 +4694,19 @@
         if (savedCols) Object.assign(columnConfig, JSON.parse(savedCols));
         const savedColors = localStorage.getItem('shopee_sheet_colors');
         if (savedColors) Object.assign(colorConfig, JSON.parse(savedColors));
+        const savedPreset = localStorage.getItem('shopee_sheet_preset');
+        if (savedPreset && COLUMN_PRESETS[savedPreset]) {
+          currentPresetKey = savedPreset;
+          const p = COLUMN_PRESETS[savedPreset];
+          const iconEl = $('current-preset-icon');
+          const nameEl = $('current-preset-name');
+          if (iconEl) iconEl.innerText = p.icon;
+          if (nameEl) nameEl.innerText = p.name;
+        }
+        const savedDensity = localStorage.getItem('shopee_sheet_density');
+        if (savedDensity) {
+          setTableDensity(savedDensity, false);
+        }
         const savedAuto = localStorage.getItem('shopee_sheet_autosave');
         if (savedAuto !== null) isAutoSaveEnabled = (savedAuto === 'true');
         updateAutoSaveUI();
@@ -5026,31 +5350,6 @@
         <input type="checkbox" ${isChecked ? 'checked' : ''} onchange="toggleSelectRow('${row.id}', this.checked)">
       </td>
       <td class="cell-center col-stt" onclick="viewDetail('${row.id}')" style="cursor:pointer" title="Click xem chi tiết đơn hàng"><span class="stt-num">${stt}</span></td>
-      <td data-col="pay" class="col-pay">
-        <div class="select-pay-wrap">
-          <select class="select-pay ${payClass}" onchange="changePayment(event, '${row.id}')">
-            <option value="—" ${row.payment_status === '—' ? 'selected' : ''}>—</option>
-            <option value="Chưa thanh toán" ${row.payment_status === 'Chưa thanh toán' ? 'selected' : ''}>Chưa thanh toán</option>
-            <option value="Đã thanh toán" ${row.payment_status === 'Đã thanh toán' ? 'selected' : ''}>Đã thanh toán</option>
-            <option value="COD" ${row.payment_status === 'COD' ? 'selected' : ''}>COD</option>
-          </select>
-        </div>
-      </td>
-      <td data-col="name" class="col-name">
-        <input class="input-name" type="text" value="${escapeHtml(row.note_name || '')}" 
-          placeholder="Nhập tên..." onchange="changeName(event, '${row.id}')">
-      </td>
-      <td data-col="cookie" class="col-cookie">
-        <div class="cookie-cell-wrap">
-          ${cookieAccChip}
-          <div class="cookie-sub-row">
-            <span class="cookie-text" style="cursor:pointer" onclick="openCookieInspector('${row.id}')" title="Bấm để xem chi tiết Cookie dạng Excel Inspector">${escapeHtml(cookieShort)}</span>
-            <button class="btn-cookie-excel" onclick="openCookieInspector('${row.id}')" title="📊 Mở bảng thuộc tính Cookie kiểu Excel">📊 Excel</button>
-            <button class="btn-cookie-search" id="btn-renew-${row.id}" onclick="recheckSingleRow('${row.id}', event)" title="🔍 Bấm để kiểm tra lại (Renew) đơn hàng này">🔍</button>
-          </div>
-          ${tagHtml}
-        </div>
-      </td>
       <td data-col="ordersn" class="col-ordersn">
         <span class="code-ordersn" onclick="copyCell(event, '${escapeHtml(row.order_sn || row.order_id)}')" title="Click để copy mã đơn">
           ${escapeHtml(row.order_sn || row.order_id || '--')}
@@ -5068,12 +5367,37 @@
           ${escapeHtml(row.receiver_phone || '--')}
         </span>
       </td>
-      <td data-col="addr" class="col-addr" title="${escapeHtml(row.receiver_address || '')}">${escapeHtml(row.receiver_address || '--')}</td>
+      <td data-col="cod" class="col-cod cell-right"><span class="cod-amount">${escapeHtml(row.cod_amount || '0 đ')}</span></td>
+      <td data-col="pay" class="col-pay">
+        <div class="select-pay-wrap">
+          <select class="select-pay ${payClass}" onchange="changePayment(event, '${row.id}')">
+            <option value="—" ${row.payment_status === '—' ? 'selected' : ''}>—</option>
+            <option value="Chưa thanh toán" ${row.payment_status === 'Chưa thanh toán' ? 'selected' : ''}>Chưa thanh toán</option>
+            <option value="Đã thanh toán" ${row.payment_status === 'Đã thanh toán' ? 'selected' : ''}>Đã thanh toán</option>
+            <option value="COD" ${row.payment_status === 'COD' ? 'selected' : ''}>COD</option>
+          </select>
+        </div>
+      </td>
       <td data-col="product" class="col-product">${prodHtml}</td>
+      <td data-col="addr" class="col-addr" title="${escapeHtml(row.receiver_address || '')}">${escapeHtml(row.receiver_address || '--')}</td>
+      <td data-col="name" class="col-name">
+        <input class="input-name" type="text" value="${escapeHtml(row.note_name || '')}" 
+          placeholder="Nhập tên..." onchange="changeName(event, '${row.id}')">
+      </td>
+      <td data-col="cookie" class="col-cookie">
+        <div class="cookie-cell-wrap">
+          ${cookieAccChip}
+          <div class="cookie-sub-row">
+            <span class="cookie-text" style="cursor:pointer" onclick="openCookieInspector('${row.id}')" title="Bấm để xem chi tiết Cookie dạng Excel Inspector">${escapeHtml(cookieShort)}</span>
+            <button class="btn-cookie-excel" onclick="openCookieInspector('${row.id}')" title="📊 Mở bảng thuộc tính Cookie kiểu Excel">📊 Excel</button>
+            <button class="btn-cookie-search" id="btn-renew-${row.id}" onclick="recheckSingleRow('${row.id}', event)" title="🔍 Bấm để kiểm tra lại (Renew) đơn hàng này">🔍</button>
+          </div>
+          ${tagHtml}
+        </div>
+      </td>
       <td data-col="product_link" class="col-product_link col-hidden">${prodLinkHtml}</td>
       <td data-col="driver_phone" class="col-driver_phone col-hidden">${driverPhoneHtml}</td>
-      <td data-col="cod" class="col-cod cell-right"><span class="cod-amount">${escapeHtml(row.cod_amount || '0 đ')}</span></td>
-      <td data-col="full_detail" class="col-full_detail cell-center">
+      <td data-col="full_detail" class="col-full_detail cell-center col-hidden">
         <button class="btn-full-tt" onclick="viewDetail('${row.id}')">📄 Xem</button>
       </td>
       <td data-col="order_time" class="col-order_time col-hidden">

@@ -1581,16 +1581,19 @@
                 if (notice) {
                     notice.innerHTML = '<span style="color: #34D399; font-weight: 700;"><i class="fa-solid fa-circle-check"></i> ĐÃ TỰ ĐỘNG ĐIỀN LINK AFFILIATE ĐỂ CHẠY LỆNH /addtocart!</span>';
                 }
-                box.style.color = '#34D399';
+                const isShort = data.short_link.includes('s.shopee.vn') || data.short_link.includes('shp.ee') || data.short_link.includes('shope.ee');
+                box.style.color = isShort ? '#34D399' : '#FBBF24';
                 box.innerHTML = `
                     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
-                        <span>🎉 <b>Chuyển đổi thành công!</b></span>
+                        <span>${isShort ? '🎉 <b>Đã tạo link rút gọn Affiliate s.shopee.vn thành công!</b>' : '⚠️ <b>Đã gắn tham số Tracking Affiliate trực tiếp vào link!</b>'}</span>
                         <button type="button" class="btn btn-secondary" onclick="copyLastAffLink()" style="padding: 3px 8px; font-size: 10px; background: #059669; border: none; color: #fff;">
                             <i class="fa-solid fa-copy"></i> Sao chép Link
                         </button>
                     </div>
-                    <div style="background: rgba(0,0,0,0.4); padding: 8px 10px; border-radius: 4px; border: 1px solid rgba(16,185,129,0.3);">
-                        <div style="color: #34D399; font-weight: 600; margin-bottom: 4px;">✅ Đã cập nhật trực tiếp vào ô "Link Sản Phẩm" để dùng cho lệnh /addtocart!</div>
+                    <div style="background: rgba(0,0,0,0.4); padding: 8px 10px; border-radius: 4px; border: 1px solid ${isShort ? 'rgba(16,185,129,0.3)' : 'rgba(251,191,36,0.3)'};">
+                        <div style="color: ${isShort ? '#34D399' : '#FBBF24'}; font-weight: 600; margin-bottom: 4px;">
+                            ${isShort ? '✅ Link rút gọn chuẩn s.shopee.vn đã tự động điền vào ô "Link Sản Phẩm"!' : 'ℹ️ Để tạo link rút gọn s.shopee.vn tự động qua Chrome: Hãy bấm "Mở Chrome Shopee Affiliate" và đăng nhập nick 1 lần.'}
+                        </div>
                         Link Affiliate: <a href="${data.short_link}" target="_blank" style="color: #22D3EE; text-decoration: underline; word-break: break-all; font-weight: 600;">${data.short_link}</a>
                     </div>
                 `;

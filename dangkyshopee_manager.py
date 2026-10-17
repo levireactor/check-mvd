@@ -110,6 +110,7 @@ AFF_CONFIG_FILE = os.path.join(DIRECTORY, "affiliate_config.json")
 
 DEFAULT_AFF_CONFIG = {
     "enabled": True,
+    "use_selenium": True,
     "app_id": "17324610663",
     "secret": "",
     "sub_id": "meoidungkhoa",
@@ -350,14 +351,18 @@ def convert_shopee_affiliate_link(raw_url, app_id=None, secret=None, sub_id=None
     canonical_url = expand_shopee_short_url(raw_url)
 
     # 2. ƯU TIÊN 1: Chuyển đổi qua Chrome Thật (Selenium Remote Debugging - Không cần API/SubID)
-    try:
-        from shopee_affiliate_browser import is_chrome_running, convert_link_via_selenium
-        if is_chrome_running() or cfg.get("use_selenium"):
+    use_selenium = cfg.get("use_selenium", True)
+    if use_selenium or is_chrome_running():
+        try:
+            from shopee_affiliate_browser import is_chrome_running, convert_link_via_selenium
             sel_ok, sel_res = convert_link_via_selenium(canonical_url)
-            if sel_ok and "s.shopee.vn" in sel_res:
+            if sel_ok and any(k in str(sel_res) for k in ["s.shopee.vn", "shp.ee", "shope.ee"]):
                 return True, sel_res
-    except Exception:
-        pass
+            elif not sel_ok and ("chưa đăng nhập" in str(sel_res).lower() or "đăng nhập" in str(sel_res).lower()):
+                # Nếu chưa đăng nhập tài khoản Shopee trên Chrome, trả về thông báo lỗi để người dùng đăng nhập
+                return False, sel_res
+        except Exception as sel_err:
+            print(f"[!] Selenium convert link warning: {sel_err}")
 
     # 3. Thử tạo link qua Web API Cookie (nếu có cookie)
     if cookie:
