@@ -613,20 +613,26 @@ def _save_templates(items):
 
 # ━━━ TELEGRAM BOT THÔNG BÁO ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 def _load_telegram_config():
-    if os.path.exists(TELEGRAM_CONFIG_FILE):
-        try:
-            with open(TELEGRAM_CONFIG_FILE, 'r', encoding='utf-8') as f:
-                return json.load(f)
-        except Exception:
-            pass
-    return {
+    default_cfg = {
         "bot_token": "",
         "chat_id": "",
         "enabled": False,
+        "auto_check_mvd": True,
+        "check_interval_seconds": 180,
         "notify_new_mvd": True,
         "notify_completed": True,
-        "notify_cancelled": True
+        "notify_cancelled": True,
+        "last_check_time": "",
+        "total_mvd_notified": 0
     }
+    if os.path.exists(TELEGRAM_CONFIG_FILE):
+        try:
+            with open(TELEGRAM_CONFIG_FILE, 'r', encoding='utf-8') as f:
+                data = json.load(f)
+                default_cfg.update(data)
+        except Exception:
+            pass
+    return default_cfg
 
 def _save_telegram_config(cfg):
     try:
@@ -1356,6 +1362,13 @@ class TrackingRequestHandler(http.server.SimpleHTTPRequestHandler):
                 cfg = _load_telegram_config()
                 token = cfg.get('bot_token', '')
                 masked_token = (token[:6] + '...' + token[-4:]) if len(token) > 12 else (token or '')
+                watcher_status = {}
+                try:
+                    import telegram_mvd_watcher
+                    watcher_status = telegram_mvd_watcher.mvd_watcher.get_status()
+                except Exception:
+                    pass
+
                 self._json(200, {
                     'enabled': cfg.get('enabled', False),
                     'chat_id': cfg.get('chat_id', ''),
@@ -1363,10 +1376,22 @@ class TrackingRequestHandler(http.server.SimpleHTTPRequestHandler):
                     'has_token': bool(token),
                     'notify_new_mvd': cfg.get('notify_new_mvd', True),
                     'notify_completed': cfg.get('notify_completed', True),
-                    'notify_cancelled': cfg.get('notify_cancelled', True)
+                    'notify_cancelled': cfg.get('notify_cancelled', True),
+                    'auto_check_mvd': cfg.get('auto_check_mvd', True),
+                    'check_interval_seconds': cfg.get('check_interval_seconds', 180),
+                    'last_check_time': cfg.get('last_check_time', ''),
+                    'total_mvd_notified': cfg.get('total_mvd_notified', 0),
+                    'watcher': watcher_status
                 })
             except Exception as e:
                 self._json(500, {'error': f'Lỗi đọc Telegram config: {str(e)}'})
+
+        elif self.path == '/api/telegram/watcher/status':
+            try:
+                import telegram_mvd_watcher
+                self._json(200, {'success': True, 'data': telegram_mvd_watcher.mvd_watcher.get_status()})
+            except Exception as e:
+                self._json(500, {'success': False, 'error': str(e)})
 
         elif self.path == '/api/autoreg/status' or self.path.startswith('/api/autoreg/status?'):
             try:
@@ -1967,10 +1992,22 @@ class TrackingRequestHandler(http.server.SimpleHTTPRequestHandler):
                     cfg['notify_completed'] = bool(body['notify_completed'])
                 if 'notify_cancelled' in body:
                     cfg['notify_cancelled'] = bool(body['notify_cancelled'])
+                if 'auto_check_mvd' in body:
+                    cfg['auto_check_mvd'] = bool(body['auto_check_mvd'])
+                if 'check_interval_seconds' in body:
+                    cfg['check_interval_seconds'] = max(60, int(body['check_interval_seconds']))
                 _save_telegram_config(cfg)
                 self._json(200, {'success': True, 'message': 'Đã lưu cấu hình Telegram'})
             except Exception as e:
                 self._json(500, {'error': f'Lỗi lưu Telegram config: {str(e)}'})
+
+        elif self.path == '/api/telegram/watcher/trigger':
+            try:
+                import telegram_mvd_watcher
+                ok, msg = telegram_mvd_watcher.mvd_watcher.trigger_check_now()
+                self._json(200, {'success': ok, 'message': msg})
+            except Exception as e:
+                self._json(500, {'success': False, 'error': str(e)})
 
         elif self.path == '/api/telegram/test':
             try:
@@ -2385,9 +2422,14 @@ def start_server():
     else:
         print(f"[!] Supabase: ⚠️  Chưa cấu hình — đang dùng file cục bộ (draft.json)")
         print(f"[!] Để bật cloud storage: điền SUPABASE_URL và SUPABASE_KEY vào file .env")
-    print(f"[*] Server running on http://localhost:{PORT}")
-    print(f"-" * 60)
-    
+    # Khởi động Telegram MVD Watcher ngầm 24/7
+    try:
+        import telegram_mvd_watcher
+        telegram_mvd_watcher.start_watcher_background()
+        print("[*] Telegram MVD Watcher: ✅ Đã kích hoạt tiến trình theo dõi nhảy MVĐ 24/7")
+    except Exception as e:
+        print(f"[!] Không thể khởi động Telegram MVD Watcher: {e}")
+
     server_address = ('', PORT)
     with ThreadedHTTPServer(server_address, TrackingRequestHandler) as httpd:
         try:

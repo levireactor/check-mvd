@@ -3919,12 +3919,13 @@
       </div>
 
       <div class="modal-body" style="padding:1.15rem;gap:0.9rem">
+        <!-- Card 1: Kích hoạt & Token Telegram -->
         <div class="proxy-card">
-          <!-- Toggle kích hoạt -->
+          <!-- Toggle kích hoạt chung -->
           <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
             <div>
               <div style="font-weight:700;font-size:0.83rem">Bật Thông Báo Telegram</div>
-              <div style="font-size:0.74rem;color:var(--text-muted)">Gửi thông báo tự động mỗi khi có cập nhật mới</div>
+              <div style="font-size:0.74rem;color:var(--text-muted)">Kích hoạt gửi tin nhắn thông báo về tài khoản / nhóm Telegram</div>
             </div>
             <label class="switch-toggle">
               <input type="checkbox" id="chk-tele-enabled">
@@ -3941,14 +3942,65 @@
           <!-- Chat ID -->
           <div style="margin-bottom:10px">
             <label style="font-weight:700;font-size:0.8rem;display:block;margin-bottom:4px">💬 Chat ID (Cá nhân hoặc ID Nhóm):</label>
-            <input type="text" id="input-tele-chatid" class="proxy-input" style="width:100%" placeholder="-100123456789 hoặc ID cá nhân">
+            <input type="text" id="input-tele-chatid" class="proxy-input" style="width:100%" placeholder="-100123456789 hoặc ID cá nhân (nhắn /start cho Bot)">
           </div>
 
           <div style="font-size:0.74rem;color:var(--text-muted);line-height:1.4">
-            💡 <i>Mẹo:</i> Chat với <code>@BotFather</code> trên Telegram để tạo bot và lấy Token, sau đó thêm bot vào nhóm hoặc chat với <code>@userinfobot</code> để lấy Chat ID.
+            💡 <i>Mẹo:</i> Chat với <code>@BotFather</code> để tạo bot và lấy Token. Sau đó mở bot vừa tạo và nhắn <code>/start</code> là hệ thống sẽ tự nhận diện Chat ID!
           </div>
         </div>
 
+        <!-- Card 2: Cỗ Máy Tự Động Quét Nhảy MVĐ 24/7 -->
+        <div class="proxy-card" style="border:1px solid rgba(14, 165, 233, 0.4);background:rgba(14, 165, 233, 0.04)">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+            <div style="display:flex;align-items:center;gap:6px">
+              <span style="font-size:1.1rem">🚀</span>
+              <span style="font-weight:800;font-size:0.85rem;color:#0284c7">Tự Động Quét & Báo Nhảy Mã Vận Đơn 24/7</span>
+            </div>
+            <label class="switch-toggle">
+              <input type="checkbox" id="chk-tele-autocheck" checked>
+              <span class="slider-toggle"></span>
+            </label>
+          </div>
+          <div style="font-size:0.75rem;color:var(--text-muted);margin-bottom:10px;line-height:1.4">
+            Cơ chế ngầm định kỳ quét các đơn chưa có MVĐ. Ngay khi Shopee vừa sinh mã vận đơn mới, Bot lập tức bắn tin nhắn kèm link tra cứu hành trình về Telegram!
+          </div>
+
+          <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:10px;background:var(--bg-card);padding:8px 12px;border-radius:6px;border:1px solid var(--border)">
+            <label style="font-size:0.8rem;font-weight:600">⏱️ Chu kỳ quét định kỳ:</label>
+            <select id="select-tele-interval" class="proxy-input" style="width:auto;padding:3px 8px;font-size:0.8rem">
+              <option value="60">1 phút (Rất nhanh)</option>
+              <option value="120">2 phút</option>
+              <option value="180" selected>3 phút (Khuyên dùng)</option>
+              <option value="300">5 phút</option>
+              <option value="600">10 phút</option>
+            </select>
+          </div>
+
+          <div style="display:flex;align-items:center;justify-content:space-between;gap:8px">
+            <div id="tele-watcher-status-text" style="font-size:0.76rem;color:var(--text-muted)">
+              ⏳ Trạng thái: Đang kết nối watcher...
+            </div>
+            <button class="top-btn" id="btn-trigger-mvd" onclick="triggerMvdWatcherNow()" style="background:#0284c7;color:#fff;border-color:#0369a1;font-weight:700;font-size:0.75rem;padding:4px 10px">
+              ⚡ Quét MVĐ Ngay
+            </button>
+          </div>
+        </div>
+
+        <!-- Card 3: Danh sách lệnh điều khiển từ Telegram -->
+        <div class="proxy-card" style="padding:0.75rem 1rem">
+          <div style="font-weight:700;font-size:0.8rem;margin-bottom:6px">🤖 Lệnh Nhanh Trên Ứng Dụng Telegram:</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;font-size:0.75rem;color:var(--text-muted)">
+            <div><code>/check</code> : Ép quét đơn ngay</div>
+            <div><code>/mvd</code> : Xem các MVĐ mới nhất</div>
+            <div><code>/pending</code> : Xem đơn chờ giao hàng</div>
+            <div><code>/status</code> : Báo cáo thống kê đơn</div>
+            <div><code>/auto_on</code> : Bật quét ngầm</div>
+            <div><code>/auto_off</code> : Tắt quét ngầm</div>
+          </div>
+        </div>
+
+        <!-- Card 4: Tùy chọn sự kiện -->
         <div class="proxy-card" style="padding:0.75rem 1rem">
           <div style="font-weight:700;font-size:0.8rem;margin-bottom:6px">Tùy Chọn Sự Kiện Gửi Báo Cáo:</div>
           <div style="display:flex;flex-direction:column;gap:6px;font-size:0.8rem">
@@ -5955,6 +6007,22 @@
         $('chk-tele-newmvd').checked = d.notify_new_mvd !== false;
         $('chk-tele-completed').checked = d.notify_completed !== false;
         $('chk-tele-cancelled').checked = d.notify_cancelled !== false;
+        $('chk-tele-autocheck').checked = d.auto_check_mvd !== false;
+        if (d.check_interval_seconds) {
+          $('select-tele-interval').value = String(d.check_interval_seconds);
+        }
+
+        const w = d.watcher || {};
+        const statusEl = $('tele-watcher-status-text');
+        if (statusEl) {
+          if (w.running && d.enabled && d.auto_check_mvd) {
+            statusEl.innerHTML = `<span style="color:#10b981;font-weight:700">🟢 Đang quét ngầm 24/7</span> • Lần quét: <b>${w.last_check_time || 'Vừa khởi động'}</b> (${w.orders_waiting_mvd || 0} đơn chờ MVĐ)`;
+          } else if (!d.has_token) {
+            statusEl.innerHTML = `<span style="color:#f59e0b">⚠️ Cần điền Bot Token để kích hoạt tự động quét</span>`;
+          } else {
+            statusEl.innerHTML = `<span style="color:#94a3b8">⏸️ Đang tạm dừng quét ngầm</span>`;
+          }
+        }
       } catch (e) {}
     }
 
@@ -5969,6 +6037,8 @@
       const notify_new_mvd = $('chk-tele-newmvd').checked;
       const notify_completed = $('chk-tele-completed').checked;
       const notify_cancelled = $('chk-tele-cancelled').checked;
+      const auto_check_mvd = $('chk-tele-autocheck').checked;
+      const check_interval_seconds = parseInt($('select-tele-interval').value) || 180;
 
       try {
         const d = await safeApiCall('/api/telegram/save', {
@@ -5980,11 +6050,13 @@
             enabled,
             notify_new_mvd,
             notify_completed,
-            notify_cancelled
+            notify_cancelled,
+            auto_check_mvd,
+            check_interval_seconds
           })
         });
         if (d.success) {
-          showToast('Đã lưu cấu hình Telegram!', '🤖');
+          showToast('Đã lưu cấu hình Bot & Auto Watcher!', '🤖');
           updateTelegramTopBarStatus();
           closeTelegramModal();
         } else {
@@ -5992,6 +6064,40 @@
         }
       } catch (e) {
         showToast('Lỗi: ' + e.message, '❌');
+      }
+    }
+
+    async function triggerMvdWatcherNow() {
+      const btn = $('btn-trigger-mvd');
+      const statusEl = $('tele-watcher-status-text');
+      if (btn) btn.disabled = true;
+      if (statusEl) statusEl.innerHTML = `<span style="color:#0284c7;font-weight:700">⏳ Đang quét kiểm tra toàn bộ đơn hàng...</span>`;
+      showToast('Đang tiến hành quét nhảy mã vận đơn...', '🔍');
+
+      try {
+        const res = await safeApiCall('/api/telegram/watcher/trigger', { method: 'POST' });
+        if (res.success) {
+          showToast(res.message || 'Đã bắt đầu quét!', '🚀');
+          setTimeout(async () => {
+            try {
+              const info = await safeApiCall('/api/telegram/watcher/status');
+              if (info.data && statusEl) {
+                statusEl.innerHTML = `<span style="color:#10b981;font-weight:700">✅ Quét hoàn tất</span> • ${info.data.last_check_status || ''}`;
+              }
+              // Tải lại draft để hiển thị MVĐ mới ngay trên bảng web
+              if (typeof loadDraftFromServer === 'function') {
+                await loadDraftFromServer(true);
+              }
+            } catch(e) {}
+            if (btn) btn.disabled = false;
+          }, 5000);
+        } else {
+          showToast(res.error || res.message || 'Lỗi kích hoạt quét', '⚠️');
+          if (btn) btn.disabled = false;
+        }
+      } catch (e) {
+        showToast('Lỗi: ' + e.message, '❌');
+        if (btn) btn.disabled = false;
       }
     }
 

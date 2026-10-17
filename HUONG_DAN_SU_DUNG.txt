@@ -57,7 +57,16 @@ E. CẢNH BÁO TỰ ĐỘNG QUA TELEGRAM BOT:
 - cookie_vault.json      : Kho lưu trữ Cookie & danh sách shop.
 - templates_config.json  : Cấu hình mẫu tin nhắn gửi khách.
 - telegram_config.json   : Cấu hình Bot Telegram.
+- telegram_mvd_watcher.py: Bộ máy tự động theo dõi và báo nhảy Mã Vận Đơn 24/7.
+- CHAY_BOT_BAO_MVD.bat   : File khởi động độc lập cho Bot Báo MVĐ Telegram.
 - proxy_config.json      : Cấu hình Proxy xoay (nếu có).
 
+5. BOT TELEGRAM BÁO NHẢY MÃ VẬN ĐƠN TỰ ĐỘNG (24/7):
+- Tự động quét các đơn chưa có MVĐ định kỳ (mặc định mỗi 3 phút).
+- Khi Shopee sinh mã vận đơn mới, Bot tự động gửi tin nhắn báo về Telegram kèm link tra cứu SPX/GHN/J&T.
+- Cập nhật trực tiếp mã vận đơn vào sheet web và Supabase.
+- Hỗ trợ chat trực tiếp với bot bằng các lệnh: /check, /mvd, /pending, /status, /auto_on, /auto_off.
+
 Chúc bạn kinh doanh hồng phát và quản lý đơn hàng Shopee hiệu quả!
+
 
