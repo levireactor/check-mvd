@@ -1469,16 +1469,17 @@ class TrackingRequestHandler(http.server.SimpleHTTPRequestHandler):
                 self._json(200, {
                     'success': True,
                     'data': {
-                        'enabled': bool(cfg.get('enabled', False)),
-                        'app_id': cfg.get('app_id', ''),
+                        'enabled': bool(cfg.get('enabled', True)),
+                        'use_selenium': bool(cfg.get('use_selenium', True)),
+                        'app_id': cfg.get('app_id', '17324610663'),
                         'has_secret': bool(sec),
                         'secret_masked': masked_sec,
                         'has_cookie': bool(cookie),
                         'cookie_masked': masked_cookie,
-                        'sub_id': cfg.get('sub_id', ''),
+                        'sub_id': cfg.get('sub_id', 'meoidungkhoa'),
                         'portal_url': cfg.get('portal_url', ''),
-                        'mmp_pid': cfg.get('mmp_pid', ''),
-                        'af_siteid': cfg.get('af_siteid', '')
+                        'mmp_pid': cfg.get('mmp_pid', 'an_17320160631'),
+                        'af_siteid': cfg.get('af_siteid', 'an_17320160631')
                     }
                 })
             except Exception as e:
@@ -2255,7 +2256,13 @@ class TrackingRequestHandler(http.server.SimpleHTTPRequestHandler):
                 ok, msg = dks_mgr.start(config, nicks)
                 if ok:
                     converted_link = dks_mgr.config.get("product_link", "")
-                    self._json(200, {'success': True, 'message': msg, 'product_link': converted_link})
+                    converted_link_2 = dks_mgr.config.get("product_link_2", "")
+                    self._json(200, {
+                        'success': True,
+                        'message': msg,
+                        'product_link': converted_link,
+                        'product_link_2': converted_link_2
+                    })
                 else:
                     self._json(400, {'error': msg})
             except Exception as e:
@@ -2318,8 +2325,10 @@ class TrackingRequestHandler(http.server.SimpleHTTPRequestHandler):
                 mmp_pid = body.get('mmp_pid', '').strip() or parsed_portal.get('mmp_pid') or cur.get('mmp_pid', '')
                 af_siteid = body.get('af_siteid', '').strip() or parsed_portal.get('af_siteid') or cur.get('af_siteid', '')
 
-                new_cfg = {
-                    'enabled': bool(body.get('enabled', False)),
+                new_cfg = cur.copy()
+                new_cfg.update({
+                    'enabled': bool(body.get('enabled', True)),
+                    'use_selenium': bool(body.get('use_selenium', cur.get('use_selenium', True))),
                     'app_id': app_id,
                     'secret': final_sec,
                     'cookie': final_cookie,
@@ -2328,7 +2337,7 @@ class TrackingRequestHandler(http.server.SimpleHTTPRequestHandler):
                     'utm_source': parsed_portal.get('utm_source', mmp_pid),
                     'af_siteid': af_siteid,
                     'portal_url': portal_url or cur.get('portal_url', '')
-                }
+                })
                 if save_affiliate_config:
                     save_affiliate_config(new_cfg)
                 self._json(200, {'success': True, 'message': 'Đã lưu cấu hình Shopee Affiliate thành công', 'data': new_cfg})
@@ -2354,7 +2363,13 @@ class TrackingRequestHandler(http.server.SimpleHTTPRequestHandler):
                 if convert_shopee_affiliate_link:
                     ok, res = convert_shopee_affiliate_link(test_url, app_id=app_id, secret=secret, sub_id=sub_id, cookie=cookie)
                     if ok:
-                        self._json(200, {'success': True, 'short_link': res})
+                        is_short = any(d in str(res) for d in ['s.shopee.vn', 'shp.ee', 'shope.ee'])
+                        self._json(200, {
+                            'success': True,
+                            'short_link': res,
+                            'is_short': is_short,
+                            'mode': 'short_link' if is_short else 'direct_tracking'
+                        })
                     else:
                         self._json(200, {'success': False, 'error': res})
                 else:

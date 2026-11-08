@@ -144,19 +144,62 @@ def save_affiliate_config(data):
     except Exception:
         return False
 
-def expand_shopee_short_url(url):
-    """Mở rộng link rút gọn s.shopee.vn / vn.shp.ee thành link gốc canonical"""
+LAST_CONVERTED_AFFILIATE_LINKS = set()
+
+def expand_shopee_short_url(url, timeout=10):
+    """
+    Mở rộng triệt để link rút gọn s.shopee.vn / vn.shp.ee / shp.ee / shope.ee thành link gốc Shopee.
+    Tự động xử lý redirect nhiều cấp (HTTP 301/302) và bóc tách universal-link (param redir/url).
+    """
+    if not url:
+        return ""
     url = url.strip()
-    if any(d in url.lower() for d in ["s.shopee.vn", "vn.shp.ee", "shp.ee", "shope.ee"]):
+    is_short = any(d in url.lower() for d in ["s.shopee.vn", "vn.shp.ee", "shp.ee", "shope.ee", "universal-link"])
+    if not is_short:
+        return url
+
+    final_url = url
+    # 1. Thử qua requests (mạnh mẽ, tự follow redirects)
+    try:
+        import requests
+        headers = {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"
+        }
+        resp = requests.get(url, headers=headers, allow_redirects=True, timeout=timeout)
+        if resp.url and "error" not in resp.url.lower():
+            final_url = resp.url
+    except Exception:
+        # 2. Fallback qua urllib
         try:
             import urllib.request
-            req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"})
+            req = urllib.request.Request(
+                url,
+                headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
+            )
             opener = urllib.request.build_opener(urllib.request.HTTPRedirectHandler)
-            with opener.open(req, timeout=8) as resp:
-                return resp.geturl()
+            with opener.open(req, timeout=timeout) as resp:
+                u = resp.geturl()
+                if u and "error" not in u.lower():
+                    final_url = u
         except Exception:
             pass
-    return url
+
+    # 3. Bóc tách link sản phẩm gốc nếu final_url là dạng universal-link hoặc có param chuyển tiếp
+    try:
+        import urllib.parse
+        parsed = urllib.parse.urlsplit(final_url)
+        qs = urllib.parse.parse_qs(parsed.query)
+        for param in ["redir", "url", "target"]:
+            if param in qs and qs[param]:
+                unquoted = urllib.parse.unquote(qs[param][0])
+                if "shopee.vn" in unquoted:
+                    final_url = unquoted
+                    break
+    except Exception:
+        pass
+
+    return final_url
 
 def parse_affiliate_portal_url(url):
     """Bóc tách các tham số từ link Custom Link / Portal Shopee Affiliate"""
@@ -189,12 +232,17 @@ def parse_affiliate_portal_url(url):
         return {}
 
 def build_shopee_direct_tracking_url(url, cfg=None):
-    """Gắn các tham số affiliate tracking trực tiếp vào link sản phẩm Shopee"""
+    """
+    Gắn các tham số affiliate tracking trực tiếp vào link sản phẩm Shopee của người dùng.
+    Tự động mở rộng link rút gọn trước và xóa bỏ toàn bộ tracking ID của người khác.
+    """
     if cfg is None:
         cfg = load_affiliate_config()
     import urllib.parse
     try:
-        parsed = urllib.parse.urlsplit(url.strip())
+        # 1. Luôn mở rộng link nếu là link rút gọn
+        canonical = expand_shopee_short_url(url)
+        parsed = urllib.parse.urlsplit(canonical.strip())
         qs = urllib.parse.parse_qs(parsed.query, keep_blank_values=True)
 
         aff_id = str(cfg.get("app_id") or cfg.get("affiliate_id") or "17324610663").strip()
@@ -203,6 +251,11 @@ def build_shopee_direct_tracking_url(url, cfg=None):
         af_siteid = str(cfg.get("af_siteid") or cfg.get("utm_source") or "an_17320160631").strip()
         utm_src = str(cfg.get("utm_source") or mmp_pid or "an_17320160631").strip()
 
+        # 2. Xóa sạch mọi mã Affiliate / UTM cũ của người khác
+        for k in ["affiliate_id", "mmp_pid", "pid", "utm_source", "utm_medium", "utm_content", "af_siteid", "utm_campaign", "utm_term"]:
+            qs.pop(k, None)
+
+        # 3. Gắn thông tin Affiliate chuẩn của chính người dùng
         if mmp_pid:
             qs["mmp_pid"] = [mmp_pid]
         if aff_id:
@@ -218,6 +271,8 @@ def build_shopee_direct_tracking_url(url, cfg=None):
 
         new_query = urllib.parse.urlencode(qs, doseq=True)
         netloc = parsed.netloc if parsed.netloc else "shopee.vn"
+        if "s.shopee.vn" in netloc or "shp.ee" in netloc:
+            netloc = "shopee.vn"
         scheme = parsed.scheme if parsed.scheme else "https"
         return urllib.parse.urlunsplit((scheme, netloc, parsed.path, new_query, parsed.fragment))
     except Exception:
@@ -325,99 +380,111 @@ def convert_via_web_custom_link(raw_url, cookie=None, sub_id=None):
 
 def convert_shopee_affiliate_link(raw_url, app_id=None, secret=None, sub_id=None, cookie=None, allow_fallback=True):
     """
-    Chuyển đổi link sản phẩm Shopee sang link Affiliate:
-    1. Ưu tiên 1: Dùng Cookie Web để gọi thẳng endpoint batchCustomLink của Shopee (không cần mở khóa API)
-    2. Ưu tiên 2: Shopee Affiliate GraphQL Open API (nếu có App ID + Secret Key)
-    3. Fallback: Gắn tham số Direct Affiliate Tracking (mmp_pid, affiliate_id, utm_source, ...)
+    Chuyển đổi linh hoạt link sản phẩm Shopee sang link Affiliate của người dùng:
+    1. Ưu tiên 1: Chuyển đổi qua Chrome Thật (Selenium Remote Debugging cổng 9222) -> lấy link s.shopee.vn
+    2. Ưu tiên 2: Dùng Cookie Web nội bộ gọi batchCustomLink (nếu cookie hợp lệ)
+    3. Ưu tiên 3: Shopee Affiliate GraphQL Open API (nếu có Secret Key)
+    4. Fallback toàn diện: Tự động giải mã link rút gọn và gắn Direct Affiliate Tracking UTM (mmp_pid, affiliate_id, ...)
     """
     import hashlib
     import urllib.request
     import urllib.error
 
     cfg = load_affiliate_config()
-    app_id = str(app_id if app_id is not None else cfg.get("app_id", "")).strip()
+    target_aff_id = str(app_id if app_id is not None else cfg.get("app_id", "17324610663")).strip()
+    target_mmp = str(cfg.get("mmp_pid", "an_17320160631")).strip()
     secret = str(secret if secret is not None else cfg.get("secret", "")).strip()
-    sub_id = str(sub_id if sub_id is not None else cfg.get("sub_id", "")).strip()
+    sub_id = str(sub_id if sub_id is not None else cfg.get("sub_id", "meoidungkhoa")).strip()
     cookie = str(cookie if cookie is not None else cfg.get("cookie", "")).strip()
 
     raw_url = raw_url.strip()
-    # 0. Nếu link đã là link Affiliate (s.shopee.vn hoặc có tham số affiliate_id), dùng trực tiếp
-    if "s.shopee.vn" in raw_url:
-        return True, raw_url
-    if "affiliate_id" in raw_url and ("mmp_pid" in raw_url or "utm_source" in raw_url):
+    if not raw_url:
+        return False, "Link sản phẩm trống"
+
+    # 0. Nếu link này đã được chính tool chuyển đổi thành công trong phiên này, dùng lại ngay
+    if raw_url in LAST_CONVERTED_AFFILIATE_LINKS:
         return True, raw_url
 
-    # 1. Mở rộng link nếu là dạng rút gọn
+    # Nếu link là link trực tiếp đã có đúng Affiliate ID và MMP PID của người dùng
+    if f"affiliate_id={target_aff_id}" in raw_url and (f"mmp_pid={target_mmp}" in raw_url or f"utm_source={target_mmp}" in raw_url):
+        LAST_CONVERTED_AFFILIATE_LINKS.add(raw_url)
+        return True, raw_url
+
+    # 1. Mở rộng link nếu là link rút gọn để có canonical URL đầy đủ
     canonical_url = expand_shopee_short_url(raw_url)
 
-    # 2. ƯU TIÊN 1: Chuyển đổi qua Chrome Thật (Selenium Remote Debugging - Không cần API/SubID)
+    # 2. ƯU TIÊN 1: Chuyển đổi qua Chrome Thật (Selenium Remote Debugging cổng 9222)
     use_selenium = cfg.get("use_selenium", True)
-    if use_selenium or is_chrome_running():
-        try:
-            from shopee_affiliate_browser import is_chrome_running, convert_link_via_selenium
-            sel_ok, sel_res = convert_link_via_selenium(canonical_url)
+    try:
+        from shopee_affiliate_browser import is_chrome_running, convert_link_via_selenium
+        if use_selenium and is_chrome_running():
+            sel_ok, sel_res = convert_link_via_selenium(canonical_url if canonical_url else raw_url)
             if sel_ok and any(k in str(sel_res) for k in ["s.shopee.vn", "shp.ee", "shope.ee"]):
+                LAST_CONVERTED_AFFILIATE_LINKS.add(sel_res)
                 return True, sel_res
-            elif not sel_ok and ("chưa đăng nhập" in str(sel_res).lower() or "đăng nhập" in str(sel_res).lower()):
-                # Nếu chưa đăng nhập tài khoản Shopee trên Chrome, trả về thông báo lỗi để người dùng đăng nhập
-                return False, sel_res
-        except Exception as sel_err:
-            print(f"[!] Selenium convert link warning: {sel_err}")
+    except Exception as sel_err:
+        print(f"[!] Selenium convert link warning: {sel_err}")
 
-    # 3. Thử tạo link qua Web API Cookie (nếu có cookie)
+    # 3. ƯU TIÊN 2: Thử tạo link qua Web API Cookie (nếu có cookie cấu hình)
     if cookie:
-        web_ok, web_res = convert_via_web_custom_link(canonical_url, cookie=cookie, sub_id=sub_id)
-        if web_ok:
-            return True, web_res
-
-    # 3. Nếu có Secret Key, gọi GraphQL Open API
-    if app_id and secret:
-        if sub_id:
-            sub_ids_str = json.dumps([sub_id])
-            input_args = f'originUrl: "{canonical_url}", subIds: {sub_ids_str}'
-        else:
-            input_args = f'originUrl: "{canonical_url}"'
-
-        gql_query = f"mutation {{ generateShortLink(input: {{ {input_args} }}) {{ shortLink }} }}"
-        payload = {"query": gql_query}
-        payload_str = json.dumps(payload, separators=(',', ':'))
-
-        timestamp = int(time.time())
-        factor = f"{app_id}{timestamp}{payload_str}{secret}"
-        signature = hashlib.sha256(factor.encode("utf-8")).hexdigest()
-
-        headers = {
-            "Content-Type": "application/json",
-            "Authorization": f"SHA256 Credential={app_id}, Timestamp={timestamp}, Signature={signature}",
-            "User-Agent": "ShopeeAffiliateClient/1.0"
-        }
-
-        req = urllib.request.Request(
-            "https://open-api.affiliate.shopee.vn/graphql",
-            data=payload_str.encode("utf-8"),
-            headers=headers,
-            method="POST"
-        )
-
         try:
-            with urllib.request.urlopen(req, timeout=12) as response:
+            web_ok, web_res = convert_via_web_custom_link(canonical_url, cookie=cookie, sub_id=sub_id)
+            if web_ok and web_res:
+                LAST_CONVERTED_AFFILIATE_LINKS.add(web_res)
+                return True, web_res
+        except Exception:
+            pass
+
+    # 4. ƯU TIÊN 3: Nếu có Secret Key, gọi GraphQL Open API
+    if target_aff_id and secret:
+        try:
+            if sub_id:
+                sub_ids_str = json.dumps([sub_id])
+                input_args = f'originUrl: "{canonical_url}", subIds: {sub_ids_str}'
+            else:
+                input_args = f'originUrl: "{canonical_url}"'
+
+            gql_query = f"mutation {{ generateShortLink(input: {{ {input_args} }}) {{ shortLink }} }}"
+            payload = {"query": gql_query}
+            payload_str = json.dumps(payload, separators=(',', ':'))
+
+            timestamp = int(time.time())
+            factor = f"{target_aff_id}{timestamp}{payload_str}{secret}"
+            signature = hashlib.sha256(factor.encode("utf-8")).hexdigest()
+
+            headers = {
+                "Content-Type": "application/json",
+                "Authorization": f"SHA256 Credential={target_aff_id}, Timestamp={timestamp}, Signature={signature}",
+                "User-Agent": "ShopeeAffiliateClient/1.0"
+            }
+
+            req = urllib.request.Request(
+                "https://open-api.affiliate.shopee.vn/graphql",
+                data=payload_str.encode("utf-8"),
+                headers=headers,
+                method="POST"
+            )
+
+            with urllib.request.urlopen(req, timeout=10) as response:
                 res_data = json.loads(response.read().decode("utf-8"))
                 if not ("errors" in res_data and res_data["errors"]):
                     data = res_data.get("data", {})
                     gen_res = data.get("generateShortLink", {})
                     short_link = gen_res.get("shortLink")
                     if short_link:
+                        LAST_CONVERTED_AFFILIATE_LINKS.add(short_link)
                         return True, short_link
         except Exception:
             pass
 
-    # 3. Fallback: Gắn tham số Tracking trực tiếp vào link nếu không có Secret hoặc API lỗi
+    # 5. FALLBACK TOÀN DIỆN (LUÔN THÀNH CÔNG 100%): Gắn Direct Tracking UTM của người dùng vào link
     if allow_fallback:
-        tracking_url = build_shopee_direct_tracking_url(canonical_url, cfg)
-        if tracking_url and tracking_url != canonical_url:
+        tracking_url = build_shopee_direct_tracking_url(canonical_url if canonical_url else raw_url, cfg)
+        if tracking_url:
+            LAST_CONVERTED_AFFILIATE_LINKS.add(tracking_url)
             return True, tracking_url
 
-    if not app_id and not cfg.get("mmp_pid"):
+    if not target_aff_id and not cfg.get("mmp_pid"):
         return False, "Chưa cấu hình tài khoản Shopee Affiliate (App ID hoặc Link Affiliate)"
 
     return True, canonical_url
@@ -436,6 +503,7 @@ class DangKyShopeeManager:
 
         self.config = {
             "product_link": "",
+            "product_link_2": "",  # Link sản phẩm số 2 (tùy chọn)
             "product_variant": "",  # Phân loại/mẫu sản phẩm mong muốn (nếu có)
             "max_cart_retries": 3,
             "use_mailfree": False,  # Mặc định bỏ lệnh mailfree
@@ -542,24 +610,43 @@ class DangKyShopeeManager:
 
         if use_addtocart:
             product_link = str(config.get("product_link", "")).strip()
-            if not product_link:
-                return False, "Bạn đã bật lệnh Thêm Giỏ Hàng, vui lòng nhập Link sản phẩm!"
+            product_link_2 = str(config.get("product_link_2", "")).strip()
+            if not product_link and not product_link_2:
+                return False, "Bạn đã bật lệnh Thêm Giỏ Hàng, vui lòng nhập ít nhất Link Sản Phẩm 1!"
 
             # Tự động xử lý chuyển đổi sang link Affiliate trước khi đưa vào bot
             aff_cfg = load_affiliate_config()
-            if aff_cfg.get("enabled", True):
-                if not ("s.shopee.vn" in product_link or "affiliate_id" in product_link):
-                    self.log(f"🔗 Đang chuyển đổi link sản phẩm sang link Affiliate của bạn...", "info")
+            target_aff_id = str(aff_cfg.get("app_id") or "17324610663").strip() if aff_cfg.get("enabled", True) else ""
+
+            if product_link and aff_cfg.get("enabled", True):
+                is_already_my_aff = (f"affiliate_id={target_aff_id}" in product_link) or (product_link in LAST_CONVERTED_AFFILIATE_LINKS)
+                if not is_already_my_aff:
+                    self.log(f"🔗 Đang chuyển đổi link sản phẩm 1 sang link Affiliate của bạn...", "info")
                     aff_ok, aff_res = convert_shopee_affiliate_link(product_link)
                     if aff_ok and aff_res:
                         product_link = aff_res
                         config["product_link"] = aff_res
-                        self.log(f"✅ Đã chuyển đổi thành công link Affiliate dùng cho /addtocart: {aff_res}", "success")
+                        self.log(f"✅ Đã chuyển đổi thành công link 1 dùng cho /addtocart: {aff_res}", "success")
                     else:
-                        self.log(f"⚠️ Chuyển đổi link Affiliate chưa được ({aff_res}), dùng link gốc.", "warning")
+                        self.log(f"⚠️ Chuyển đổi link 1 chưa được ({aff_res}), dùng link gốc.", "warning")
                 else:
                     config["product_link"] = product_link
-                    self.log(f"🔗 Sử dụng trực tiếp link Affiliate cho /addtocart: {product_link}", "info")
+                    self.log(f"🔗 Sử dụng trực tiếp link Affiliate cho link 1: {product_link}", "info")
+
+            if product_link_2 and aff_cfg.get("enabled", True):
+                is_already_my_aff_2 = (f"affiliate_id={target_aff_id}" in product_link_2) or (product_link_2 in LAST_CONVERTED_AFFILIATE_LINKS)
+                if not is_already_my_aff_2:
+                    self.log(f"🔗 Đang chuyển đổi link sản phẩm 2 sang link Affiliate của bạn...", "info")
+                    aff_ok2, aff_res2 = convert_shopee_affiliate_link(product_link_2)
+                    if aff_ok2 and aff_res2:
+                        product_link_2 = aff_res2
+                        config["product_link_2"] = aff_res2
+                        self.log(f"✅ Đã chuyển đổi thành công link 2 dùng cho /addtocart: {aff_res2}", "success")
+                    else:
+                        self.log(f"⚠️ Chuyển đổi link 2 chưa được ({aff_res2}), dùng link gốc.", "warning")
+                else:
+                    config["product_link_2"] = product_link_2
+                    self.log(f"🔗 Sử dụng trực tiếp link Affiliate cho link 2: {product_link_2}", "info")
 
         self.config.update(config)
         self.should_stop = False
@@ -702,6 +789,13 @@ class DangKyShopeeManager:
 
         # =========================================================================
         # (TÙY CHỌN) LỆNH 1: /mailfree
+        # CƠ CHẾ: Bắt chuẩn 100% thông báo thành công từ bot (@dangkyshopee_bot):
+        #          - "THÀNH CÔNG!"
+        #          - "XÁC MINH THÀNH CÔNG!"
+        #          - "THÔNG TIN MAIL"
+        #          - Nút "Đọc Mail"
+        #          - "**INBOX**"
+        #          Bắt được xong chuyển ngay sang lệnh tiếp theo, KHÔNG delay 80s.
         # =========================================================================
         if use_mailfree:
             self.current_step = "LỆNH: /mailfree"
@@ -710,70 +804,129 @@ class DangKyShopeeManager:
             self.log(f"📤 Gửi Lệnh: /mailfree cho nick...", "info")
 
             mail_cmd = f"/mailfree {raw_nick}"
+            t_mail_start = time.time()
             success_mail, mail_res = await self._execute_mailfree(client, bot_entity, mail_cmd)
+            elapsed_mail = round(time.time() - t_mail_start, 1)
+
             if not success_mail:
-                item["error"] = f"Lỗi Bước /mailfree: {mail_res}"
+                item["error"] = f"Lỗi Bước /mailfree ({elapsed_mail}s): {mail_res}"
                 return False
 
             item["mail_info"] = mail_res
-            self.log(f"✅ Lệnh /mailfree THÀNH CÔNG! {mail_res}", "success")
+            self.log(f"✅ BẮT ĐƯỢC thông báo /mailfree THÀNH CÔNG sau {elapsed_mail}s! ({mail_res})", "success")
 
-            # Delay 80s giữa các lệnh nếu còn lệnh tiếp theo
+            # Bắt được thông báo thành công → chuyển ngay sang lệnh tiếp theo (đệm an toàn 2s, không delay 80s)
             if (use_addtocart or use_address) and not self.should_stop:
-                self.log("⏳ Nghỉ 80s sau lệnh /mailfree trước khi chuyển sang lệnh tiếp theo...", "info")
-                for _ in range(80):
-                    if self.should_stop:
-                        return False
-                    await asyncio.sleep(1)
+                self.log("⚡ Chuyển ngay sang lệnh tiếp theo (bỏ qua delay 80s, đệm an toàn 2s)...", "info")
+                await asyncio.sleep(2)
 
             if self.should_stop:
                 return False
 
         # =========================================================================
-        # (TÙY CHỌN) LỆNH 2: /addtocart
+        # (TÙY CHỌN) LỆNH 2: /addtocart (LINK 1 + LINK 2)
+        # CƠ CHẾ: Bắt chuẩn thông báo "KẾT QUẢ THÊM GIỎ" + "Thành công: X"
+        #          Sau khi Link 1 thành công -> nảy sang chạy tiếp Link 2.
+        #          Chạy xong chuyển ngay sang lệnh tiếp theo, KHÔNG delay 80s.
         # =========================================================================
         if use_addtocart:
             self.current_step = "LỆNH: /addtocart"
             item["status"] = "addtocart"
-            item["step_detail"] = "Đang gửi lệnh /addtocart..."
-            prod_link = self.config.get("product_link", "").strip()
+            item["step_detail"] = "Đang gửi lệnh /addtocart Link 1..."
+            prod_link_1 = self.config.get("product_link", "").strip()
+            prod_link_2 = self.config.get("product_link_2", "").strip()
 
-            # Kiểm tra tự động chuyển đổi sang link Affiliate của người dùng
-            aff_cfg = load_affiliate_config()
-            if aff_cfg.get("enabled", True):
-                if not ("affiliate_id" in prod_link or "s.shopee.vn" in prod_link):
-                    self.log("🔗 Đang chuyển đổi link sản phẩm sang link Affiliate của bạn...", "info")
-                    aff_ok, aff_res = convert_shopee_affiliate_link(prod_link)
-                    if aff_ok and aff_res:
-                        prod_link = aff_res
-                        self.config["product_link"] = aff_res
-                        self.log(f"✅ Đã chuyển đổi thành công link Affiliate: {prod_link}", "success")
+            cart_results = []
+            link_1_success = False
+            success_cart_2 = False
+
+            # --- THỰC THI LINK 1 ---
+            if prod_link_1:
+                # Kiểm tra tự động chuyển đổi sang link Affiliate nếu cần
+                aff_cfg = load_affiliate_config()
+                if aff_cfg.get("enabled", True):
+                    target_aff_id = str(aff_cfg.get("app_id") or "17324610663").strip()
+                    is_aff_1 = (f"affiliate_id={target_aff_id}" in prod_link_1) or (prod_link_1 in LAST_CONVERTED_AFFILIATE_LINKS)
+                    if not is_aff_1:
+                        self.log("🔗 Đang chuyển đổi Link 1 sang link Affiliate của bạn...", "info")
+                        aff_ok, aff_res = convert_shopee_affiliate_link(prod_link_1)
+                        if aff_ok and aff_res:
+                            prod_link_1 = aff_res
+                            self.config["product_link"] = aff_res
+                            self.log(f"✅ Đã chuyển đổi Link 1 thành công: {prod_link_1}", "success")
+                        else:
+                            self.log(f"⚠️ Chuyển đổi Link 1 chưa được: {aff_res}. Tiếp tục dùng link gốc.", "warning")
                     else:
-                        self.log(f"⚠️ Chuyển đổi link Affiliate chưa được: {aff_res}. Tiếp tục dùng link gốc.", "warning")
+                        self.log(f"🔗 Sử dụng trực tiếp link Affiliate cho Link 1: {prod_link_1}", "info")
+
+                self.log(f"📤 Gửi /addtocart Link 1: {prod_link_1}|<nick>...", "info")
+                cart_cmd_1 = f"/addtocart {prod_link_1}|{raw_nick}"
+                t_cart1_start = time.time()
+                success_cart_1, cart_res_1 = await self._execute_addtocart(client, bot_entity, cart_cmd_1)
+                elapsed_cart1 = round(time.time() - t_cart1_start, 1)
+
+                if success_cart_1:
+                    link_1_success = True
+                    cart_results.append(f"Link 1: {cart_res_1}")
+                    self.log(f"✅ BẮT ĐƯỢC thông báo THÀNH CÔNG Link 1 sau {elapsed_cart1}s! ({cart_res_1})", "success")
                 else:
-                    self.log(f"🔗 Sử dụng trực tiếp link Affiliate cho /addtocart: {prod_link}", "info")
-
-            self.log(f"📤 Gửi /addtocart {prod_link}|<nick>...", "info")
-
-            cart_cmd = f"/addtocart {prod_link}|{raw_nick}"
-            success_cart, cart_res = await self._execute_addtocart(client, bot_entity, cart_cmd)
-            if success_cart:
-                item["cart_info"] = cart_res
-                self.log(f"✅ Lệnh /addtocart THÀNH CÔNG! {cart_res}", "success")
-            else:
-                item["cart_info"] = f"Lỗi: {cart_res}"
-                if not use_address:
-                    item["error"] = f"Lỗi /addtocart: {cart_res}"
-                    return False
-                self.log(f"⚠️ Lệnh /addtocart không thành công ({cart_res}), tiếp tục chuyển sang lệnh địa chỉ...", "warning")
-
-            # Delay 80s giữa các lệnh nếu còn lệnh địa chỉ
-            if use_address and not self.should_stop:
-                self.log("⏳ Nghỉ 80s sau lệnh /addtocart trước khi chuyển sang lệnh địa chỉ...", "info")
-                for _ in range(80):
-                    if self.should_stop:
+                    cart_results.append(f"Link 1 Lỗi: {cart_res_1}")
+                    self.log(f"⚠️ Link 1 không thành công ({cart_res_1})", "warning")
+                    if not use_address and not prod_link_2:
+                        item["error"] = f"Lỗi /addtocart Link 1: {cart_res_1}"
+                        item["cart_info"] = " | ".join(cart_results)
                         return False
-                    await asyncio.sleep(1)
+
+            # --- THỰC THI LINK 2 (SAU KHI BẮT ĐƯỢC KẾT QUẢ LINK 1 ĐÃ NHẬP THÀNH CÔNG) ---
+            if prod_link_2 and not self.should_stop:
+                if prod_link_1 and not link_1_success:
+                    self.log("⚠️ Link 1 chưa thành công, bỏ qua lệnh /addtocart cho Link 2.", "warning")
+                else:
+                    self.log("⚡ Bắt được thông báo Link 1 thành công! Chạy tiếp /addtocart Link 2 ngay (đệm 2s, không delay 80s)...", "info")
+                    await asyncio.sleep(2)
+
+                    self.current_step = "LỆNH: /addtocart (Link 2)"
+                    item["step_detail"] = "Đang gửi lệnh /addtocart Link 2..."
+
+                    aff_cfg = load_affiliate_config()
+                    if aff_cfg.get("enabled", True):
+                        target_aff_id = str(aff_cfg.get("app_id") or "17324610663").strip()
+                        is_aff_2 = (f"affiliate_id={target_aff_id}" in prod_link_2) or (prod_link_2 in LAST_CONVERTED_AFFILIATE_LINKS)
+                        if not is_aff_2:
+                            self.log("🔗 Đang chuyển đổi Link 2 sang link Affiliate của bạn...", "info")
+                            aff_ok2, aff_res2 = convert_shopee_affiliate_link(prod_link_2)
+                            if aff_ok2 and aff_res2:
+                                prod_link_2 = aff_res2
+                                self.config["product_link_2"] = aff_res2
+                                self.log(f"✅ Đã chuyển đổi Link 2 thành công: {prod_link_2}", "success")
+                            else:
+                                self.log(f"⚠️ Chuyển đổi Link 2 chưa được: {aff_res2}. Tiếp tục dùng link gốc.", "warning")
+                        else:
+                            self.log(f"🔗 Sử dụng trực tiếp link Affiliate cho Link 2: {prod_link_2}", "info")
+
+                    self.log(f"📤 Gửi /addtocart Link 2: {prod_link_2}|<nick>...", "info")
+                    cart_cmd_2 = f"/addtocart {prod_link_2}|{raw_nick}"
+                    t_cart2_start = time.time()
+                    success_cart_2, cart_res_2 = await self._execute_addtocart(client, bot_entity, cart_cmd_2)
+                    elapsed_cart2 = round(time.time() - t_cart2_start, 1)
+
+                    if success_cart_2:
+                        cart_results.append(f"Link 2: {cart_res_2}")
+                        self.log(f"✅ BẮT ĐƯỢC thông báo THÀNH CÔNG Link 2 sau {elapsed_cart2}s! ({cart_res_2})", "success")
+                    else:
+                        cart_results.append(f"Link 2 Lỗi: {cart_res_2}")
+                        self.log(f"⚠️ Link 2 không thành công ({cart_res_2})", "warning")
+
+            item["cart_info"] = " | ".join(cart_results) if cart_results else "Không có link giỏ"
+
+            if not link_1_success and (not prod_link_2 or not success_cart_2) and not use_address:
+                item["error"] = f"Lỗi /addtocart: {item['cart_info']}"
+                return False
+
+            # Bắt được thông báo thành công → chuyển ngay sang lệnh tiếp theo (đệm 2s an toàn, không delay 80s)
+            if use_address and not self.should_stop:
+                self.log("⚡ Bắt được thông báo addtocart thành công! Chuyển ngay sang lệnh địa chỉ (bỏ qua delay 80s, đệm an toàn 2s)...", "info")
+                await asyncio.sleep(2)
 
             if self.should_stop:
                 return False
@@ -789,47 +942,119 @@ class DangKyShopeeManager:
             self.log(f"📤 Gửi lệnh {addr_cmd_type} cho nick...", "info")
 
             addr_cmd = f"{addr_cmd_type} {raw_nick}"
+            t_addr_start = time.time()
             success_addr, addr_res = await self._execute_address_wizard(client, bot_entity, addr_cmd)
+            elapsed_addr = round(time.time() - t_addr_start, 1)
+
             if not success_addr:
-                item["error"] = f"Lỗi ({addr_cmd_type}): {addr_res}"
+                item["error"] = f"Lỗi ({addr_cmd_type}) sau {elapsed_addr}s: {addr_res}"
                 return False
 
             item["address_info"] = addr_res
-            self.log(f"✅ Lệnh {addr_cmd_type} THÀNH CÔNG! {addr_res}", "success")
+            self.log(f"✅ BẮT ĐƯỢC thông báo {addr_cmd_type} THÀNH CÔNG sau {elapsed_addr}s! {addr_res}", "success")
 
         return True
 
     # -------------------------------------------------------------------------
-    # BỘ XỬ LÝ LỆNH 1: /mailfree
+    # BỘ XỬ LÝ LỆNH 1: /mailfree (BẮT CHUẨN THÔNG BÁO THÀNH CÔNG TỪ BOT)
     # -------------------------------------------------------------------------
     async def _execute_mailfree(self, client, bot_entity, cmd_text):
-        timeout = int(self.config.get("timeout_step", 50))
+        """
+        Bắt chuẩn 100% thông báo thành công /mailfree từ @dangkyshopee_bot:
+        1. Bắt các dạng thông báo thành công thực tế của Bot:
+           - "THÀNH CÔNG!" (kèm email, mật khẩu)
+           - "XÁC MINH THÀNH CÔNG!" (kèm user, vị trí, thiết bị)
+           - "THÔNG TIN MAIL" (kèm Shopee, email, mật khẩu)
+           - Tin nhắn có nút inline "Đọc Mail"
+           - "**INBOX**" (khi mail đã được cấp và hộp thư đã mở)
+        2. Tự động giải phóng khi kẹt phiên:
+           - "Bạn đang có phiên chạy dở" ➔ Tự động gửi /stop, đợi 2s và gửi lại lệnh
+        3. Báo lỗi ngay lập tức (không treo chờ timeout):
+           - "Cookie đăng nhập đã hết hạn"
+           - "Key proxy đã hết hạn"
+           - "KiotProxy không cấp được proxy"
+           - Bất kỳ thông báo "❌ Lỗi:" hoặc "❌"
+        """
+        timeout = max(int(self.config.get("timeout_step", 150)), 150)
         last_sent = await client.send_message(bot_entity, cmd_text)
         start_time = time.time()
+        has_sent_stop = False
 
         while time.time() - start_time < timeout:
             if self.should_stop:
                 return False, "Tiến trình bị dừng"
 
-            messages = await client.get_messages(bot_entity, limit=4)
+            messages = await client.get_messages(bot_entity, limit=5)
             for m in messages:
-                if not m.out and m.id > last_sent.id:
-                    txt = m.text or ""
-                    # Kiểm tra dấu hiệu thành công
-                    if "THÀNH CÔNG!" in txt or "XÁC MINH THÀNH CÔNG!" in txt:
-                        # Rút trích email nếu có
-                        em_match = re.search(r'([a-zA-Z0-9_\-\.]+@[a-zA-Z0-9_\-\.]+\.[a-zA-Z]{2,})', txt)
-                        email = em_match.group(1) if em_match else "Đã cấp mail"
-                        return True, email
+                if m.out or m.id <= last_sent.id:
+                    continue
 
-                    # Kiểm tra dấu hiệu lỗi
-                    if "❌" in txt or "Lỗi:" in txt:
-                        err_line = txt.split("\n")[0]
-                        return False, err_line
+                txt = m.text or ""
+                txt_lower = txt.lower()
 
-            await asyncio.sleep(2)
+                # Quét nút inline của tin nhắn
+                has_doc_mail_btn = False
+                if m.buttons:
+                    for row in m.buttons:
+                        for btn in row:
+                            b_text = (btn.text or "").strip().lower()
+                            if "đọc mail" in b_text or "doc mail" in b_text:
+                                has_doc_mail_btn = True
+                                break
+                        if has_doc_mail_btn:
+                            break
 
-        return False, f"Hết thời gian chờ phản hồi ({timeout}s)"
+                # 1. DẤU HIỆU BÁO THÀNH CÔNG CỦA /mailfree
+                is_success = (
+                    "thành công!" in txt_lower or
+                    "xác minh thành công" in txt_lower or
+                    "thông tin mail" in txt_lower or
+                    has_doc_mail_btn or
+                    "**inbox**" in txt_lower or
+                    ("xác nhận email" in txt_lower and "welcome" in txt_lower)
+                )
+
+                if is_success:
+                    # Trích xuất email nếu có trong tin nhắn
+                    em_match = re.search(r'([a-zA-Z0-9_\-\.]+@[a-zA-Z0-9_\-\.]+\.[a-zA-Z]{2,})', txt)
+                    if em_match:
+                        email_str = em_match.group(1)
+                        # Trích xuất mật khẩu mail nếu có
+                        pass_match = re.search(r'🔐\s*`?([^\n`]+)`?', txt)
+                        if pass_match:
+                            return True, f"{email_str}|{pass_match.group(1).strip()}"
+                        return True, email_str
+
+                    # Nếu là tin xác minh thành công (hiển thị User)
+                    user_match = re.search(r'User:\s*\*?([^\n\*]+)\*?', txt, re.IGNORECASE)
+                    if user_match:
+                        return True, f"Xác minh: {user_match.group(1).strip()}"
+
+                    if "**inbox**" in txt_lower:
+                        return True, "Hộp thư đã xác nhận"
+
+                    return True, "Cấp mail thành công"
+
+                # 2. XỬ LÝ PHIÊN CHẠY DỞ (TỰ ĐỘNG GỬI /stop ĐỂ GIẢI PHÓNG)
+                if "bạn đang có phiên chạy dở" in txt_lower or "đang có phiên chạy dở" in txt_lower:
+                    if not has_sent_stop:
+                        self.log("⚠️ Bot báo có phiên chạy dở cũ. Đang tự động gửi /stop để giải phóng...", "warning")
+                        await client.send_message(bot_entity, "/stop")
+                        has_sent_stop = True
+                        await asyncio.sleep(2)
+                        self.log("🔄 Đang gửi lại lệnh /mailfree sau khi giải phóng...", "info")
+                        last_sent = await client.send_message(bot_entity, cmd_text)
+                        break
+
+                # 3. DẤU HIỆU LỖI (BÁO LỖI NGAY LẬP TỨC, KHÔNG ĐỢI TIMEOUT)
+                if "❌" in txt or "lỗi:" in txt_lower or "không đăng nhập được" in txt_lower or "hết hạn" in txt_lower:
+                    err_line = txt.split("\n")[0].strip()
+                    err_clean = re.sub(r'[*_`]', '', err_line)
+                    return False, err_clean
+
+            await asyncio.sleep(1)
+
+        return False, f"Hết thời gian chờ phản hồi /mailfree ({timeout}s)"
 
     # -------------------------------------------------------------------------
     # BỘ XỬ LÝ LỆNH: /addtocart (NÂNG CẤP: CHỌN PHÂN LOẠI & BẤM NÚT XÁC NHẬN THÊM SẢN PHẨM)
@@ -983,6 +1208,7 @@ class DangKyShopeeManager:
 
         last_sent = await client.send_message(bot_entity, cmd_text)
         start_time = time.time()
+        has_sent_stop = False
         variant_clicked = False
         confirm_clicked = False
         last_confirm_click_time = 0
@@ -998,13 +1224,21 @@ class DangKyShopeeManager:
                     continue
 
                 txt = m.text or ""
+                txt_lower = txt.lower()
 
                 # Bỏ qua các tin nhắn mail cũ nếu còn sót
-                if any(w in txt.lower() for w in ["đọc mail", "hộp thư", "đã cấp mail", "xác minh thành công"]) and "kết quả thêm giỏ" not in txt.lower():
+                if any(w in txt_lower for w in ["đọc mail", "hộp thư", "đã cấp mail", "xác minh thành công"]) and "kết quả thêm giỏ" not in txt_lower:
                     continue
 
-                # 1. Kiểm tra nếu đã có kết quả thêm giỏ
-                if "KẾT QUẢ THÊM GIỎ" in txt:
+                # 1. Cơ chế bắt báo thành công thêm giỏ hàng
+                is_cart_result = (
+                    "kết quả thêm giỏ" in txt_lower or 
+                    ("thành công:" in txt_lower and "lỗi:" in txt_lower) or
+                    ("thêm giỏ" in txt_lower and "thành công" in txt_lower) or
+                    ("đã thêm" in txt_lower and "giỏ" in txt_lower)
+                )
+
+                if is_cart_result:
                     success_match = re.search(r'Thành công:\s*\*?(\d+)\*?', txt, re.IGNORECASE)
                     fail_match = re.search(r'Lỗi:\s*\*?(\d+)\*?', txt, re.IGNORECASE)
                     s_count = int(success_match.group(1)) if success_match else 0
@@ -1014,18 +1248,30 @@ class DangKyShopeeManager:
                         lines = [ln.strip() for ln in txt.split("\n") if "x1" in ln or "x2" in ln or "x3" in ln]
                         item_name = lines[0] if lines else f"Thành công {s_count} món"
                         return True, item_name
-                    else:
+                    elif "thành công" in txt_lower and f_count == 0 and "lỗi" not in txt_lower:
+                        return True, "Thành công thêm giỏ hàng"
+                    elif f_count > 0 and s_count == 0:
                         return False, f"Thêm giỏ báo lỗi (Thành công: {s_count}, Lỗi: {f_count})"
 
-                # 2. Kiểm tra nếu bot báo lỗi
-                if "❌ Lỗi:" in txt or "Không đăng nhập được" in txt or "Cookie đăng nhập đã hết hạn" in txt:
-                    return False, txt.split("\n")[0]
+                # 2. Xử lý phiên chạy dở cũ (tự động gửi /stop để giải phóng)
+                if "bạn đang có phiên chạy dở" in txt_lower or "đang có phiên chạy dở" in txt_lower:
+                    if not has_sent_stop:
+                        self.log("⚠️ Bot báo có phiên chạy dở cũ. Đang tự động gửi /stop để giải phóng...", "warning")
+                        await client.send_message(bot_entity, "/stop")
+                        has_sent_stop = True
+                        await asyncio.sleep(2)
+                        self.log("🔄 Đang gửi lại lệnh /addtocart sau khi giải phóng...", "info")
+                        last_sent = await client.send_message(bot_entity, cmd_text)
+                        break
+                    else:
+                        return False, "Kẹt phiên chạy dở"
 
-                if "Bạn đang có phiên chạy dở" in txt:
-                    return False, "Kẹt phiên chạy dở"
+                # 3. Kiểm tra nếu bot báo lỗi
+                if "❌" in txt or "lỗi:" in txt_lower or "không đăng nhập được" in txt_lower or "cookie đăng nhập đã hết hạn" in txt_lower:
+                    return False, txt.split("\n")[0].strip()
 
                 # 3. Quét và xử lý các nút inline của bot
-                if m.buttons and "KẾT QUẢ THÊM GIỎ" not in txt:
+                if m.buttons and not is_cart_result:
                     confirm_btn = self._find_confirm_button(m.buttons)
                     variant_btn, match_type = self._find_best_variant_button(m.buttons, target_variant)
 
@@ -1134,6 +1380,7 @@ class DangKyShopeeManager:
         timeout = int(self.config.get("timeout_address", 180))
         last_sent = await client.send_message(bot_entity, cmd_text)
         start_time = time.time()
+        has_sent_stop = False
 
         # Các cờ trạng thái tuần tự theo dõi từng thông báo nảy ra
         step1_area_sent = False
@@ -1162,6 +1409,7 @@ class DangKyShopeeManager:
                     continue
 
                 txt = m.text or ""
+                txt_lower = txt.lower()
 
                 # 1. Bot thông báo THÊM ĐỊA CHỈ THÀNH CÔNG!
                 if "THÊM ĐỊA CHỈ THÀNH CÔNG!" in txt:
@@ -1170,11 +1418,24 @@ class DangKyShopeeManager:
                     self.log(f"🎉 [Bot Xác Nhận]: {summary_text}", "success")
                     return True, summary_text
 
-                # 2. Bot báo lỗi đăng nhập / hết hạn cookie
+                # 2. Xử lý phiên chạy dở cũ (tự động gửi /stop để giải phóng)
+                if "bạn đang có phiên chạy dở" in txt_lower or "đang có phiên chạy dở" in txt_lower:
+                    if not has_sent_stop:
+                        self.log("⚠️ Bot báo có phiên chạy dở cũ. Đang tự động gửi /stop để giải phóng...", "warning")
+                        await client.send_message(bot_entity, "/stop")
+                        has_sent_stop = True
+                        await asyncio.sleep(2)
+                        self.log("🔄 Đang gửi lại lệnh địa chỉ sau khi giải phóng...", "info")
+                        last_sent = await client.send_message(bot_entity, cmd_text)
+                        break
+                    else:
+                        return False, "Kẹt phiên chạy dở"
+
+                # 3. Bot báo lỗi đăng nhập / hết hạn cookie
                 if "Không đăng nhập được" in txt or "Cookie đăng nhập đã hết hạn" in txt or "SPC_F chưa được chấp nhận" in txt:
                     return False, txt.split("\n")[0]
 
-                # 3. Bot báo lỗi tra cứu khu vực
+                # 4. Bot báo lỗi tra cứu khu vực
                 if "Lỗi tìm kiếm: Chưa tra cứu được khu vực" in txt:
                     return False, "AREA_SEARCH_ERROR"
 

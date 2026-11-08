@@ -608,20 +608,37 @@
 
                 <!-- KHU VỰC LỆNH /addtocart (ẨN/HIỆN THEO CHECKBOX) -->
                 <div id="groupAddtocart" style="display: flex; flex-direction: column; gap: 14px; margin-top: 4px;">
-                    <!-- Lệnh 1: Link sản phẩm -->
+                    <!-- Lệnh 1: Link sản phẩm 1 -->
                     <div class="form-group">
                         <label for="productLink">
-                            <span class="badge-step" style="background: rgba(245,158,11,0.2); color: #FBBF24; border-color: rgba(245,158,11,0.4);">/addtocart</span> Link Sản Phẩm
+                            <span class="badge-step" style="background: rgba(245,158,11,0.2); color: #FBBF24; border-color: rgba(245,158,11,0.4);">/addtocart</span> Link Sản Phẩm 1
                         </label>
                         <div style="display: flex; gap: 8px;">
-                            <input type="text" id="productLink" placeholder="Ví dụ: https://s.shopee.vn/... hoặc vn.shp.ee/..." style="flex: 1;" onchange="handleProductLinkChange()" onpaste="setTimeout(handleProductLinkChange, 120)">
-                            <button type="button" class="btn" onclick="convertAndApplyProductLink()" id="btnQuickConvertLink" style="padding: 0 14px; font-size: 12px; font-weight: 600; white-space: nowrap; background: linear-gradient(135deg, #10B981, #059669); border: none; color: #fff; border-radius: var(--radius-sm); cursor: pointer; display: flex; align-items: center; gap: 6px; box-shadow: 0 2px 8px rgba(16, 185, 129, 0.3);">
+                            <input type="text" id="productLink" placeholder="Ví dụ: https://s.shopee.vn/... hoặc vn.shp.ee/..." style="flex: 1;" onchange="handleProductLinkChange(1)" onpaste="setTimeout(() => handleProductLinkChange(1), 120)">
+                            <button type="button" class="btn" onclick="convertAndApplyProductLink(1)" id="btnQuickConvertLink" style="padding: 0 14px; font-size: 12px; font-weight: 600; white-space: nowrap; background: linear-gradient(135deg, #10B981, #059669); border: none; color: #fff; border-radius: var(--radius-sm); cursor: pointer; display: flex; align-items: center; gap: 6px; box-shadow: 0 2px 8px rgba(16, 185, 129, 0.3);">
                                 <i class="fa-solid fa-wand-magic-sparkles"></i> Đổi sang Link Affiliate
                             </button>
                         </div>
                         <div id="affLiveNotice" style="font-size: 11px; margin-top: 6px; color: #34D399; display: flex; align-items: center; gap: 6px;">
                             <i class="fa-solid fa-wand-magic-sparkles"></i>
                             <span>Cơ chế tự động: Sau khi chuyển đổi, tool sẽ <b>dùng trực tiếp link Affiliate</b> này để gửi lệnh <b>/addtocart</b> vào bot.</span>
+                        </div>
+                    </div>
+
+                    <!-- Lệnh 2: Link sản phẩm 2 (Tùy chọn) -->
+                    <div class="form-group">
+                        <label for="productLink2">
+                            <span class="badge-step" style="background: rgba(245,158,11,0.2); color: #FBBF24; border-color: rgba(245,158,11,0.4);">/addtocart</span> Link Sản Phẩm 2 (Tùy chọn)
+                        </label>
+                        <div style="display: flex; gap: 8px;">
+                            <input type="text" id="productLink2" placeholder="Nhập link sản phẩm 2 để add tiếp sau khi link 1 thành công (nếu có)" style="flex: 1;" onchange="handleProductLinkChange(2)" onpaste="setTimeout(() => handleProductLinkChange(2), 120)">
+                            <button type="button" class="btn" onclick="convertAndApplyProductLink(2)" id="btnQuickConvertLink2" style="padding: 0 14px; font-size: 12px; font-weight: 600; white-space: nowrap; background: linear-gradient(135deg, #10B981, #059669); border: none; color: #fff; border-radius: var(--radius-sm); cursor: pointer; display: flex; align-items: center; gap: 6px; box-shadow: 0 2px 8px rgba(16, 185, 129, 0.3);">
+                                <i class="fa-solid fa-wand-magic-sparkles"></i> Đổi sang Link Affiliate
+                            </button>
+                        </div>
+                        <div id="affLiveNotice2" style="font-size: 11px; margin-top: 6px; color: #34D399; display: flex; align-items: center; gap: 6px;">
+                            <i class="fa-solid fa-wand-magic-sparkles"></i>
+                            <span>Cơ chế tự động: Sau khi bắt được kết quả Link 1 nhập thành công, tool sẽ <b>chạy tiếp 1 lệnh /addtocart cho Link 2</b>.</span>
                         </div>
                     </div>
 
@@ -1120,8 +1137,10 @@
         }
 
         let productLink = document.getElementById('productLink').value.trim();
-        if (useAddtocart && !productLink) {
-            alert('Bạn đã tích chọn lệnh Thêm Giỏ Hàng (/addtocart), vui lòng nhập Link Sản Phẩm!');
+        let productLink2 = document.getElementById('productLink2') ? document.getElementById('productLink2').value.trim() : '';
+
+        if (useAddtocart && !productLink && !productLink2) {
+            alert('Bạn đã tích chọn lệnh Thêm Giỏ Hàng (/addtocart), vui lòng nhập ít nhất Link Sản Phẩm 1!');
             document.getElementById('productLink').focus();
             return;
         }
@@ -1136,34 +1155,69 @@
             return;
         }
 
-        // Tự động kiểm tra và chuyển đổi link sang link Affiliate nếu người dùng chưa bấm nút đổi
-        if (useAddtocart && productLink && !productLink.includes('s.shopee.vn') && !productLink.includes('affiliate_id')) {
+        // Tự động kiểm tra và chuyển đổi link sang link Affiliate nếu link chưa được chuyển đổi
+        if (useAddtocart) {
             const btn = document.getElementById('btnStart');
             const origText = btn ? btn.innerHTML : '';
-            if (btn) {
-                btn.disabled = true;
-                btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Đang đổi link Affiliate...';
-            }
-            try {
-                const affRes = await fetch('/api/bot-dks/test-aff', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ url: productLink })
-                });
-                const affData = await affRes.json();
-                if (affData.success && affData.short_link) {
-                    productLink = affData.short_link;
-                    document.getElementById('productLink').value = productLink;
-                    const notice = document.getElementById('affLiveNotice');
-                    if (notice) {
-                        notice.innerHTML = '<span style="color: #34D399; font-weight: 700;"><i class="fa-solid fa-circle-check"></i> ĐÃ TỰ ĐỘNG ĐỔI THÀNH LINK AFFILIATE ĐỂ GỬI LỆNH /addtocart!</span>';
-                    }
+
+            // Tự động đổi Link 1
+            if (productLink && productLink !== lastConvertedAffLink1) {
+                if (btn) {
+                    btn.disabled = true;
+                    btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Đang đổi Link 1 Affiliate...';
                 }
-            } catch (e) {
-                console.warn('Tự động đổi link trước khi start:', e);
-            } finally {
-                if (btn) btn.innerHTML = origText;
+                try {
+                    const affRes = await fetch('/api/bot-dks/test-aff', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ url: productLink })
+                    });
+                    const affData = await affRes.json();
+                    if (affData.success && affData.short_link) {
+                        productLink = affData.short_link;
+                        lastConvertedAffLink1 = affData.short_link;
+                        lastConvertedAffLink = affData.short_link;
+                        document.getElementById('productLink').value = productLink;
+                        const notice = document.getElementById('affLiveNotice');
+                        if (notice) {
+                            notice.innerHTML = '<span style="color: #34D399; font-weight: 700;"><i class="fa-solid fa-circle-check"></i> ĐÃ TỰ ĐỘNG ĐỔI THÀNH LINK AFFILIATE ĐỂ GỬI LỆNH /addtocart!</span>';
+                        }
+                    }
+                } catch (e) {
+                    console.warn('Tự động đổi link 1 trước khi start:', e);
+                }
             }
+
+            // Tự động đổi Link 2
+            if (productLink2 && productLink2 !== lastConvertedAffLink2) {
+                if (btn) {
+                    btn.disabled = true;
+                    btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Đang đổi Link 2 Affiliate...';
+                }
+                try {
+                    const affRes2 = await fetch('/api/bot-dks/test-aff', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ url: productLink2 })
+                    });
+                    const affData2 = await affRes2.json();
+                    if (affData2.success && affData2.short_link) {
+                        productLink2 = affData2.short_link;
+                        lastConvertedAffLink2 = affData2.short_link;
+                        if (document.getElementById('productLink2')) {
+                            document.getElementById('productLink2').value = productLink2;
+                        }
+                        const notice2 = document.getElementById('affLiveNotice2');
+                        if (notice2) {
+                            notice2.innerHTML = '<span style="color: #34D399; font-weight: 700;"><i class="fa-solid fa-circle-check"></i> ĐÃ TỰ ĐỘNG ĐỔI LINK 2 THÀNH AFFILIATE!</span>';
+                        }
+                    }
+                } catch (e) {
+                    console.warn('Tự động đổi link 2 trước khi start:', e);
+                }
+            }
+
+            if (btn) btn.innerHTML = origText;
         }
 
         const config = {
@@ -1171,6 +1225,7 @@
             use_addtocart: useAddtocart,
             use_address: useAddress,
             product_link: productLink,
+            product_link_2: productLink2,
             product_variant: document.getElementById('productVariant') ? document.getElementById('productVariant').value.trim() : '',
             address_command: document.getElementById('addressCommand').value,
             address_area: document.getElementById('addressArea').value.trim(),
@@ -1194,6 +1249,9 @@
             if (data.success) {
                 if (data.product_link) {
                     document.getElementById('productLink').value = data.product_link;
+                }
+                if (data.product_link_2 && document.getElementById('productLink2')) {
+                    document.getElementById('productLink2').value = data.product_link_2;
                 }
                 alert('🚀 Đã khởi động chiến dịch thành công! Tool sẽ dùng trực tiếp link Affiliate cho lệnh /addtocart.');
                 fetchStatus();
@@ -1470,23 +1528,29 @@
     }
 
     let lastConvertedAffLink = '';
-    async function convertAndApplyProductLink() {
-        const input = document.getElementById('productLink');
+    let lastConvertedAffLink1 = '';
+    let lastConvertedAffLink2 = '';
+
+    async function convertAndApplyProductLink(linkIdx = 1) {
+        const inputId = linkIdx === 2 ? 'productLink2' : 'productLink';
+        const btnId = linkIdx === 2 ? 'btnQuickConvertLink2' : 'btnQuickConvertLink';
+        const noticeId = linkIdx === 2 ? 'affLiveNotice2' : 'affLiveNotice';
+        const input = document.getElementById(inputId);
         const url = input ? input.value.trim() : '';
         if (!url) {
-            alert('Vui lòng nhập hoặc dán link sản phẩm Shopee vào ô trước!');
+            alert(`Vui lòng nhập hoặc dán Link Sản Phẩm ${linkIdx} vào ô trước!`);
             input && input.focus();
             return;
         }
 
-        const btn = document.getElementById('btnQuickConvertLink');
+        const btn = document.getElementById(btnId);
         const origBtnText = btn ? btn.innerHTML : '';
         if (btn) {
             btn.disabled = true;
             btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Đang đổi...';
         }
 
-        const notice = document.getElementById('affLiveNotice');
+        const notice = document.getElementById(noticeId);
         if (notice) {
             notice.innerHTML = '<span style="color: #60A5FA;"><i class="fa-solid fa-spinner fa-spin"></i> Đang tự động chuyển đổi sang link Affiliate của bạn...</span>';
         }
@@ -1499,14 +1563,21 @@
             });
             const data = await res.json();
             if (data.success && data.short_link) {
-                lastConvertedAffLink = data.short_link;
+                if (linkIdx === 2) {
+                    lastConvertedAffLink2 = data.short_link;
+                } else {
+                    lastConvertedAffLink1 = data.short_link;
+                    lastConvertedAffLink = data.short_link;
+                lastConvertedAffLink1 = data.short_link;
+                }
                 if (input) {
                     input.value = data.short_link;
                     input.style.borderColor = '#10B981';
                     input.style.boxShadow = '0 0 10px rgba(16, 185, 129, 0.4)';
                 }
+                const isShort = data.is_short || data.short_link.includes('s.shopee.vn') || data.short_link.includes('shp.ee');
                 if (notice) {
-                    notice.innerHTML = '<span style="color: #34D399; font-weight: 700;"><i class="fa-solid fa-circle-check"></i> ĐÃ ĐỔI THÀNH LINK AFFILIATE VÀ TỰ ĐỘNG DÙNG CHO LỆNH /addtocart!</span>';
+                    notice.innerHTML = `<span style="color: #34D399; font-weight: 700;"><i class="fa-solid fa-circle-check"></i> ${isShort ? 'ĐÃ ĐỔI SANG LINK RÚT GỌN s.shopee.vn' : 'ĐÃ GẮN MÃ AFFILIATE CỦA BẠN'} - TỰ ĐỘNG DÙNG CHO /addtocart!</span>`;
                 }
             } else {
                 if (notice) {
@@ -1525,17 +1596,27 @@
         }
     }
 
-    let convertLinkDebounce = null;
-    function handleProductLinkChange() {
-        const input = document.getElementById('productLink');
+    let convertLinkDebounce1 = null;
+    let convertLinkDebounce2 = null;
+    function handleProductLinkChange(linkIdx = 1) {
+        const inputId = linkIdx === 2 ? 'productLink2' : 'productLink';
+        const lastConverted = linkIdx === 2 ? lastConvertedAffLink2 : lastConvertedAffLink1;
+        const input = document.getElementById(inputId);
         if (!input) return;
         const val = input.value.trim();
-        // Nếu là link thô Shopee và chưa đổi thành affiliate
-        if (val && !val.includes('s.shopee.vn') && !val.includes('affiliate_id')) {
-            clearTimeout(convertLinkDebounce);
-            convertLinkDebounce = setTimeout(() => {
-                convertAndApplyProductLink();
-            }, 300);
+        // Tự động chuyển đổi nếu link khác với link affiliate đã tạo gần nhất
+        if (val && val !== lastConverted) {
+            if (linkIdx === 2) {
+                clearTimeout(convertLinkDebounce2);
+                convertLinkDebounce2 = setTimeout(() => {
+                    convertAndApplyProductLink(2);
+                }, 300);
+            } else {
+                clearTimeout(convertLinkDebounce1);
+                convertLinkDebounce1 = setTimeout(() => {
+                    convertAndApplyProductLink(1);
+                }, 300);
+            }
         }
     }
 
@@ -1570,6 +1651,7 @@
             const data = await res.json();
             if (data.success) {
                 lastConvertedAffLink = data.short_link;
+                lastConvertedAffLink1 = data.short_link;
                 // CẬP NHẬT TRỰC TIẾP VÀO Ô LINK SẢN PHẨM ĐỂ DÙNG CHO /addtocart
                 const input = document.getElementById('productLink');
                 if (input) {

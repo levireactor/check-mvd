@@ -10,17 +10,19 @@ echo ================================================================
 echo.
 echo [*] Đang khởi động Google Chrome cho Shopee Affiliate...
 
-if exist "C:\Program Files\Google\Chrome\Application\chrome.exe" (
-    set "CHROME_BIN=C:\Program Files\Google\Chrome\Application\chrome.exe"
-) else if exist "C:\Program Files (x86)\Google\Chrome\Application\chrome.exe" (
-    set "CHROME_BIN=C:\Program Files (x86)\Google\Chrome\Application\chrome.exe"
-) else if exist "%LOCALAPPDATA%\Google\Chrome\Application\chrome.exe" (
-    set "CHROME_BIN=%LOCALAPPDATA%\Google\Chrome\Application\chrome.exe"
-) else (
-    set "CHROME_BIN=chrome.exe"
+python -c "import shopee_affiliate_browser; ok, msg = shopee_affiliate_browser.launch_chrome_affiliate(); print('[*]', msg)" 2>nul
+if %errorlevel% neq 0 (
+    if exist "C:\Program Files\Google\Chrome\Application\chrome.exe" (
+        set "CHROME_BIN=C:\Program Files\Google\Chrome\Application\chrome.exe"
+    ) else if exist "C:\Program Files (x86)\Google\Chrome\Application\chrome.exe" (
+        set "CHROME_BIN=C:\Program Files (x86)\Google\Chrome\Application\chrome.exe"
+    ) else if exist "%LOCALAPPDATA%\Google\Chrome\Application\chrome.exe" (
+        set "CHROME_BIN=%LOCALAPPDATA%\Google\Chrome\Application\chrome.exe"
+    ) else (
+        set "CHROME_BIN=chrome.exe"
+    )
+    start "" "%CHROME_BIN%" --remote-debugging-port=9222 --remote-allow-origins=* --user-data-dir="%~dp0chrome_aff_profile" --no-first-run --no-default-browser-check "https://affiliate.shopee.vn/offer/custom_link?mmp_pid=an_17320160631&affiliate_id=17324610663&pid=affiliates&utm_source=an_17320160631&utm_medium=affiliates&utm_content=meoidungkhoa&af_siteid=an_17320160631"
 )
-
-start "" "%CHROME_BIN%" --remote-debugging-port=9222 --remote-allow-origins=* --user-data-dir="%~dp0chrome_aff_profile" --no-first-run --no-default-browser-check "https://affiliate.shopee.vn/offer/custom_link?mmp_pid=an_17320160631&affiliate_id=17324610663&pid=affiliates&utm_source=an_17320160631&utm_medium=affiliates&utm_content=meoidungkhoa&af_siteid=an_17320160631"
 
 echo.
 echo [*] Trình duyệt Chrome Shopee Affiliate đã được mở!

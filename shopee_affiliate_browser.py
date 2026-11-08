@@ -62,6 +62,17 @@ def is_chrome_running():
     except Exception:
         return False
 
+def get_portal_url():
+    """Lấy Portal URL từ cấu hình người dùng, hoặc URL mặc định"""
+    try:
+        from dangkyshopee_manager import load_affiliate_config
+        cfg = load_affiliate_config()
+        if cfg.get("portal_url"):
+            return cfg["portal_url"]
+    except Exception:
+        pass
+    return DEFAULT_PORTAL_URL
+
 def launch_chrome_affiliate():
     """Khởi động trình duyệt Chrome độc lập cho Shopee Affiliate (Độc lập, bền vững)"""
     if is_chrome_running():
@@ -69,6 +80,7 @@ def launch_chrome_affiliate():
 
     os.makedirs(PROFILE_DIR, exist_ok=True)
     chrome_bin = get_chrome_path()
+    portal_url = get_portal_url()
 
     # Sử dụng cmd start để tiến trình Chrome hoàn toàn độc lập với Python
     start_cmd = (
@@ -77,7 +89,7 @@ def launch_chrome_affiliate():
         f'--remote-allow-origins=* '
         f'--user-data-dir="{PROFILE_DIR}" '
         f'--no-first-run --no-default-browser-check '
-        f'"{DEFAULT_PORTAL_URL}"'
+        f'"{portal_url}"'
     )
 
     try:
@@ -86,8 +98,8 @@ def launch_chrome_affiliate():
             shell=True,
             creationflags=0x00000008 | subprocess.CREATE_NEW_PROCESS_GROUP
         )
-        # Chờ Chrome sẵn sàng tối đa 10s
-        for _ in range(20):
+        # Chờ Chrome sẵn sàng tối đa 4s
+        for _ in range(8):
             time.sleep(0.5)
             if is_chrome_running():
                 return True, "Đã khởi động trình duyệt Chrome Shopee Affiliate thành công"
@@ -104,12 +116,14 @@ def convert_link_via_selenium(product_link, timeout=15):
     if not product_link:
         return False, "Link sản phẩm trống"
 
+    portal_url = get_portal_url()
+
     # Nếu Chrome chưa chạy, tự khởi động
     if not is_chrome_running():
         ok, msg = launch_chrome_affiliate()
-        if not ok:
+        if not ok or not is_chrome_running():
             return False, f"Chưa thể kết nối Chrome: {msg}. Hãy bấm đúp chạy file MO_CHROME_AFFILIATE.bat trên máy."
-        time.sleep(2)
+        time.sleep(1)
 
     options = Options()
     options.add_experimental_option("debuggerAddress", f"127.0.0.1:{PORT}")
@@ -132,11 +146,11 @@ def convert_link_via_selenium(product_link, timeout=15):
                 continue
 
         if not target_tab:
-            driver.get(DEFAULT_PORTAL_URL)
+            driver.get(portal_url)
             time.sleep(2)
         else:
             if "custom_link" not in driver.current_url:
-                driver.get(DEFAULT_PORTAL_URL)
+                driver.get(portal_url)
                 time.sleep(2)
 
         time.sleep(1)
@@ -147,12 +161,15 @@ def convert_link_via_selenium(product_link, timeout=15):
         # 1. Tìm ô nhập link sản phẩm (textarea trên trang Custom Link)
         input_elem = None
         selectors = [
-            "textarea",
             "textarea[placeholder*='link']",
             "textarea[placeholder*='liên kết']",
             "textarea[placeholder*='http']",
-            "input[type='text']",
-            ".custom-link-input"
+            "textarea",
+            "input[placeholder*='link']",
+            "input[placeholder*='liên kết']",
+            "input[placeholder*='http']",
+            ".custom-link-input",
+            "input[type='text']"
         ]
 
         for sel in selectors:
@@ -170,12 +187,29 @@ def convert_link_via_selenium(product_link, timeout=15):
         if not input_elem:
             return False, "Không tìm thấy ô nhập link trên trang Shopee Affiliate. Hãy đảm bảo bạn đã đăng nhập và đang ở trang Custom Link."
 
-        # 2. Xóa và kích hoạt sự kiện input/change cho React/Vue
+        # Đọc trước kết quả cũ nếu có (để tránh nhận nhầm kết quả cũ của lần trước)
+        old_result = driver.execute_script("""
+            const el = arguments[0];
+            const m = (document.body.innerText || '').match(/https?:\\/\\/(s\\.shopee\\.vn|vn\\.shp\\.ee|shp\\.ee|shope\\.ee)\\/[a-zA-Z0-9_-]+/);
+            return m ? m[0] : '';
+        """, input_elem)
+
+        # 2. Xóa và kích hoạt sự kiện nhập liệu chuẩn cho Vue / React (dùng native value setter)
         driver.execute_script("""
             const el = arguments[0];
             const val = arguments[1];
             el.focus();
-            el.value = val;
+            try {
+                const proto = el instanceof HTMLTextAreaElement ? window.HTMLTextAreaElement.prototype : window.HTMLInputElement.prototype;
+                const setter = Object.getOwnPropertyDescriptor(proto, 'value')?.set;
+                if (setter) {
+                    setter.call(el, val);
+                } else {
+                    el.value = val;
+                }
+            } catch(e) {
+                el.value = val;
+            }
             el.dispatchEvent(new Event('input', { bubbles: true }));
             el.dispatchEvent(new Event('change', { bubbles: true }));
         """, input_elem, product_link)
@@ -201,18 +235,23 @@ def convert_link_via_selenium(product_link, timeout=15):
             "//button[contains(@class, 'shopee-button--primary')]"
         ]
 
-        for xpath in button_xpaths:
-            try:
-                btns = driver.find_elements(By.XPATH, xpath)
-                for btn in btns:
-                    if btn.is_displayed() and btn.is_enabled():
-                        driver.execute_script("arguments[0].click();", btn)
-                        button_clicked = True
+        # Chờ nút được kích hoạt tối đa 3s
+        wait_btn_start = time.time()
+        while time.time() - wait_btn_start < 3 and not button_clicked:
+            for xpath in button_xpaths:
+                try:
+                    btns = driver.find_elements(By.XPATH, xpath)
+                    for btn in btns:
+                        if btn.is_displayed() and btn.is_enabled():
+                            driver.execute_script("arguments[0].click();", btn)
+                            button_clicked = True
+                            break
+                    if button_clicked:
                         break
-                if button_clicked:
-                    break
-            except Exception:
-                continue
+                except Exception:
+                    continue
+            if not button_clicked:
+                time.sleep(0.3)
 
         if not button_clicked:
             # Thử click button đầu tiên có màu cam hoặc primary
@@ -230,37 +269,53 @@ def convert_link_via_selenium(product_link, timeout=15):
         if not button_clicked:
             return False, "Không tìm thấy nút 'Lấy link' hoặc nút đang bị khóa trên trang Shopee Affiliate"
 
-        # 4. Chờ link kết quả s.shopee.vn xuất hiện
+        # 4. Chờ link kết quả s.shopee.vn mới xuất hiện
         short_link = None
         start_wait = time.time()
         while time.time() - start_wait < timeout:
             time.sleep(0.5)
             try:
-                # Quét JavaScript trên toàn bộ DOM (input, a, body)
+                # Quét JavaScript trên DOM, đảm bảo BỎ QUA input_elem và BỎ QUA chính product_link / old_result
                 found = driver.execute_script("""
-                    // Quét các thẻ input / textarea kết quả
+                    const inputEl = arguments[0];
+                    const inputVal = (arguments[1] || '').trim();
+                    const prevLink = (arguments[2] || '').trim();
+
+                    function checkShort(str) {
+                        if (!str) return null;
+                        const m = str.match(/https?:\\/\\/(s\\.shopee\\.vn|vn\\.shp\\.ee|shp\\.ee|shope\\.ee)\\/[a-zA-Z0-9_-]+/i);
+                        if (!m) return null;
+                        const cand = m[0];
+                        if (cand === inputVal) return null;
+                        if (prevLink && cand === prevLink) return null;
+                        return cand;
+                    }
+
+                    // 1. Quét các thẻ input, textarea kết quả (khác inputEl ban đầu)
                     const inputs = Array.from(document.querySelectorAll('input, textarea'));
                     for (const inp of inputs) {
-                        const val = inp.value || '';
-                        if (val.includes('s.shopee.vn') || val.includes('shp.ee') || val.includes('shope.ee')) {
-                            const m = val.match(/https?:\\/\\/(s\\.shopee\\.vn|vn\\.shp\\.ee|shope\\.ee)\\/[a-zA-Z0-9_-]+/);
-                            if (m) return m[0];
-                        }
+                        if (inp === inputEl) continue;
+                        const cand = checkShort(inp.value || '');
+                        if (cand) return cand;
                     }
-                    // Quét các thẻ link a
+
+                    // 2. Quét các thẻ link a
                     const links = Array.from(document.querySelectorAll('a'));
                     for (const a of links) {
-                        const href = a.href || '';
-                        if (href.includes('s.shopee.vn') || href.includes('shp.ee') || href.includes('shope.ee')) {
-                            const m = href.match(/https?:\\/\\/(s\\.shopee\\.vn|vn\\.shp\\.ee|shope\\.ee)\\/[a-zA-Z0-9_-]+/);
-                            if (m) return m[0];
-                        }
+                        const cand = checkShort(a.href || '') || checkShort(a.innerText || '');
+                        if (cand) return cand;
                     }
-                    // Quét innerText toàn trang
-                    const bodyMatch = document.body.innerText.match(/https?:\\/\\/(s\\.shopee\\.vn|vn\\.shp\\.ee|shope\\.ee)\\/[a-zA-Z0-9_-]+/);
-                    if (bodyMatch) return bodyMatch[0];
+
+                    // 3. Quét các thẻ kết quả chuyên dụng hoặc gần nút copy
+                    const candidates = Array.from(document.querySelectorAll('.custom-link-result, [class*="result"], [class*="short-link"], [class*="link-box"], [class*="copy"], span, div, p'));
+                    for (const el of candidates) {
+                        if (el.contains(inputEl)) continue;
+                        const cand = checkShort(el.innerText || '');
+                        if (cand) return cand;
+                    }
+
                     return null;
-                """)
+                """, input_elem, product_link, old_result)
                 if found:
                     short_link = found.strip()
                     break
@@ -270,7 +325,7 @@ def convert_link_via_selenium(product_link, timeout=15):
         if short_link:
             return True, short_link
         else:
-            return False, "Đã bấm nút 'Lấy link' nhưng không thấy link s.shopee.vn xuất hiện trong thời gian chờ"
+            return False, "Đã bấm nút 'Lấy link' nhưng không thấy link s.shopee.vn mới xuất hiện trong thời gian chờ"
 
     except Exception as e:
         return False, f"Lỗi thao tác Selenium: {str(e)}"
