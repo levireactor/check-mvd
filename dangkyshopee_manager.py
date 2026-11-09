@@ -516,8 +516,8 @@ class DangKyShopeeManager:
             "phone_mode": "auto",  # auto: lấy sđt acc nếu có, ko có thì random; random: luôn random; custom: dùng số chỉ định
             "custom_phone": "",
             "delay_between_nicks": 6,
-            "timeout_step": 80,
-            "timeout_cart": 80,
+            "timeout_step": 150,
+            "timeout_cart": 240,
             "max_area_retries": 3
         }
 
@@ -871,16 +871,16 @@ class DangKyShopeeManager:
                     self.log(f"✅ BẮT ĐƯỢC thông báo THÀNH CÔNG Link 1 sau {elapsed_cart1}s! ({cart_res_1})", "success")
                 else:
                     cart_results.append(f"Link 1 Lỗi: {cart_res_1}")
-                    self.log(f"⚠️ Link 1 không thành công ({cart_res_1})", "warning")
-                    if not use_address and not prod_link_2:
-                        item["error"] = f"Lỗi /addtocart Link 1: {cart_res_1}"
-                        item["cart_info"] = " | ".join(cart_results)
-                        return False
+                    self.log(f"❌ Link 1 không thành công ({cart_res_1})", "error")
+                    item["error"] = f"Lỗi /addtocart Link 1: {cart_res_1}"
+                    item["cart_info"] = " | ".join(cart_results)
+                    return False  # DỪNG LẠI, KHÔNG CHẠY TIẾP NẾU LINK 1 LỖI HOẶC CHƯA XONG
 
             # --- THỰC THI LINK 2 (SAU KHI BẮT ĐƯỢC KẾT QUẢ LINK 1 ĐÃ NHẬP THÀNH CÔNG) ---
             if prod_link_2 and not self.should_stop:
                 if prod_link_1 and not link_1_success:
                     self.log("⚠️ Link 1 chưa thành công, bỏ qua lệnh /addtocart cho Link 2.", "warning")
+                    return False
                 else:
                     self.log("⚡ Bắt được thông báo Link 1 thành công! Chạy tiếp /addtocart Link 2 ngay (đệm 2s, không delay 80s)...", "info")
                     await asyncio.sleep(2)
@@ -915,17 +915,16 @@ class DangKyShopeeManager:
                         self.log(f"✅ BẮT ĐƯỢC thông báo THÀNH CÔNG Link 2 sau {elapsed_cart2}s! ({cart_res_2})", "success")
                     else:
                         cart_results.append(f"Link 2 Lỗi: {cart_res_2}")
-                        self.log(f"⚠️ Link 2 không thành công ({cart_res_2})", "warning")
+                        self.log(f"❌ Link 2 không thành công ({cart_res_2})", "error")
+                        item["error"] = f"Lỗi /addtocart Link 2: {cart_res_2}"
+                        item["cart_info"] = " | ".join(cart_results)
+                        return False  # DỪNG LẠI, KHÔNG CHẠY TIẾP NẾU LINK 2 LỖI HOẶC CHƯA XONG
 
             item["cart_info"] = " | ".join(cart_results) if cart_results else "Không có link giỏ"
 
-            if not link_1_success and (not prod_link_2 or not success_cart_2) and not use_address:
-                item["error"] = f"Lỗi /addtocart: {item['cart_info']}"
-                return False
-
-            # Bắt được thông báo thành công → chuyển ngay sang lệnh tiếp theo (đệm 2s an toàn, không delay 80s)
+            # Đã xong toàn bộ các link giỏ hàng hoàn tất → chuyển sang lệnh địa chỉ (đệm 2s an toàn)
             if use_address and not self.should_stop:
-                self.log("⚡ Bắt được thông báo addtocart thành công! Chuyển ngay sang lệnh địa chỉ (bỏ qua delay 80s, đệm an toàn 2s)...", "info")
+                self.log("⚡ Đã hoàn tất thêm giỏ hàng thành công! Chuyển ngay sang lệnh địa chỉ (đệm an toàn 2s)...", "info")
                 await asyncio.sleep(2)
 
             if self.should_stop:
@@ -1063,8 +1062,12 @@ class DangKyShopeeManager:
         """Kiểm tra nếu nút mang ý nghĩa Hủy/Cancel/Quay lại/Đóng"""
         if not btn_text:
             return False
-        t = btn_text.strip().lower()
-        cancel_keywords = ["hủy", "huy", "cancel", "quay lại", "thoát", "close", "đóng", "back", "dừng", "stop"]
+        import unicodedata
+        t = unicodedata.normalize('NFC', btn_text.strip().lower())
+        cancel_keywords = [
+            "hủy", "huỷ", "huy", "cancel", "quay lại", "quay lai",
+            "thoát", "thoat", "close", "đóng", "dong", "back", "dừng", "dung", "stop", "🚫"
+        ]
         return any(ck in t for ck in cancel_keywords)
 
     def _is_qty_button(self, btn_text):
@@ -1199,15 +1202,18 @@ class DangKyShopeeManager:
         """
         Chạy một chu trình thêm giỏ hàng:
         1. Gửi lệnh /addtocart
-        2. Chọn phân loại sản phẩm (nếu có yêu cầu hoặc chưa chọn)
-        3. Bấm nút XÁC NHẬN thêm sản phẩm (VD: '✅ Thêm 1 sản phẩm')
-        4. Chờ bot trả về 'KẾT QUẢ THÊM GIỎ'
+        2. Chờ bot xử lý:
+           - Bot gửi '⏳ Đang thêm...': TUYỆT ĐỐI KHÔNG BẤM NÚT (vì nút duy nhất là nút Hủy). Kiên nhẫn chờ bot thêm xong.
+           - Nếu bot có thông báo chọn phân loại rõ ràng thì mới xử lý.
+           - Chờ đến khi bot trả về kết quả '🛒 KẾT QUẢ THÊM GIỎ' hoặc báo lỗi.
+        3. Tuyệt đối không bấm nút Hủy giỏ hàng và không dừng giữa chừng.
         """
-        timeout = int(self.config.get("timeout_cart", 80))
+        timeout = max(int(self.config.get("timeout_cart", 240)), 240)
         target_variant = self.config.get("product_variant", "").strip()
 
         last_sent = await client.send_message(bot_entity, cmd_text)
         start_time = time.time()
+        last_progress_log = 0
         has_sent_stop = False
         variant_clicked = False
         confirm_clicked = False
@@ -1230,7 +1236,7 @@ class DangKyShopeeManager:
                 if any(w in txt_lower for w in ["đọc mail", "hộp thư", "đã cấp mail", "xác minh thành công"]) and "kết quả thêm giỏ" not in txt_lower:
                     continue
 
-                # 1. Cơ chế bắt báo thành công thêm giỏ hàng
+                # 1. Cơ chế bắt báo thành công thêm giỏ hàng (KẾT QUẢ CUỐI CÙNG)
                 is_cart_result = (
                     "kết quả thêm giỏ" in txt_lower or 
                     ("thành công:" in txt_lower and "lỗi:" in txt_lower) or
@@ -1253,10 +1259,41 @@ class DangKyShopeeManager:
                     elif f_count > 0 and s_count == 0:
                         return False, f"Thêm giỏ báo lỗi (Thành công: {s_count}, Lỗi: {f_count})"
 
-                # 2. Xử lý phiên chạy dở cũ (tự động gửi /stop để giải phóng)
+                # 2. Kiểm tra nếu bot báo lỗi kết thúc (Terminal Errors)
+                if "❌" in txt or "lỗi:" in txt_lower or "không đăng nhập được" in txt_lower or "cookie đăng nhập đã hết hạn" in txt_lower:
+                    return False, txt.split("\n")[0].strip()
+
+                if "đã hủy thêm giỏ hàng" in txt_lower:
+                    return False, "Bot báo đã hủy thêm giỏ hàng"
+
+                # 3. TIN NHẮN ĐANG TIẾN HÀNH THÊM GIỎ (⏳ Đang thêm... / resolve_proxy...)
+                # TUYỆT ĐỐI KHÔNG BẤM BẤT KỲ NÚT NÀO TRÊN TIN NHẮN NÀY (Vì nút duy nhất là nút HỦY!)
+                is_in_progress = (
+                    "đang thêm" in txt_lower or
+                    "đang xử lý" in txt_lower or
+                    "đang lấy" in txt_lower or
+                    "đang kết nối" in txt_lower or
+                    "resolve_proxy" in txt_lower or
+                    txt.strip().startswith("⏳")
+                )
+
+                if is_in_progress:
+                    now = time.time()
+                    if now - last_progress_log > 8:
+                        elapsed = round(now - start_time)
+                        self.log(f"⏳ Bot đang thực hiện thêm giỏ hàng (đã chờ {elapsed}s, KHÔNG bấm hủy)...", "info")
+                        last_progress_log = now
+                    # Đang chạy ngầm, kiên nhẫn đợi bot hoàn tất và sửa nội dung tin nhắn
+                    continue
+
+                # 4. Xử lý phiên chạy dở cũ (chỉ giải phóng nếu là phiên cũ của lệnh khác, KHÔNG giải phóng nếu bot đang addtocart)
                 if "bạn đang có phiên chạy dở" in txt_lower or "đang có phiên chạy dở" in txt_lower:
+                    if "/addtocart" in txt_lower or "thêm vào giỏ" in txt_lower:
+                        # Bot vẫn đang trong phiên addtocart, chờ bot hoàn tất
+                        await asyncio.sleep(3)
+                        continue
                     if not has_sent_stop:
-                        self.log("⚠️ Bot báo có phiên chạy dở cũ. Đang tự động gửi /stop để giải phóng...", "warning")
+                        self.log("⚠️ Bot báo có phiên chạy dở cũ khác. Đang gửi /stop để giải phóng...", "warning")
                         await client.send_message(bot_entity, "/stop")
                         has_sent_stop = True
                         await asyncio.sleep(2)
@@ -1266,12 +1303,9 @@ class DangKyShopeeManager:
                     else:
                         return False, "Kẹt phiên chạy dở"
 
-                # 3. Kiểm tra nếu bot báo lỗi
-                if "❌" in txt or "lỗi:" in txt_lower or "không đăng nhập được" in txt_lower or "cookie đăng nhập đã hết hạn" in txt_lower:
-                    return False, txt.split("\n")[0].strip()
-
-                # 3. Quét và xử lý các nút inline của bot
-                if m.buttons and not is_cart_result:
+                # 5. Nếu bot thực sự gửi bảng chọn phân loại sản phẩm (chỉ khi có câu nhắc chọn phân loại rõ ràng)
+                has_variant_prompt = any(vp in txt_lower for vp in ["chọn phân loại", "chọn mẫu", "chọn sản phẩm", "vui lòng chọn"])
+                if m.buttons and has_variant_prompt and not is_cart_result:
                     confirm_btn = self._find_confirm_button(m.buttons)
                     variant_btn, match_type = self._find_best_variant_button(m.buttons, target_variant)
 
@@ -1418,8 +1452,13 @@ class DangKyShopeeManager:
                     self.log(f"🎉 [Bot Xác Nhận]: {summary_text}", "success")
                     return True, summary_text
 
-                # 2. Xử lý phiên chạy dở cũ (tự động gửi /stop để giải phóng)
+                # 2. Xử lý phiên chạy dở cũ (chỉ gửi /stop nếu không phải là phiên addtocart)
                 if "bạn đang có phiên chạy dở" in txt_lower or "đang có phiên chạy dở" in txt_lower:
+                    if "/addtocart" in txt_lower or "thêm vào giỏ" in txt_lower:
+                        self.log("⏳ Phát hiện bot đang hoàn tất phiên thêm giỏ hàng, chờ bot xong trước khi thêm địa chỉ...", "info")
+                        await asyncio.sleep(4)
+                        continue
+
                     if not has_sent_stop:
                         self.log("⚠️ Bot báo có phiên chạy dở cũ. Đang tự động gửi /stop để giải phóng...", "warning")
                         await client.send_message(bot_entity, "/stop")
